@@ -7,8 +7,8 @@ from runner_manager_protonge import RunnerManagerProtonGE
 def main():
     set_process_name("launcher")
 
-    # make_prefix = PrefixManager("pruebaWine", "wmp11 quartz2", "/home/uni/.local/share/lutris/runners/wine/wine-11.0-amd64-wow64")
-    # make_prefix = PrefixManager("pruebaProton", "wmp11 quartz2", "/home/uni/.local/share/lutris/runners/proton/GE-Proton10-25/")
+    make_prefix = PrefixManager("pruebaWine", "wmp11 quartz2", "/home/uni/.local/share/lutris/runners/wine/wine-11.0-amd64-wow64")
+    make_prefix = PrefixManager("pruebaProton", "wmp11 quartz2", "/home/uni/.local/share/lutris/runners/proton/GE-Proton10-25/")
 
     runnerManager = RunnerManagerKron4ek()
     releases = runnerManager.get_runner_all_releases(4, 3)

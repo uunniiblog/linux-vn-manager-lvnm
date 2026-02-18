@@ -2,14 +2,15 @@ import os
 import subprocess
 import json
 import shutil
+import config
 from process_logger import ProcessLogger
 from pathlib import Path
 
 class PrefixManager:
     BASE_DIR = Path(__file__).parent.resolve()
-    CODEC_DIR = BASE_DIR / "vn_winestuff" / "codec.sh"
-    DATA_ROOT = Path.home() / ".local" / "share" / "lvnm" / "prefixes"
-    REGISTRY_FILE = DATA_ROOT / ".prefixes.json"
+    CODEC_SH = config.CODEC_SCRIPT
+    DATA_ROOT = config.PREFIXES_DIR
+    REGISTRY_FILE = config.PREFIXES_DATA
 
     def __init__(self, name, codecs, runner_path):
         self.name = name
@@ -75,12 +76,12 @@ class PrefixManager:
 
     def _run_codecs(self):
         """Installs codecs via external script"""
-        if not self.CODEC_DIR.exists():
-            print(f"Warning: Codec script missing at {self.CODEC_DIR}")
+        if not self.CODEC_SH.exists():
+            print(f"Warning: Codec script missing at {self.CODEC_SH}")
             return
 
         print(f"Installing codecs: {self.codecs}")
-        cmd = ["sh", str(self.CODEC_DIR)] + self.codecs.split()
+        cmd = ["sh", str(self.CODEC_SH)] + self.codecs.split()
 
         ProcessLogger.run(cmd, self.env, suppress_codes=[1])
         print("Codecs installation completed.")
@@ -110,6 +111,7 @@ class PrefixManager:
 
     def delete_prefix(self):
         """Deletes the prefix folder"""
+        # TODO: add validation if games with prefix active
         # Remove the directory
         if self.prefix_path.exists():
             shutil.rmtree(self.prefix_path)

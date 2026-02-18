@@ -59,7 +59,7 @@ class RunnerManagerInterface:
     @staticmethod
     def extract_tar(tar_path, dest_dir, tag, compression="gz"):
         """Handles extraction and cleanup for .tar.gz (gz) or .tar.xz (xz)"""
-        print(f"Extracting...")
+        print(f"\nExtracting...")
         mode = f"r:{compression}"
         try:
             with tarfile.open(tar_path, mode) as tar:

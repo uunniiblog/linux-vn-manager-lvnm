@@ -1,12 +1,13 @@
+import config
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
 
 class RunnerManagerProtonGE(RunnerManagerInterface):
-    DATA_ROOT = Path.home() / ".local" / "share" / "lvnm" / "runners" / "proton"
-    API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
+    PROTON_RUNNER_DIR = config.PROTON_RUNNERS_DIR
+    API_URL = config.PROTONGE_API_URL
 
     def __init__(self):
-        self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        self.PROTON_RUNNER_DIR.mkdir(parents=True, exist_ok=True)
 
     def get_runner_all_releases(self, page=1, per_page=30):
         """ Fetches all GE-Proton releases from GitHub """
@@ -47,10 +48,10 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
 
         target_asset = assets[target_name]
         download_url = target_asset["browser_download_url"]
-        tar_path = self.DATA_ROOT / target_name
+        tar_path = self.PROTON_RUNNER_DIR / target_name
         
         if RunnerManagerInterface.download_file(download_url, tar_path):
-            RunnerManagerInterface.extract_tar(tar_path, self.DATA_ROOT, tag, compression="gz")
+            RunnerManagerInterface.extract_tar(tar_path, self.PROTON_RUNNER_DIR, tag, compression="gz")
 
     def get_release_info(self, release_data):
         """ Lists assets for the specific Proton-GE release """

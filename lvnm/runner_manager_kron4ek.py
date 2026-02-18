@@ -1,12 +1,13 @@
+import config
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
 
 class RunnerManagerKron4ek(RunnerManagerInterface):
-    DATA_ROOT = Path.home() / ".local" / "share" / "lvnm" / "runners" / "wine"
-    API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
+    WINE_RUNNERS_PATH = config.WINE_RUNNERS_DIR
+    API_URL = config.KRON4EK_API_URL
 
     def __init__(self):
-        self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        self.WINE_RUNNERS_PATH.mkdir(parents=True, exist_ok=True)
 
     def get_runner_all_releases(self, page=1, per_page=30):
         """ Fetches wine releases and identifies arch availability """
@@ -56,10 +57,10 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
             return
 
         target_asset = assets[target_name]
-        tar_path = self.DATA_ROOT / target_name
+        tar_path = self.WINE_RUNNERS_PATH / target_name
         
         if self.download_file(target_asset["browser_download_url"], tar_path):
-            self.extract_tar(tar_path, self.DATA_ROOT, tag, compression="xz")
+            self.extract_tar(tar_path, self.WINE_RUNNERS_PATH, tag, compression="xz")
 
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """
