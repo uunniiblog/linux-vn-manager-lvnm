@@ -3,10 +3,14 @@ import json
 import tarfile
 import urllib.request
 import urllib.error
+import config
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 class RunnerManagerInterface:
+    PROTON_DIR = config.PROTON_RUNNERS_DIR
+    WINE_DIR = config.WINE_RUNNERS_DIR
+
     @abstractmethod
     def get_runner_all_releases(self): pass
 
@@ -74,3 +78,15 @@ class RunnerManagerInterface:
         except Exception as e:
             print(f"[Error] Extraction failed: {e}")
             return False
+    
+    @staticmethod
+    def is_runner_valid(runner_path):
+        """Checks if the runner path exists and is functional"""
+        path = Path(runner_path)
+        if not path.exists():
+            return False
+        
+        if "wine" in str(path).lower():
+            return (path / "bin" / "wine").exists()
+            
+        return True

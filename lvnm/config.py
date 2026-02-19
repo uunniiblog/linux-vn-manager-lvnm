@@ -3,6 +3,7 @@ from pathlib import Path
 
 VERSION = 'v0.0.1'
 GIT_URL = ''
+LOG_LEVEL = "debug"
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()

@@ -2,15 +2,15 @@ import sys
 import subprocess
 
 class ProcessLogger:
-    # Default filters for umu/Proton noise
+    # Filter lines not wanted to be logged
     DEFAULT_FILTERS = [
-        "INFO: umu-launcher",
-        "INFO: steamrt3",
-        "ProtonFixes",
-        "WARNING: Executable not found: winecfg",
-        "Proton: Executable is inside wine prefix",
-        "wineserver: using server-side synchronization.",
-        "wine: using kernel-base synchronization."
+        # "INFO: umu-launcher",
+        # "INFO: steamrt3",
+        # "ProtonFixes",
+        # "WARNING: Executable not found: winecfg",
+        # "Proton: Executable is inside wine prefix",
+        # "wineserver: using server-side synchronization.",
+        # "wine: using kernel-base synchronization."
     ]
 
     @staticmethod
@@ -45,5 +45,6 @@ class ProcessLogger:
                 
                 if check:
                     raise subprocess.CalledProcessError(proc.returncode, cmd)
-            
+                    
+            print(f"proc.returncode {proc.returncode}")
             return proc.returncode

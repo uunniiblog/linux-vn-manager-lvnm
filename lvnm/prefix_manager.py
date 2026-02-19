@@ -145,3 +145,16 @@ class PrefixManager:
                 if not dest.exists():
                     os.symlink(font, dest)
         return True
+
+    @staticmethod
+    def get_prefix_info(name):
+        """Returns the dictionary for a specific prefix if it exists"""
+        if not Path(config.PREFIXES_DATA).exists():
+            return None
+            
+        try:
+            with open(config.PREFIXES_DATA, "r") as f:
+                registry = json.load(f)
+                return registry.get(name)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return None
