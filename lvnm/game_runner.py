@@ -4,7 +4,6 @@ import config
 from pathlib import Path
 from model.game_card import GameCard
 from process_logger import ProcessLogger
-# import subprocess # Depending on how ProcessLogger is implemented
 
 class GameRunner:
     PREFIXES_DATA = Path(config.PREFIXES_DATA)
@@ -85,6 +84,7 @@ class GameRunner:
     def is_running(self) -> bool:
         """Checks if the game process is currently active."""
         # TODO
+        return self.is_running
 
     def stop(self):
         """Gracefully attempts to terminate the running game process."""
@@ -113,6 +113,7 @@ class GameRunner:
         self.env["GAMEID"] = self.game.umu_gameid
         self.env["STORE"] = self.game.umu_store
 
+        # TODO: fix this later
         if GameRunner.LOG_LEVEL.lower() != "debug":
             self.env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             self.env["G_MESSAGES_DEBUG"] = ""
