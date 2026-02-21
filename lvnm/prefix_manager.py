@@ -3,8 +3,10 @@ import subprocess
 import json
 import shutil
 import config
-from execution_manager import ExecutionManager
 from pathlib import Path
+from model.prefix import Prefix
+from execution_manager import ExecutionManager
+
 
 class PrefixManager:
     CODEC_SH = config.CODEC_SCRIPT
@@ -27,12 +29,14 @@ class PrefixManager:
         """Attempts to populate object attributes from the JSON file."""
         info = self.get_prefix_info(self.name)
         if info:
-            self.runner_path = Path(info["runner"])
-            self.type = info["type"]
-            self.codecs = info.get("codecs", "")
+            self.card = Prefix.from_dict(self.name, info)
+            self.runner_path = Path(self.card.runner)
+            self.type = self.card.type
+            self.codecs = self.card.codecs
+            self.winetricks = self.card.winetricks
             self._setup_env()
             return True
-            
+
         print(f"Prefix {self.name} does not exist yet")
         return False
 
@@ -52,12 +56,13 @@ class PrefixManager:
             self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
             self.runner_command = [str(wine_bin)]
 
-    def create_prefix(self, runner_path: str, codecs: str = ""):
+    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = ""):
         """Physical creation and initialization of the prefix."""
         print(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
         self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
         self.codecs = codecs
+        self.winetricks = winetricks
         self._setup_env()
 
         try:
@@ -70,6 +75,9 @@ class PrefixManager:
 
             if self.codecs:
                 self.install_codecs(self.codecs)
+
+            if self.winetricks:
+                self.install_winetricks(self.winetricks)
 
             self._save_metadata()
             print(f"Prefix {self.name} ready.")
@@ -97,6 +105,24 @@ class PrefixManager:
         # Update local state and save
         new_codecs = set(self.codecs.split()) | set(codecs_list.split())
         self.codecs = " ".join(sorted(new_codecs))
+        self._save_metadata()
+        return True
+
+    def install_winetricks(self, winetricks_list: str):
+        """Installs winetricks components into the prefix."""
+        winetricks_bin = shutil.which("winetricks")
+        if not winetricks_bin:
+            print("[Error] winetricks not found in PATH.")
+            return False
+
+        print(f"Installing winetricks into {self.name}: {winetricks_list}")
+        cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
+
+        ExecutionManager.run(cmd, self.env, wait=True)
+        
+        # Update local state and save
+        new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
+        self.winetricks = " ".join(sorted(new_tricks))
         self._save_metadata()
         return True
 
@@ -128,13 +154,15 @@ class PrefixManager:
                     json_file = json.load(f)
                 except json.JSONDecodeError: pass
 
-        json_file[self.name] = {
-            "name": self.name,
-            "path": str(self.prefix_path),
-            "runner": str(self.runner_path),
-            "type": self.type,
-            "codecs": self.codecs,
-        }
+        card = Prefix(
+            name=self.name,
+            path=str(self.prefix_path),
+            runner=str(self.runner_path),
+            type=self.type,
+            codecs=self.codecs,
+            winetricks=self.winetricks
+        )
+        json_file[self.name] = card.to_dict()
 
         with open(self.PREFIXES_FILE, "w") as f:
             json.dump(json_file, f, indent=4)

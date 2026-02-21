@@ -6,10 +6,33 @@ from runner_manager_kron4ek import RunnerManagerKron4ek
 from runner_manager_protonge import RunnerManagerProtonGE
 from game_manager import GameManager
 from game_runner import GameRunner
+from system_utils import SystemUtils
 
 
 def main():
     set_process_name("launcher")
+
+    sys_data = SystemUtils.get_system_info()
+    software = SystemUtils.get_software_support()
+    print(sys_data)
+    print(software)
+
+    # istoria_session = GameRunner("Istoria")
+
+    # if istoria_session.run():
+    #     print("Launching...")
+        
+    #     # Keep program alive to keep game alive
+    #     try:
+    #         while istoria_session.is_running():
+    #             print("game running...")
+    #             time.sleep(1) # Wait and keep checking
+    #     except KeyboardInterrupt:
+    #         print("\nShutting down...")
+    #         istoria_session.stop()
+        
+    #     # After the game closes, check the exit code
+    #     print(f"Game exited with code: {istoria_session.process.returncode}")
 
     # GameManager.add_game("/media/pepega/STRED4TB/VNs/水葬銀貨のイストリア/install/水葬銀貨のイストリア/水葬銀貨のイストリア.exe", "Istoria", "wine10.20-wow64-prueba2", "v20471")
     # GameManager.update_game("Istoria", {
@@ -19,12 +42,20 @@ def main():
     # prefix = PrefixManager("wine10.20-wow64-prueba")
     # prefix.rename_prefix("wine10.20-wow64")
 
-    prefix = PrefixManager("wineamd64")
+    
+
+    prefix = PrefixManager("winetricks-test")    
     prefix.delete_prefix()
     prefix.create_prefix(
         runner_path="/home/uni/.local/share/lvnm/runners/wine/wine-10.17-amd64", 
-        codecs="wmp11 quartz2"
+        codecs="wmp11",
+        winetricks="vcrun2012 ffdshow"
     )
+    prefix.install_codecs("quartz2")
+    prefix.install_winetricks("wmp9 wmp11")
+    prefix.install_winetricks("wmp9")
+    print(PrefixManager.get_prefix_info("winetricks-test"))
+
 
     # # prefix.delete_prefix()
     # GameManager.update_game("Istoria", {
@@ -32,23 +63,6 @@ def main():
     #     "envvar": {"LANG": "ja_JP.UTF-8", "TZ": "Asia/Tokyo"},
     #     "prefix": "pruebaWine"
     # })
-
-    istoria_session = GameRunner("Istoria")
-
-    if istoria_session.run():
-        print("Launching...")
-        
-        # Keep program alive to keep game alive
-        try:
-            while istoria_session.is_running():
-                print("game running...")
-                time.sleep(1) # Wait and keep checking
-        except KeyboardInterrupt:
-            print("\nShutting down...")
-            istoria_session.stop()
-        
-        # After the game closes, check the exit code
-        print(f"Game exited with code: {istoria_session.process.returncode}")
 
     # make_prefix = PrefixManager("Nitroplusnew", "", "/home/uni/.local/share/lvnm/runners/proton/GE-Proton10-24")
 
