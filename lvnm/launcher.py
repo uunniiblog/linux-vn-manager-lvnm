@@ -1,5 +1,11 @@
 import ctypes
 import ctypes.util
+import sys
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTranslator, QLocale
+from ui.main_window import MainWindow
+
+# Remove later:
 import time
 from prefix_manager import PrefixManager
 from runner_manager_kron4ek import RunnerManagerKron4ek
@@ -10,12 +16,27 @@ from system_utils import SystemUtils
 
 
 def main():
-    set_process_name("launcher")
-
     sys_data = SystemUtils.get_system_info()
     software = SystemUtils.get_software_support()
     print(sys_data)
     print(software)
+
+    app = QApplication(sys.argv)
+    
+    # TODO
+    translator = QTranslator()
+    if translator.load(QLocale.system(), "lvnm", "_", "locale"):
+        app.installTranslator(translator)
+
+    set_process_name("launcher")
+
+    # Launch UI
+    window = MainWindow()
+    window.show()
+    
+    sys.exit(app.exec())
+
+    # TESTING SHIT
 
     # istoria_session = GameRunner("Istoria")
 
@@ -44,17 +65,17 @@ def main():
 
     
 
-    prefix = PrefixManager("winetricks-test")    
-    prefix.delete_prefix()
-    prefix.create_prefix(
-        runner_path="/home/uni/.local/share/lvnm/runners/wine/wine-10.17-amd64", 
-        codecs="wmp11",
-        winetricks="vcrun2012 ffdshow"
-    )
-    prefix.install_codecs("quartz2")
-    prefix.install_winetricks("wmp9 wmp11")
-    prefix.install_winetricks("wmp9")
-    print(PrefixManager.get_prefix_info("winetricks-test"))
+    # prefix = PrefixManager("winetricks-test")    
+    # prefix.delete_prefix()
+    # prefix.create_prefix(
+    #     runner_path="/home/uni/.local/share/lvnm/runners/wine/wine-10.17-amd64", 
+    #     codecs="wmp11",
+    #     winetricks="vcrun2012 ffdshow"
+    # )
+    # prefix.install_codecs("quartz2")
+    # prefix.install_winetricks("wmp9 wmp11")
+    # prefix.install_winetricks("wmp9")
+    # print(PrefixManager.get_prefix_info("winetricks-test"))
 
 
     # # prefix.delete_prefix()

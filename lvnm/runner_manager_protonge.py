@@ -27,7 +27,7 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
         
         return filtered_releases
     
-    def get_runner_download(self, release_data):
+    def get_runner_download(self, release_data, progress_callback=None):
         """ Downloads the .tar.gz for the specific GE tag """
         tag = release_data['tag']
         print(f"Preparing to download {tag}...")
@@ -48,10 +48,10 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
 
         target_asset = assets[target_name]
         download_url = target_asset["browser_download_url"]
-        tar_path = self.PROTON_RUNNER_DIR / target_name
+        dest_path = self.PROTON_RUNNER_DIR / target_name
         
-        if RunnerManagerInterface.download_file(download_url, tar_path):
-            RunnerManagerInterface.extract_tar(tar_path, self.PROTON_RUNNER_DIR, tag, compression="gz")
+        if RunnerManagerInterface.download_file(download_url, dest_path, progress_callback=progress_callback):
+            RunnerManagerInterface.extract_tar(dest_path, self.PROTON_RUNNER_DIR, tag, compression="gz")
 
     def get_release_info(self, release_data):
         """ Lists assets for the specific Proton-GE release """

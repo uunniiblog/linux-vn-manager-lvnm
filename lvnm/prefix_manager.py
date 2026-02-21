@@ -242,3 +242,10 @@ class PrefixManager:
             return None
         with open(config.PREFIXES_DATA, "r") as f:
             return json.load(f).get(name)
+
+    @staticmethod
+    def get_prefix_json():
+        if not Path(config.PREFIXES_DATA).exists():
+            return None
+        with open(config.PREFIXES_DATA, "r") as f:
+            return json.load(f)

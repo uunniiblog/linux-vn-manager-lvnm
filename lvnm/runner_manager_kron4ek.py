@@ -34,7 +34,7 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
                 })
         return filtered_releases
 
-    def get_runner_download(self, release_data, arch="wow64"):
+    def get_runner_download(self, release_data, arch="wow64", progress_callback=None):
         """ Downloads the selected arch (wow64/amd64), preferring vanilla builds """
         tag = release_data['tag']
         key = "has_amd64" if arch == "amd64" else "has_wow64"
@@ -57,10 +57,10 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
             return
 
         target_asset = assets[target_name]
-        tar_path = self.WINE_RUNNERS_PATH / target_name
+        dest_path = self.WINE_RUNNERS_PATH / target_name
         
-        if self.download_file(target_asset["browser_download_url"], tar_path):
-            self.extract_tar(tar_path, self.WINE_RUNNERS_PATH, tag, compression="xz")
+        if self.download_file(target_asset["browser_download_url"], dest_path, progress_callback=progress_callback):
+            self.extract_tar(dest_path, self.WINE_RUNNERS_PATH, tag, compression="xz")
 
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """

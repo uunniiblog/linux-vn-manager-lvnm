@@ -32,7 +32,7 @@ class RunnerManagerInterface:
         return None
 
     @staticmethod
-    def download_file(url, dest_path):
+    def download_file(url, dest_path, progress_callback=None):
         """Helper to download a file with a progress bar"""
         try:
             print(f"Downloading: {url}...")
@@ -52,6 +52,11 @@ class RunnerManagerInterface:
                         if total_size > 0:
                             percent = downloaded * 100 / total_size
                             print(f"\rProgress: [{percent:.1f}%] {downloaded}/{total_size} bytes", end='')
+
+                        # Gui
+                        if progress_callback and total_size > 0:
+                            percent = int(downloaded * 100 / total_size)
+                            progress_callback(percent)
 
             return True
         except Exception as e:
@@ -90,3 +95,43 @@ class RunnerManagerInterface:
             return (path / "bin" / "wine").exists()
             
         return True
+
+    @staticmethod
+    def get_local_runners(runner_dir, prefixes_data):
+        """Returns a list of folder names in the runners directory"""
+        if not runner_dir.exists():
+            return []
+
+        runner_usage = {}
+        for prefix_name, info in prefixes_data.items():
+            runner_path = info.get("runner", "")
+            if runner_path:
+                # Get the folder name from the end of the path
+                folder_name = Path(runner_path).name
+                if folder_name not in runner_usage:
+                    runner_usage[folder_name] = []
+                runner_usage[folder_name].append(prefix_name)
+
+        display_list = []
+        for d in runner_dir.iterdir():
+            if d.is_dir():
+                folder_name = d.name
+                prefixes = runner_usage.get(folder_name, [])
+                
+                if prefixes:
+                    # Format: runner-name (prefix1, prefix2)
+                    display_list.append(f"{folder_name} ({', '.join(prefixes)})")
+                else:
+                    display_list.append(folder_name)
+        
+        return sorted(display_list, reverse=True)
+
+    @staticmethod
+    def delete_runner(runner_dir, folder_name):
+        """Deletes a runner folder from disk"""
+        import shutil
+        target = runner_dir / folder_name
+        if target.exists() and target.is_dir():
+            shutil.rmtree(target)
+            return True
+        return False
