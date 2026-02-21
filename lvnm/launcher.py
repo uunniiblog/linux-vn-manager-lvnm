@@ -1,5 +1,6 @@
 import ctypes
 import ctypes.util
+import time
 from prefix_manager import PrefixManager
 from runner_manager_kron4ek import RunnerManagerKron4ek
 from runner_manager_protonge import RunnerManagerProtonGE
@@ -10,27 +11,46 @@ from game_runner import GameRunner
 def main():
     set_process_name("launcher")
 
+    # GameManager.add_game("/media/pepega/STRED4TB/VNs/水葬銀貨のイストリア/install/水葬銀貨のイストリア/水葬銀貨のイストリア.exe", "Istoria", "wine10.20-wow64-prueba2", "v20471")
     # GameManager.update_game("Istoria", {
-    #     "vndb": "v12345",
     #     "envvar": {"LANG": "ja_JP.UTF-8", "TZ": "Asia/Tokyo"}
     # })
 
-    # make_prefix = PrefixManager("Nitroplusnew", "", "/home/uni/.local/share/lvnm/runners/proton/GE-Proton10-24")
+    # prefix = PrefixManager("wine10.20-wow64-prueba")
+    # prefix.rename_prefix("wine10.20-wow64")
 
-    # GameManager.update_game("Demonbane", {
-    #     "envvar": {"LANG": "ja_JP.UTF-8", "PROTON_MEDIA_USE_GST": "1"},
-    #     "prefix": "Nitroplusnew"
+    prefix = PrefixManager("wineamd64")
+    prefix.delete_prefix()
+    prefix.create_prefix(
+        runner_path="/home/uni/.local/share/lvnm/runners/wine/wine-10.17-amd64", 
+        codecs="wmp11 quartz2"
+    )
+
+    # # prefix.delete_prefix()
+    # GameManager.update_game("Istoria", {
+    #     "vndb": "v12345",
+    #     "envvar": {"LANG": "ja_JP.UTF-8", "TZ": "Asia/Tokyo"},
+    #     "prefix": "pruebaWine"
     # })
 
-    # GameManager.update_game("Demonbane", {"gamescope": {"enabled": "true", "parameters": "-F fsr -w 1280 -h 960 -f"}})
+    istoria_session = GameRunner("Istoria")
 
-    # GameRunner.run_game("Istoria")
-    demonbane_session = GameRunner("Demonbane")
-    print("Executing launch sequence...")
-    launched = demonbane_session.run()
+    if istoria_session.run():
+        print("Launching...")
+        
+        # Keep program alive to keep game alive
+        try:
+            while istoria_session.is_running():
+                print("game running...")
+                time.sleep(1) # Wait and keep checking
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            istoria_session.stop()
+        
+        # After the game closes, check the exit code
+        print(f"Game exited with code: {istoria_session.process.returncode}")
 
-    # make_prefix = PrefixManager("pruebaWine", "wmp11 quartz2", "/home/uni/.local/share/lvnm/runners/wine/wine-10.20-amd64-wow64")
-    # make_prefix = PrefixManager("pruebaProton", "wmp11 quartz2", "/home/uni/.local/share/lvnm/runners/proton/GE-Proton10-24")
+    # make_prefix = PrefixManager("Nitroplusnew", "", "/home/uni/.local/share/lvnm/runners/proton/GE-Proton10-24")
 
     # runnerManager = RunnerManagerKron4ek()
     # releases = runnerManager.get_runner_all_releases(4, 3)

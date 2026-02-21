@@ -119,3 +119,25 @@ class GameManager:
                 json.dump(data, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"[Error] Failed to save to {GameManager.GAME_FILE}: {e}")
+
+    @staticmethod
+    def update_prefix_references(old_name: str, new_name: str):
+        """Updates all games in the registry that use a specific prefix."""
+        if not GameManager.GAME_FILE.exists():
+            return
+
+        print(f"Updating game references: '{old_name}' -> '{new_name}'")
+        
+        games_data = GameManager._load_data()
+
+        updated_count = 0
+        for game_name, details in games_data.items():
+            if details.get("prefix") == old_name:
+                details["prefix"] = new_name
+                updated_count += 1
+        
+        if updated_count > 0:
+            GameManager._save_data(games_data)
+            print(f"Updated {updated_count} game(s) to use new prefix name.")
+        else:
+            print("No games were using this prefix.")

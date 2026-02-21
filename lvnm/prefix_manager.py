@@ -3,140 +3,110 @@ import subprocess
 import json
 import shutil
 import config
-from process_logger import ProcessLogger
+from execution_manager import ExecutionManager
 from pathlib import Path
 
 class PrefixManager:
-    BASE_DIR = Path(__file__).parent.resolve()
     CODEC_SH = config.CODEC_SCRIPT
     DATA_ROOT = config.PREFIXES_DIR
-    REGISTRY_FILE = config.PREFIXES_DATA
+    PREFIXES_FILE = config.PREFIXES_DATA
 
-    def __init__(self, name, codecs, runner_path):
+    def __init__(self, name: str):
         self.name = name
-        self.codecs = codecs
-        self.runner_path = Path(runner_path)
         self.prefix_path = self.DATA_ROOT / name
+        self.runner_path = None
+        self.type = None
+        self.codecs = ""
         self.env = os.environ.copy()
         self.env["WINEPREFIX"] = str(self.prefix_path)
-
-        try:
-            # Determine runner type and configure environment
-            if 'proton' in str(self.runner_path).lower():
-                self._setup_umu()
-            else:
-                self._setup_wine()
-
-            # Prepare directory
-            self.prefix_path.mkdir(parents=True, exist_ok=True)
-
-            # Create prefix
-            self._initialize_prefix()
-            
-            # Install codecs with vn_winestuff
-            if self.codecs:
-                self._run_codecs()
-
-            # Save json with current prefixes
-            self._save_metadata()
-            
-            print(f"--- Prefix {self.name} successfully created ---")
-
-        except Exception as e:
-            print(f"\n[FATAL ERROR] Creation failed: {e}")
-            # Clean up partial prefix if drive_c wasn't even created
-            if self.prefix_path.exists() and not (self.prefix_path / "drive_c").exists():
-                shutil.rmtree(self.prefix_path)
-
-
-    def _setup_umu(self):
-        """Setup env vars for Proton/UMU"""
-        self.env["PROTONPATH"] = str(self.runner_path)
-        self.env["GAMEID"] = "umu-default"
-        self.env["STORE"] = "none"
-        self.env["WINE"] = "umu-run"
-        self.runner_command = ["umu-run"]
-
-    def _setup_wine(self):
-        """Setup env vars for Standard Wine"""
-        wine_bin = self.runner_path / "bin" / "wine"
-        if not wine_bin.exists():
-            raise FileNotFoundError(f"Wine binary not found at {wine_bin}")
         
-        self.env["WINE"] = str(wine_bin)
-        self.runner_command = [str(wine_bin)]
-        self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
+        # Automatically load data if it exists
+        self._load_from_json()
 
-    def _initialize_prefix(self):
-        """Builds the prefix using wineboot"""
-        print("Initializing prefix (wineboot)...")
-        cmd = self.runner_command + ["wineboot", "-u"]
-        
-        ProcessLogger.run(cmd, self.env)
+    def _load_from_json(self):
+        """Attempts to populate object attributes from the JSON file."""
+        info = self.get_prefix_info(self.name)
+        if info:
+            self.runner_path = Path(info["runner"])
+            self.type = info["type"]
+            self.codecs = info.get("codecs", "")
+            self._setup_env()
+            return True
+            
+        print(f"Prefix {self.name} does not exist yet")
+        return False
 
-    def _run_codecs(self):
-        """Installs codecs via external script"""
-        if not self.CODEC_SH.exists():
-            print(f"Warning: Codec script missing at {self.CODEC_SH}")
+    def _setup_env(self):
+        """Configures the environment based on current runner_path and type."""
+        if not self.runner_path:
             return
 
-        print(f"Installing codecs: {self.codecs}")
-        cmd = ["sh", str(self.CODEC_SH)] + self.codecs.split()
+        if self.type == "proton":
+            self.env["PROTONPATH"] = str(self.runner_path)
+            self.env["GAMEID"] = "umu-default"
+            self.env["STORE"] = "none"
+            self.runner_command = ["umu-run"]
+        else:
+            wine_bin = self.runner_path / "bin" / "wine"
+            self.env["WINE"] = str(wine_bin)
+            self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
+            self.runner_command = [str(wine_bin)]
 
-        ProcessLogger.run(cmd, self.env, suppress_codes=[1])
-        print("Codecs installation completed.")
+    def create_prefix(self, runner_path: str, codecs: str = ""):
+        """Physical creation and initialization of the prefix."""
+        print(f"--- Creating Prefix: {self.name} ---")
+        self.runner_path = Path(runner_path)
+        self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
+        self.codecs = codecs
+        self._setup_env()
 
-    def _save_metadata(self):
-        self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
-        registry = {}
-        
-        if self.REGISTRY_FILE.exists():
-            try:
-                with open(self.REGISTRY_FILE, "r") as f:
-                    registry = json.load(f)
-            except json.JSONDecodeError:
-                pass
-
-        registry[self.name] = {
-            "name": self.name,
-            "path": str(self.prefix_path),
-            "runner": str(self.runner_path),
-            "type": "proton" if "PROTONPATH" in self.env else "wine",
-            "codecs": self.codecs,
-        }
-
-        with open(self.REGISTRY_FILE, "w") as f:
-            json.dump(registry, f, indent=4)
-        print(f"Registry updated: {self.REGISTRY_FILE}")
-
-    def delete_prefix(self):
-        """Deletes the prefix folder"""
-        # TODO: add validation if games with prefix active
-        # Remove the directory
-        if self.prefix_path.exists():
-            shutil.rmtree(self.prefix_path)
-            print(f"Deleted folder: {self.prefix_path}")
-
-        # Update the JSON registry
-        if self.REGISTRY_FILE.exists():
-            with open(self.REGISTRY_FILE, "r") as f:
-                registry = json.load(f)
+        try:
+            self.prefix_path.mkdir(parents=True, exist_ok=True)
             
-            if self.name in registry:
-                del registry[self.name]
-                with open(self.REGISTRY_FILE, "w") as f:
-                    json.dump(registry, f, indent=4)
-                print(f"Removed '{self.name}' from registry.")
+            print("Initializing prefix (wineboot)...")
+            cmd = self.runner_command + ["wineboot", "-u"]
+            #ProcessLogger.run(cmd, self.env)
+            ExecutionManager.run(cmd, self.env, wait=True)
+
+            if self.codecs:
+                self.install_codecs(self.codecs)
+
+            self._save_metadata()
+            print(f"Prefix {self.name} ready.")
+            return True
+
+        except Exception as e:
+            print(f"[Error] Creation failed: {e}")
+            # Clean up if it's a 'zombie' prefix (dir exists but no drive_c)
+            if self.prefix_path.exists() and not (self.prefix_path / "drive_c").exists():
+                shutil.rmtree(self.prefix_path)
+            return False
+
+    def install_codecs(self, codecs_list: str):
+        """Installs or updates codecs in an existing prefix."""
+        if not self.CODEC_SH.exists():
+            print(f"Warning: Codec script missing at {self.CODEC_SH}")
+            return False
+
+        print(f"Installing codecs into {self.name}: {codecs_list}")
+        cmd = ["sh", str(self.CODEC_SH)] + codecs_list.split()
+
+        #ProcessLogger.run(cmd, self.env, suppress_codes=[1])
+        ExecutionManager.run(cmd, self.env, wait=True, suppress_codes=[1])
         
+        # Update local state and save
+        new_codecs = set(self.codecs.split()) | set(codecs_list.split())
+        self.codecs = " ".join(sorted(new_codecs))
+        self._save_metadata()
         return True
 
-    def add_fonts(self, fonts_source_path):
-        """ Links fonts from a source folder into the Wine prefix """
+    def add_fonts(self, fonts_source_path: str):
+        """Links fonts from a source folder into the Wine prefix."""
         target_dir = self.prefix_path / "drive_c" / "windows" / "Fonts"
         source_path = Path(fonts_source_path)
         
-        if not source_path.exists():
-            print("Source fonts path does not exist.")
+        if not target_dir.exists():
+            print(f"Error: Prefix {self.name} doesn't seem to be initialized (no Font dir).")
             return False
 
         for font in source_path.iterdir():
@@ -144,17 +114,103 @@ class PrefixManager:
                 dest = target_dir / font.name
                 if not dest.exists():
                     os.symlink(font, dest)
+        print(f"Fonts linked to {self.name}")
         return True
 
+    def _save_metadata(self):
+        """Writes current state to the json file."""
+        self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        json_file = {}
+        
+        if self.PREFIXES_FILE.exists():
+            with open(self.PREFIXES_FILE, "r") as f:
+                try:
+                    json_file = json.load(f)
+                except json.JSONDecodeError: pass
+
+        json_file[self.name] = {
+            "name": self.name,
+            "path": str(self.prefix_path),
+            "runner": str(self.runner_path),
+            "type": self.type,
+            "codecs": self.codecs,
+        }
+
+        with open(self.PREFIXES_FILE, "w") as f:
+            json.dump(json_file, f, indent=4)
+
+    def delete_prefix(self):
+        """Wipes the folder and removes from json."""
+        if self.prefix_path.exists():
+            shutil.rmtree(self.prefix_path)
+            
+        if self.PREFIXES_FILE.exists():
+            with open(self.PREFIXES_FILE, "r") as f:
+                json_file = json.load(f)
+            if self.name in json_file:
+                del json_file[self.name]
+                with open(self.PREFIXES_FILE, "w") as f:
+                    json.dump(json_file, f, indent=4)
+        return True
+
+    def rename_prefix(self, new_name: str):
+        """Renames the prefix folder and updates the json entry."""
+        if self.get_prefix_info(new_name):
+            print(f"Error: A prefix named '{new_name}' already exists in the json_file.")
+            return False
+
+        from game_manager import GameManager
+        old_name = self.name
+        old_path = self.prefix_path
+        new_path = self.DATA_ROOT / new_name
+
+        try:
+            # Rename directory
+            if old_path.exists():
+                old_path.rename(new_path)
+                print(f"Directory renamed: {old_path.name} -> {new_path.name}")
+            else:
+                print(f"[Debug] Physical path {old_path} not found, updating json_file only.")
+
+            # Update variables
+            self.name = new_name
+            self.prefix_path = new_path
+            self.env["WINEPREFIX"] = str(new_path)
+
+            # Rewrite json file
+            if self.PREFIXES_FILE.exists():
+                with open(self.PREFIXES_FILE, "r") as f:
+                    try:
+                        json_file = json.load(f)
+                    except json.JSONDecodeError:
+                        json_file = {}
+
+                if old_name in json_file:
+                    # Extract the old data and update the specific fields
+                    prefix_data = json_file.pop(old_name)
+                    prefix_data["name"] = new_name
+                    prefix_data["path"] = str(new_path)
+                    
+                    # Insert under the new key
+                    json_file[new_name] = prefix_data
+
+                    with open(self.PREFIXES_FILE, "w") as f:
+                        json.dump(json_file, f, indent=4)
+                    
+                    print(f"json_file updated: '{old_name}' is now '{new_name}'")
+                    
+                    # Update games to new prefix name
+                    GameManager.update_prefix_references(old_name, new_name)
+
+            return True
+
+        except Exception as e:
+            print(f"[Error] Failed to rename prefix: {e}")
+            return False
+
     @staticmethod
-    def get_prefix_info(name):
-        """Returns the dictionary for a specific prefix if it exists"""
+    def get_prefix_info(name: str):
         if not Path(config.PREFIXES_DATA).exists():
             return None
-            
-        try:
-            with open(config.PREFIXES_DATA, "r") as f:
-                registry = json.load(f)
-                return registry.get(name)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return None
+        with open(config.PREFIXES_DATA, "r") as f:
+            return json.load(f).get(name)

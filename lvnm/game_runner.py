@@ -1,9 +1,10 @@
 import os
 import json
 import config
+import subprocess
 from pathlib import Path
 from model.game_card import GameCard
-from process_logger import ProcessLogger
+from execution_manager import ExecutionManager
 
 class GameRunner:
     PREFIXES_DATA = Path(config.PREFIXES_DATA)
@@ -53,8 +54,10 @@ class GameRunner:
         is_proton = "proton" in str(runner_path).lower()
         
         if is_proton:
+            self.is_proton = True
             self.cmd = self._handle_proton(runner_path)
         else:
+            self.is_proton = False
             self.cmd = self._handle_wine(runner_path)
 
         if not self.cmd:
@@ -77,23 +80,11 @@ class GameRunner:
 
         self._log_run_command(Path(self.prefix_info["runner"]))
 
-        self.process = ProcessLogger.run(self.cmd, self.env)
+        #self.process = ProcessLogger.run(self.cmd, self.env)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False)
+
         print(f"self.process {self.process}")
         return True
-
-    def is_running(self) -> bool:
-        """Checks if the game process is currently active."""
-        # TODO
-        return self.is_running
-
-    def stop(self):
-        """Gracefully attempts to terminate the running game process."""
-        if self.is_running():
-            print(f"Stopping game '{self.name}'...")
-            self.process.terminate()
-            # self.process.kill() # Use kill() if terminate() is too weak
-        else:
-            print(f"Game '{self.name}' is not currently running.")
 
     def _handle_wine(self, runner_path: Path) -> list:
         """Specific logic for Wine runners"""
@@ -112,12 +103,6 @@ class GameRunner:
         self.env["PROTONPATH"] = str(runner_path)
         self.env["GAMEID"] = self.game.umu_gameid
         self.env["STORE"] = self.game.umu_store
-
-        # TODO: fix this later
-        if GameRunner.LOG_LEVEL.lower() != "debug":
-            self.env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
-            self.env["G_MESSAGES_DEBUG"] = ""
-            self.env["PRESSURE_VESSEL_VERBOSE"] = "0"
         
         return ["umu-run", self.game.path]
 
@@ -136,6 +121,77 @@ class GameRunner:
         with open(GameRunner.PREFIXES_DATA, "r", encoding="utf-8") as f:
             data = json.load(f)
             return data.get(prefix_name)
+
+    def is_running(self) -> bool:
+        """Checks if the game process is currently active."""
+        if self.process is None:
+            return False
+        
+        # Check if the initial process is still alive
+        if self.process.poll() is None:
+            return True
+
+        # Check by scanning /proc for spawn subprocesses, seems to be needed for wine runners
+        return self._is_prefix_active()
+
+    def _is_prefix_active(self) -> bool:
+        """Check if any process is still running in the Wine prefix by scanning /proc."""
+        prefix_path = self.env.get("WINEPREFIX", "")
+        if not prefix_path:
+            return False
+
+        try:
+            target = f"WINEPREFIX={prefix_path}".encode()
+            for pid_dir in Path("/proc").iterdir():
+                if not pid_dir.name.isdigit():
+                    continue
+                
+                try:
+                    environ_data = (pid_dir / "environ").read_bytes().split(b'\x00')
+                    if target in environ_data:
+                        return True
+                except (PermissionError, FileNotFoundError, ProcessLookupError):
+                    continue
+        except Exception as e:
+            print(f"Debug: _is_prefix_active error: {e}")
+
+        return False
+
+    def stop(self):
+        """Gracefully attempts to terminate the running game process."""
+        if not self.is_running():
+            print(f"Game '{self.name}' is not running.")
+            return
+
+        print(f"Stopping game '{self.name}'...")
+        
+        if self.is_proton:
+            self.process.terminate()
+            runner_path = Path(self.prefix_info["runner"])
+            wineserver_bin = runner_path / "files" / "bin" / "wineserver"
+            print(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
+            self._kill_wineserver(wineserver_bin, runner_path)
+        else:
+            self.process.terminate()
+            runner_path = Path(self.prefix_info["runner"])
+            wineserver_bin = runner_path / "bin" / "wineserver"
+            print(f"Calling _kill_wineserver wine {wineserver_bin} {runner_path}")
+            self._kill_wineserver(wineserver_bin, runner_path)
+            
+
+    def _kill_wineserver(self, wineserver_bin, runner_path): 
+        """ Kills all processes associated with this prefix """
+        if wineserver_bin.exists():
+            print("[_kill_wineserver] wineserver_bin exists")
+            subprocess.run([str(wineserver_bin), "-k"], env={"WINEPREFIX": self.env["WINEPREFIX"]})
+        else:
+            # Search for wineserver in the runner path
+            print("[_kill_wineserver] wineserver_bin not found")
+            found = list(runner_path.glob("**/bin/wineserver"))
+            if found:
+                wineserver_bin = found[0]
+                subprocess.run([str(wineserver_bin), "-k"], env={"WINEPREFIX": self.env["WINEPREFIX"]})
+
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
