@@ -12,13 +12,13 @@ class RunnerManagerInterface:
     WINE_DIR = config.WINE_RUNNERS_DIR
 
     @abstractmethod
-    def get_runner_all_releases(self): pass
+    def get_runner_all_releases(self, page=1, per_page=30): pass
 
     @abstractmethod
-    def get_runner_download(self, tag): pass
+    def get_runner_download(self, release_data, progress_callback=None): pass
 
     @abstractmethod
-    def get_release_info(self, tag): pass
+    def get_release_info(self, release_data): pass
 
     @staticmethod
     def fetch_json(url):

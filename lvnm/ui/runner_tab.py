@@ -13,30 +13,35 @@ class DownloadDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         self.runner_type = runner_type # "wine" or "proton"
+        self.current_page = 1
+        self.releases = []
         
         self.setWindowTitle(self.tr("Download New Runner"))
         self.resize(400, 500)
         
         layout = QVBoxLayout(self)
+
+        # List
         layout.addWidget(QLabel(self.tr("Select a version to download:")))
-        
         self.list_widget = QListWidget()
         layout.addWidget(self.list_widget)
         
-        # Load data
-        self.releases = self.manager.get_runner_all_releases()
-        for rel in self.releases:
-            if runner_type == "wine":
-                # Show both amd64 and wow64
-                if rel.get("has_amd64"):
-                    item = f"{rel['tag']} (amd64)"
-                    self.list_widget.addItem(item)
-                if rel.get("has_wow64"):
-                    item = f"{rel['tag']} (wow64)"
-                    self.list_widget.addItem(item)
-            else:
-                self.list_widget.addItem(rel['tag'])
+        # Pagination
+        page_layout = QHBoxLayout()
+        self.prev_btn = QPushButton(self.tr("← Previous"))
+        self.page_label = QLabel(self.tr(f"Page {self.current_page}"))
+        self.page_label.setAlignment(Qt.AlignCenter)
+        self.next_btn = QPushButton(self.tr("Next →"))
+        
+        self.prev_btn.clicked.connect(self.load_prev_page)
+        self.next_btn.clicked.connect(self.load_next_page)
+        
+        page_layout.addWidget(self.prev_btn)
+        page_layout.addWidget(self.page_label, 1)
+        page_layout.addWidget(self.next_btn)
+        layout.addLayout(page_layout)
 
+        # Buttons
         btn_layout = QHBoxLayout()
         self.download_btn = QPushButton(self.tr("Download"))
         self.cancel_btn = QPushButton(self.tr("Cancel"))
@@ -48,22 +53,59 @@ class DownloadDialog(QDialog):
         btn_layout.addWidget(self.download_btn)
         layout.addLayout(btn_layout)
 
+        self.fetch_page()
+
+    def fetch_page(self):
+        """Fetches and populates the list for the current page"""
+        self.list_widget.clear()
+        self.page_label.setText(self.tr(f"Page {self.current_page}"))
+        self.prev_btn.setEnabled(self.current_page > 1)
+        
+        # Update UI while fetching
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.releases = self.manager.get_runner_all_releases(page=self.current_page)
+        QApplication.restoreOverrideCursor()
+
+        if not self.releases:
+            self.list_widget.addItem(self.tr("No more releases found."))
+            self.next_btn.setEnabled(False)
+            return
+        
+        self.next_btn.setEnabled(True)
+        for rel in self.releases:
+            if self.runner_type == "wine":
+                if rel.get("has_amd64"):
+                    self.list_widget.addItem(f"{rel['tag']} (amd64)")
+                if rel.get("has_wow64"):
+                    self.list_widget.addItem(f"{rel['tag']} (wow64)")
+            else:
+                self.list_widget.addItem(rel['tag'])
+
+    def load_next_page(self):
+        self.current_page += 1
+        self.fetch_page()
+
+    def load_prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.fetch_page()
+
     def get_selection(self):
-        """Helper to parse the list selection back into manager arguments"""
         item = self.list_widget.currentItem()
-        if not item: return None, None
+        if not item or not self.releases: return None, None
         
         text = item.text()
-        if self.runner_type == "wine":
-            # Extract tag and arch from "tag (arch)" string
-            tag = text.split(" (")[0]
-            arch = "amd64" if "(amd64)" in text else "wow64"
-            # Find the original release dict
-            rel_data = next(r for r in self.releases if r['tag'] == tag)
-            return rel_data, arch
-        else:
-            rel_data = next(r for r in self.releases if r['tag'] == text)
-            return rel_data, None
+        try:
+            if self.runner_type == "wine":
+                tag = text.split(" (")[0]
+                arch = "amd64" if "(amd64)" in text else "wow64"
+                rel_data = next(r for r in self.releases if r['tag'] == tag)
+                return rel_data, arch
+            else:
+                rel_data = next(r for r in self.releases if r['tag'] == text)
+                return rel_data, None
+        except StopIteration:
+            return None, None
 
 class RunnerSubTab(QWidget):
     """Reusable component for both Wine and Proton tabs"""

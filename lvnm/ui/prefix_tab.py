@@ -39,9 +39,7 @@ class PrefixTab(QWidget):
         self.edit_btn.clicked.connect(self.on_edit)
         self.add_btn.clicked.connect(self.on_add)
         self.del_btn.clicked.connect(self.on_delete)
-
-
-        #main_layout.addStretch()
+        self.prefixes_list.itemDoubleClicked.connect(self.on_edit)
 
         self.refresh_list()
 
