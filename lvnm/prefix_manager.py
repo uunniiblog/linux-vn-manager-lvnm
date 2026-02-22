@@ -3,6 +3,7 @@ import subprocess
 import json
 import shutil
 import config
+from datetime import datetime
 from pathlib import Path
 from model.prefix import Prefix
 from execution_manager import ExecutionManager
@@ -30,6 +31,7 @@ class PrefixManager:
         info = self.get_prefix_info(self.name)
         if info:
             self.card = Prefix.from_dict(self.name, info)
+            self.prefix_path = Path(self.card.path)
             self.runner_path = Path(self.card.runner)
             self.type = self.card.type
             self.codecs = self.card.codecs
@@ -56,7 +58,7 @@ class PrefixManager:
             self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
             self.runner_command = [str(wine_bin)]
 
-    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = ""):
+    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", executor=None):
         """Physical creation and initialization of the prefix."""
         print(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
@@ -70,17 +72,30 @@ class PrefixManager:
             
             print("Initializing prefix (wineboot)...")
             cmd = self.runner_command + ["wineboot", "-u"]
-            #ProcessLogger.run(cmd, self.env)
-            ExecutionManager.run(cmd, self.env, wait=True)
+            desc = f"Initializing prefix {self.name} (wineboot)"
 
-            if self.codecs:
-                self.install_codecs(self.codecs)
+            # Callback method
+            def finalize_creation():
+                self._save_metadata()
+                print(f"Prefix {self.name} ready.")
 
-            if self.winetricks:
-                self.install_winetricks(self.winetricks)
+            if executor:
+                # Add wineboot to the queue
+                executor.add_task(cmd, self.env, desc, on_finished_callback=finalize_creation)
+                
+                # Add Codecs and Winetricks to the queue
+                if self.codecs:
+                    self.install_codecs(self.codecs, executor=executor)
+                if self.winetricks:
+                    self.install_winetricks(self.winetricks, executor=executor)
+            else:
+                ExecutionManager.run(cmd, self.env, wait=True)
+                finalize_creation()
+                if self.codecs:
+                    self.install_codecs(self.codecs)
+                if self.winetricks:
+                    self.install_winetricks(self.winetricks)
 
-            self._save_metadata()
-            print(f"Prefix {self.name} ready.")
             return True
 
         except Exception as e:
@@ -90,25 +105,29 @@ class PrefixManager:
                 shutil.rmtree(self.prefix_path)
             return False
 
-    def install_codecs(self, codecs_list: str):
+    def install_codecs(self, codecs_list: str, executor=None):
         """Installs or updates codecs in an existing prefix."""
         if not self.CODEC_SH.exists():
             print(f"Warning: Codec script missing at {self.CODEC_SH}")
             return False
 
         print(f"Installing codecs into {self.name}: {codecs_list}")
+        desc = f"Installing codecs: {codecs_list}"
         cmd = ["sh", str(self.CODEC_SH)] + codecs_list.split()
 
-        #ProcessLogger.run(cmd, self.env, suppress_codes=[1])
-        ExecutionManager.run(cmd, self.env, wait=True, suppress_codes=[1])
-        
-        # Update local state and save
-        new_codecs = set(self.codecs.split()) | set(codecs_list.split())
-        self.codecs = " ".join(sorted(new_codecs))
-        self._save_metadata()
+        def finalize():
+            new_codecs = set(self.codecs.split()) | set(codecs_list.split())
+            self.codecs = " ".join(sorted(new_codecs))
+            self._save_metadata()
+
+        if executor:
+            executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True, suppress_codes=[1])
+            finalize()
         return True
 
-    def install_winetricks(self, winetricks_list: str):
+    def install_winetricks(self, winetricks_list: str, executor=None):
         """Installs winetricks components into the prefix."""
         winetricks_bin = shutil.which("winetricks")
         if not winetricks_bin:
@@ -116,14 +135,20 @@ class PrefixManager:
             return False
 
         print(f"Installing winetricks into {self.name}: {winetricks_list}")
+        desc = f"Installing winetricks: {winetricks_list}"
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
 
-        ExecutionManager.run(cmd, self.env, wait=True)
-        
-        # Update local state and save
-        new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
-        self.winetricks = " ".join(sorted(new_tricks))
-        self._save_metadata()
+        def finalize():
+            new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
+            self.winetricks = " ".join(sorted(new_tricks))
+            self._save_metadata()
+
+        if executor:
+            executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True)
+            finalize()
+
         return True
 
     def add_fonts(self, fonts_source_path: str):
@@ -189,21 +214,10 @@ class PrefixManager:
 
         from game_manager import GameManager
         old_name = self.name
-        old_path = self.prefix_path
-        new_path = self.DATA_ROOT / new_name
 
         try:
-            # Rename directory
-            if old_path.exists():
-                old_path.rename(new_path)
-                print(f"Directory renamed: {old_path.name} -> {new_path.name}")
-            else:
-                print(f"[Debug] Physical path {old_path} not found, updating json_file only.")
-
             # Update variables
             self.name = new_name
-            self.prefix_path = new_path
-            self.env["WINEPREFIX"] = str(new_path)
 
             # Rewrite json file
             if self.PREFIXES_FILE.exists():
@@ -217,7 +231,7 @@ class PrefixManager:
                     # Extract the old data and update the specific fields
                     prefix_data = json_file.pop(old_name)
                     prefix_data["name"] = new_name
-                    prefix_data["path"] = str(new_path)
+                    prefix_data["update_date"] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
                     
                     # Insert under the new key
                     json_file[new_name] = prefix_data

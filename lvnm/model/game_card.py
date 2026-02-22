@@ -1,5 +1,6 @@
 import json
 import config
+from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Optional
@@ -21,6 +22,7 @@ class GameCard:
     envvar: Dict[str, str] = field(default_factory=dict)
     dlloverride: Dict[str, str] = field(default_factory=dict)
     gamescope: GameScope = field(default_factory=GameScope)
+    update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

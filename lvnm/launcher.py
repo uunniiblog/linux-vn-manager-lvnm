@@ -21,6 +21,22 @@ def main():
     print(sys_data)
     print(software)
 
+    # istoria_session = GameRunner("Carnival")
+
+    # if istoria_session.run():
+    #     print("Launching...")
+        
+    #     # Keep program alive to keep game alive
+    #     try:
+    #         while istoria_session.is_running():
+    #             print("game running...")
+    #             time.sleep(1) # Wait and keep checking
+    #     except KeyboardInterrupt:
+    #         print("\nShutting down...")
+    #         istoria_session.stop()
+    #     print(f"Game exited with code: {istoria_session.process.returncode}")
+    
+
     app = QApplication(sys.argv)
     
     # TODO

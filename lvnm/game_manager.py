@@ -1,5 +1,6 @@
 import config
 import json
+from datetime import datetime
 from prefix_manager import PrefixManager
 from runner_manager import RunnerManagerInterface
 from pathlib import Path
@@ -87,6 +88,7 @@ class GameManager:
             return
 
         current_card = GameCard.from_dict(name, raw_data[name])
+        current_card.update_date = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
         for key, value in updates.items():
             if key == "gamescope" and isinstance(value, dict):
@@ -134,6 +136,7 @@ class GameManager:
         for game_name, details in games_data.items():
             if details.get("prefix") == old_name:
                 details["prefix"] = new_name
+                details["update_date"] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
                 updated_count += 1
         
         if updated_count > 0:

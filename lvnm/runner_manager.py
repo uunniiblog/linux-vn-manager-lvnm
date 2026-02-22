@@ -135,3 +135,17 @@ class RunnerManagerInterface:
             shutil.rmtree(target)
             return True
         return False
+
+    @staticmethod
+    def get_all_installed_runners():
+        """Returns a dict mapping 'Runner Name' to its full path"""
+        runners = {}
+        # Fetch Wine runners
+        if config.WINE_RUNNERS_DIR.exists():
+            for d in config.WINE_RUNNERS_DIR.iterdir():
+                if d.is_dir(): runners[d.name] = str(d)
+        # Fetch Proton runners
+        if config.PROTON_RUNNERS_DIR.exists():
+            for d in config.PROTON_RUNNERS_DIR.iterdir():
+                if d.is_dir(): runners[d.name] = str(d)
+        return runners
