@@ -13,7 +13,7 @@ from ui.theme_manager import ThemeManager
 
 
 class MainWindow(QMainWindow):
-    SETTINGS_FILE = config.SETTINGS_FILE
+    SETTINGS_FILE = config.UI_SETTINGS
 
     def __init__(self):
         super().__init__()

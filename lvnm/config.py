@@ -16,7 +16,8 @@ PREFIXES_DIR = DATA_DIR / "prefixes"
 CODEC_SCRIPT = BASE_DIR / "vn_winestuff" / "codec.sh"
 PREFIXES_DATA = DATA_DIR / ".prefixes.json"
 GAMES_DATA = DATA_DIR / ".games.json"
-SETTINGS_FILE = DATA_DIR / ".ui.config"
+UI_SETTINGS = DATA_DIR / ".ui.config"
+USER_SETTINGS = DATA_DIR / ".userconf.json"
 
 # URLS
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"

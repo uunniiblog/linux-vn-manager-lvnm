@@ -11,6 +11,7 @@ class Prefix:
     type: str
     codecs: str = ""
     winetricks: str = ""
+    fonts: bool = False
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
     @classmethod

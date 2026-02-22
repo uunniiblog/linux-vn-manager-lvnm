@@ -8,13 +8,13 @@ from datetime import datetime
 from prefix_manager import PrefixManager
 from game_manager import GameManager
 from ui.console_dialog import ConsoleDialog
+from system_utils import SystemUtils
 
 class PrefixTab(QWidget):
     def __init__(self):
         super().__init__()
         self.prefixes_data = []
         main_layout = QVBoxLayout(self)
-        main_layout.addWidget(QLabel(self.tr("Prefix View - TODO")))
 
         # GroupBox prefixes
         prefix_group = QGroupBox(self.tr("Prefixes"))
@@ -101,8 +101,15 @@ class PrefixTab(QWidget):
         dialog = EditPrefixDialog(prefix, self)
         if dialog.exec():
             data = dialog.get_data()
+            fonts_path = data.get("fonts", None)
             console = ConsoleDialog(self)
             has_tasks = False
+
+            # Check if path exists
+            if prefix.check_prefix_exists() is False:
+                print("[Error] Prefix Path doesn't exist")
+                QMessageBox.critical(self, self.tr("Error"), self.tr("Prefix Path does not exist"))
+                return
             
             # Handle Renaming first
             if data["name"] != prefix.name:
@@ -126,11 +133,18 @@ class PrefixTab(QWidget):
                 prefix.install_winetricks(data["winetricks"], executor=console)
                 has_tasks = True
 
+            # Handle Fonts
+            if fonts_path and prefix.fonts == False:
+                prefix.add_fonts(fonts_path, executor=console)
+                has_tasks = True
+
             if has_tasks:
                 #console.set_header_info(prefix.prefix_path, prefix.runner_path)
                 #console.show()
                 console.start_queue()
-                console.exec() 
+                console.exec()
+            else:
+                print("[Debug] No changes in prefix")
 
             # Update the date and metadata one last time
             prefix.card.update_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -143,22 +157,21 @@ class PrefixTab(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             name = data["name"]
+            fonts_path = data.get("fonts", None)            
             
-            # 1. Validation - check if it already exists in JSON
+            # Check if it already exists in JSON
             if PrefixManager.get_prefix_info(name):
                 QMessageBox.warning(self, self.tr("Error"), self.tr(f"Prefix '{name}' already exists."))
                 return
                 
-            # 2. Instantiate Manager
-            # It will print "Prefix [name] does not exist yet" internally, which is expected!
+            # Instantiate Manager
             prefix = PrefixManager(name)
             
-            # 3. Prepare the Console
+            # Prepare the Console
             console = ConsoleDialog(self)
             console.setWindowTitle(self.tr(f"Creating Prefix: {name}"))
             
-            
-            # 4. Add tasks to queue
+            # Add tasks to queue
             success = prefix.create_prefix(
                 runner_path=data["runner_path"], 
                 codecs=data["codecs"], 
@@ -167,6 +180,8 @@ class PrefixTab(QWidget):
             )
             
             if success:
+                if fonts_path:
+                    prefix.add_fonts(fonts_path, executor=console)
                 # console.set_header_info(str(config.PREFIXES_DIR / name), data["runner_path"])
                 # console.show()
                 console.start_queue()
@@ -174,18 +189,19 @@ class PrefixTab(QWidget):
             else:
                 QMessageBox.warning(self, self.tr("Error"), self.tr("Failed to prepare prefix creation."))
 
-            # 5. Refresh UI List
+            # Refresh UI List
             self.refresh_list()
 
     
 class EditPrefixDialog(QDialog):
-    SETTINGS_FILE = config.SETTINGS_FILE
+    SETTINGS_FILE = config.UI_SETTINGS
 
     def __init__(self, prefix_manager, parent=None):
         super().__init__(parent)
         self.manager = prefix_manager
         self.setWindowTitle(self.tr(f"Edit Prefix: {self.manager.name}"))
         self.resize(500, 600)
+        self.user_settings = SystemUtils.load_settings()
 
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
@@ -218,6 +234,14 @@ class EditPrefixDialog(QDialog):
         form_layout.addRow(self.tr("Last Updated:"), self.date_label)
 
         self.layout.addLayout(form_layout)
+
+        # Font checkbox
+        self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
+        self.font_checkbox.setChecked(bool(self.manager.fonts))
+        if self.manager.fonts:
+            # Not gonna bother unlinking fonts from prefixes for now
+            self.font_checkbox.setDisabled(True)
+        self.layout.addWidget(self.font_checkbox)
 
         # Codecs Section
         self.codec_boxes = {}
@@ -298,12 +322,18 @@ class EditPrefixDialog(QDialog):
         new_codecs = [id for id, cb in self.codec_boxes.items() if cb.isChecked() and cb.isEnabled()]
         new_tricks = [id for id, cb in self.trick_boxes.items() if cb.isChecked() and cb.isEnabled()]
         
-        return {
+        data = {
             "name": self.name_edit.text(),
             "path": self.path_edit.text(),
             "codecs": " ".join(new_codecs),
             "winetricks": " ".join(new_tricks)
         }
+
+        if self.font_checkbox.isChecked():
+            data["fonts"] = self.user_settings.get("font_folder", "")
+
+        return data
+
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
         # Use a unique key for this specific dialog
@@ -315,18 +345,19 @@ class EditPrefixDialog(QDialog):
         """Overrides the default close event to save geometry before closing."""
         self.settings.setValue("EditPrefixDialog/geometry", self.saveGeometry())
         super().closeEvent(event)
-        
+
     def hideEvent(self, event):
         """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
         self.settings.setValue("EditPrefixDialog/geometry", self.saveGeometry())
         super().hideEvent(event)
 
 class CreatePrefixDialog(QDialog):
-    SETTINGS_FILE = config.SETTINGS_FILE
+    SETTINGS_FILE = config.UI_SETTINGS
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Create New Prefix"))
         self.resize(500, 600)
+        self.user_settings = SystemUtils.load_settings()
 
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
@@ -353,6 +384,11 @@ class CreatePrefixDialog(QDialog):
         form_layout.addRow(self.tr("Runner:"), self.runner_combo)
 
         self.layout.addLayout(form_layout)
+
+        # --- Font checkbox ---
+        self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
+        self.font_checkbox.setChecked(bool(self.user_settings.get("font_folder", "")))
+        self.layout.addWidget(self.font_checkbox)
 
         # --- Codecs Section ---
         self.codec_boxes = {}
@@ -426,12 +462,17 @@ class CreatePrefixDialog(QDialog):
         new_codecs = [id for id, cb in self.codec_boxes.items() if cb.isChecked()]
         new_tricks = [id for id, cb in self.trick_boxes.items() if cb.isChecked()]
         
-        return {
+        data = {
             "name": self.name_edit.text().strip(),
             "runner_path": self.available_runners[selected_runner_name],
             "codecs": " ".join(new_codecs),
             "winetricks": " ".join(new_tricks)
         }
+
+        if self.font_checkbox.isChecked():
+            data["fonts"] = self.user_settings.get("font_folder", "")
+
+        return data
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""

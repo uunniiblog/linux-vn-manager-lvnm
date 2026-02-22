@@ -1,18 +1,90 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QComboBox, 
-                               QLabel, QGroupBox, QFormLayout)
+                               QLabel, QGroupBox, QFormLayout,
+                               QHBoxLayout, QLineEdit, QPushButton,
+                               QCheckBox, QFileDialog)
 from system_utils import SystemUtils
+import config
 
 class SettingsTab(QWidget):
+    CONFIG_FILE = config.USER_SETTINGS
+
     def __init__(self, theme_manager):
         super().__init__()
         self.theme_manager = theme_manager
+
+        # Load existing settings
+        self.user_settings = SystemUtils.load_settings()
         
         # Main layout for the entire tab
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20) # Add breathing room around the edges
         main_layout.setSpacing(20) # Space between the different sections
         
-        # --- SECTION 1: Appearance ---
+        # ==========================================
+        # Functional Settings
+        settings_group = QGroupBox(self.tr("Settings"))
+        settings_layout = QFormLayout(settings_group)    
+        
+        # Font Folder
+        font_layout = QHBoxLayout()
+        self.font_edit = QLineEdit(self.user_settings.get("font_folder", ""))
+        self.font_edit.setPlaceholderText(self.tr("Select folder to symlink fonts..."))
+        self.font_btn = QPushButton(self.tr("Browse..."))
+        font_layout.addWidget(self.font_edit)
+        font_layout.addWidget(self.font_btn)
+        settings_layout.addRow(QLabel(self.tr("Font Folder:")), font_layout)
+        
+        # Gamescope Global Settings
+        gs_layout = QHBoxLayout()
+        self.gs_checkbox = QCheckBox(self.tr("Enable"))
+        self.gs_checkbox.setChecked(self.user_settings.get("gamescope_enabled", False))
+        self.gs_params = QLineEdit(self.user_settings.get("gamescope_params", ""))
+        self.gs_params.setPlaceholderText(self.tr("Parameters (e.g., -W 1920 -H 1080)"))
+        gs_layout.addWidget(self.gs_checkbox)
+        gs_layout.addWidget(self.gs_params)
+        settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
+        
+        # Save Data Management (Disabled for now)
+        save_layout = QHBoxLayout()
+        self.save_checkbox = QCheckBox(self.tr("Enable"))
+        self.save_edit = QLineEdit(self.user_settings.get("save_folder", ""))
+        self.save_edit.setPlaceholderText(self.tr("Main folder for save files..."))
+        self.save_btn = QPushButton(self.tr("Browse..."))
+        save_layout.addWidget(self.save_checkbox)
+        save_layout.addWidget(self.save_edit)
+        save_layout.addWidget(self.save_btn)
+        
+        self.save_checkbox.setEnabled(False)
+        self.save_edit.setEnabled(False)
+        self.save_btn.setEnabled(False)
+        settings_layout.addRow(QLabel(self.tr("Save Management:")), save_layout)
+        
+        # One Game One Prefix
+        self.ogop_checkbox = QCheckBox(self.tr("Enable"))
+        self.ogop_checkbox.setChecked(self.user_settings.get("one_game_one_prefix", False))
+        self.ogop_checkbox.setEnabled(False)
+        settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
+        
+        # Global Winetricks
+        wt_layout = QHBoxLayout()
+        global_wt = self.user_settings.get("global_wt", {}) # Get the dict or empty dict
+
+        self.wt_jp_locale = QCheckBox(self.tr("Japanese Locale (jp_locale)"))
+        # Read from nested dict: global_wt -> jp_locale
+        self.wt_jp_locale.setChecked(global_wt.get("jp_locale", False))
+
+        self.wt_jp_timezone = QCheckBox(self.tr("Japanese Timezone (jp_timezone)"))
+        # Read from nested dict: global_wt -> jp_timezone
+        self.wt_jp_timezone.setChecked(global_wt.get("jp_timezone", False))
+
+        wt_layout.addWidget(self.wt_jp_locale)
+        wt_layout.addWidget(self.wt_jp_timezone)
+        settings_layout.addRow(QLabel(self.tr("Global Winetricks:")), wt_layout)
+
+        main_layout.addWidget(settings_group)
+
+        # ==========================================
+        # Appearance Settings
         appearance_group = QGroupBox(self.tr("Appearance"))
         appearance_layout = QFormLayout(appearance_group)
         
@@ -31,7 +103,8 @@ class SettingsTab(QWidget):
         
         main_layout.addWidget(appearance_group)
 
-        # --- SECTION 2: System Info ---
+        # ==========================================
+        # System Info 
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
         
@@ -61,15 +134,49 @@ class SettingsTab(QWidget):
         
         main_layout.addStretch()
 
+        # ==========================================
+        # Connect Signals for Auto-Save
+        self.font_btn.clicked.connect(self.browse_font_folder)
+        self.font_edit.textChanged.connect(lambda t: self.save_setting("font_folder", t))
+        
+        self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting("gamescope_enabled", bool(s)))
+        self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
+        
+        self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
+        self.wt_jp_locale.stateChanged.connect(
+            lambda s: self.save_nested_setting("global_wt", "jp_locale", bool(s))
+        )
+        self.wt_jp_timezone.stateChanged.connect(
+            lambda s: self.save_nested_setting("global_wt", "jp_timezone", bool(s))
+        )
+
     def change_theme(self, index):
         mapping = {0: "auto", 1: "light", 2: "dark"}
-        new_mode = mapping[index]
-        
-        # 1. Save to disk
-        self.theme_manager.settings.setValue("theme_mode", new_mode)
-        
-        # 2. Tell manager to refresh the UI immediately
+        new_mode = mapping[index]        
+        self.theme_manager.settings.setValue("theme_mode", new_mode)        
         self.theme_manager.update_theme()
 
     def check(self, val): 
         return "✅" if val else "❌"
+
+    def browse_font_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, self.tr("Select Font Folder"), "")
+        if folder:
+            self.font_edit.setText(folder) # This triggers textChanged, which auto-saves
+
+    def save_setting(self, key, value):
+        """Updates the local dictionary and flushes it to the JSON file."""
+        self.user_settings[key] = value
+        SystemUtils.save_settings(self.user_settings)
+
+    def save_nested_setting(self, parent_key, child_key, value):
+        """Updates a nested dictionary setting and saves to disk."""
+        # Ensure the parent dictionary exists
+        if parent_key not in self.user_settings or not isinstance(self.user_settings[parent_key], dict):
+            self.user_settings[parent_key] = {}
+        
+        # Update the child value
+        self.user_settings[parent_key][child_key] = value
+        
+        # Flush to JSON
+        SystemUtils.save_settings(self.user_settings)

@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 import shutil
+import json
 import config
 
 class SystemUtils:
@@ -154,3 +155,25 @@ class SystemUtils:
             status = "✅" if installed else "❌"
             print(f"{status} {pkg}")
         print("="*50)
+    
+    @staticmethod
+    def load_settings() -> dict:
+        """Loads user settings from the JSON file."""
+        if os.path.exists(config.USER_SETTINGS):
+            try:
+                with open(config.USER_SETTINGS, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error reading settings: {e}")
+        return {}
+
+    @staticmethod
+    def save_settings(data: dict):
+        """Saves user settings to the JSON file."""
+        try:
+            # Ensure the directory exists before saving
+            os.makedirs(os.path.dirname(config.USER_SETTINGS), exist_ok=True)
+            with open(config.USER_SETTINGS, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"Error writing settings: {e}")

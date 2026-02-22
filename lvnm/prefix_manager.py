@@ -22,6 +22,7 @@ class PrefixManager:
         self.codecs = ""
         self.env = os.environ.copy()
         self.env["WINEPREFIX"] = str(self.prefix_path)
+        self.fonts = False
         
         # Automatically load data if it exists
         self._load_from_json()
@@ -36,6 +37,7 @@ class PrefixManager:
             self.type = self.card.type
             self.codecs = self.card.codecs
             self.winetricks = self.card.winetricks
+            self.fonts = self.card.fonts
             self._setup_env()
             return True
 
@@ -151,21 +153,27 @@ class PrefixManager:
 
         return True
 
-    def add_fonts(self, fonts_source_path: str):
+    def add_fonts(self, fonts_source_path: str, executor=None):
         """Links fonts from a source folder into the Wine prefix."""
-        target_dir = self.prefix_path / "drive_c" / "windows" / "Fonts"
-        source_path = Path(fonts_source_path)
+        base_path = Path(self.prefix_path)
+        target_dir = base_path / "drive_c" / "windows" / "Fonts"
+                
+        # -sf: 's' for symbolic, 'f' to force/overwrite if a link already exists
+        shell_script = f'for f in "{fonts_source_path}"/*; do ln -sf "$f" "{target_dir}/"; done'
         
-        if not target_dir.exists():
-            print(f"Error: Prefix {self.name} doesn't seem to be initialized (no Font dir).")
-            return False
+        cmd = ["sh", "-c", shell_script]
 
-        for font in source_path.iterdir():
-            if font.is_file():
-                dest = target_dir / font.name
-                if not dest.exists():
-                    os.symlink(font, dest)
-        print(f"Fonts linked to {self.name}")
+        def finalize():
+            self.fonts = True
+            print("Fonts symlinked sucessfully")
+            self._save_metadata()
+
+        if executor:
+            executor.add_task(cmd, self.env, "Linking system fonts to prefix...", on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True)
+            finalize()
+        
         return True
 
     def _save_metadata(self):
@@ -185,7 +193,8 @@ class PrefixManager:
             runner=str(self.runner_path),
             type=self.type,
             codecs=self.codecs,
-            winetricks=self.winetricks
+            winetricks=self.winetricks,
+            fonts=self.fonts
         )
         json_file[self.name] = card.to_dict()
 
@@ -249,6 +258,12 @@ class PrefixManager:
         except Exception as e:
             print(f"[Error] Failed to rename prefix: {e}")
             return False
+
+    def check_prefix_exists(self):
+        if Path(self.prefix_path).exists():
+            return True
+        
+        return False
 
     @staticmethod
     def get_prefix_info(name: str):
