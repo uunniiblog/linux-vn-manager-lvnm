@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroup
                             QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
                             QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
                             QPlainTextEdit, QGridLayout, QComboBox)
-from PySide6.QtCore import Qt, QProcess
+from PySide6.QtCore import Qt, QProcess, QSettings
 from datetime import datetime
 from prefix_manager import PrefixManager
 from game_manager import GameManager
@@ -26,9 +26,9 @@ class PrefixTab(QWidget):
 
         # Buttons
         btn_layout = QHBoxLayout()
-        self.edit_btn = QPushButton(self.tr("Edit Selected"))
         self.add_btn = QPushButton(self.tr("Create Prefix"))
-        self.del_btn = QPushButton(self.tr("Delete Selected"))
+        self.edit_btn = QPushButton(self.tr("Edit Prefix"))
+        self.del_btn = QPushButton(self.tr("Delete Prefix"))
         
         btn_layout.addWidget(self.edit_btn)
         btn_layout.addWidget(self.add_btn)
@@ -179,11 +179,16 @@ class PrefixTab(QWidget):
 
     
 class EditPrefixDialog(QDialog):
+    SETTINGS_FILE = config.SETTINGS_FILE
+
     def __init__(self, prefix_manager, parent=None):
         super().__init__(parent)
         self.manager = prefix_manager
         self.setWindowTitle(self.tr(f"Edit Prefix: {self.manager.name}"))
         self.resize(500, 600)
+
+        # Load Stored UI settings
+        self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
 
         self.layout = QVBoxLayout(self)
         form_layout = QFormLayout()
@@ -244,6 +249,8 @@ class EditPrefixDialog(QDialog):
         btn_layout.addWidget(self.save_btn)
         self.layout.addLayout(btn_layout)
 
+        self._restore_state()
+
     def create_check_group(self, title, data_list, installed_list, storage_dict):
         """Helper to create the scrollable checkbox groups"""
         group = QGroupBox(title)
@@ -297,12 +304,32 @@ class EditPrefixDialog(QDialog):
             "codecs": " ".join(new_codecs),
             "winetricks": " ".join(new_tricks)
         }
+    def _restore_state(self):
+        """Restores the window size and position from the previous session."""
+        # Use a unique key for this specific dialog
+        geometry = self.settings.value("EditPrefixDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+    def closeEvent(self, event):
+        """Overrides the default close event to save geometry before closing."""
+        self.settings.setValue("EditPrefixDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)
+        
+    def hideEvent(self, event):
+        """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
+        self.settings.setValue("EditPrefixDialog/geometry", self.saveGeometry())
+        super().hideEvent(event)
 
 class CreatePrefixDialog(QDialog):
+    SETTINGS_FILE = config.SETTINGS_FILE
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Create New Prefix"))
         self.resize(500, 600)
+
+        # Load Stored UI settings
+        self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
 
         self.layout = QVBoxLayout(self)
         form_layout = QFormLayout()
@@ -351,6 +378,8 @@ class CreatePrefixDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
         btn_layout.addWidget(self.create_btn)
         self.layout.addLayout(btn_layout)
+
+        self._restore_state()
 
     def _update_path_label(self, text):
         """Updates the path preview label as the user types"""
@@ -403,3 +432,20 @@ class CreatePrefixDialog(QDialog):
             "codecs": " ".join(new_codecs),
             "winetricks": " ".join(new_tricks)
         }
+
+    def _restore_state(self):
+        """Restores the window size and position from the previous session."""
+        # Use a unique key for this specific dialog
+        geometry = self.settings.value("CreatePrefixDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+    def closeEvent(self, event):
+        """Overrides the default close event to save geometry before closing."""
+        self.settings.setValue("CreatePrefixDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)
+    
+    def hideEvent(self, event):
+        """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
+        self.settings.setValue("CreatePrefixDialog/geometry", self.saveGeometry())
+        super().hideEvent(event)

@@ -34,10 +34,13 @@ class GameRunner:
         if not self.prefix_info:
             raise ValueError(f"Prefix '{self.game.prefix}' (required for {self.name}) not found.")
 
-    def prepare(self):
+    def prepare_environment(self):
         """Builds the environment and the final command list."""
         self.env = os.environ.copy()
         self.env["WINEPREFIX"] = self.prefix_info["path"]
+        self.env["PWD"] = self.prefix_info["path"]
+        self.game_dir = str(Path(self.game.path).parent)
+        #self.env["PWD"] = self.game_dir
         
         # Add user-defined environment variables
         for key, val in self.game.envvar.items():
@@ -73,7 +76,7 @@ class GameRunner:
         try:
             # Only prepare if we haven't already
             if not self.cmd or not self.env:
-                self.prepare()
+                self.prepare_environment()
         except Exception as e:
             print(f"[Error] Preparation failed: {e}")
             return False
@@ -81,7 +84,7 @@ class GameRunner:
         self._log_run_command(Path(self.prefix_info["runner"]))
 
         #self.process = ProcessLogger.run(self.cmd, self.env)
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
 
         print(f"self.process {self.process}")
         return True

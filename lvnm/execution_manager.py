@@ -33,7 +33,7 @@ class ExecutionManager:
         return env
 
     @staticmethod
-    def run(cmd, env, wait=True, check=True, suppress_codes=None):
+    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None):
         """
         Executes a command with automatic verbosity management.
         
@@ -43,6 +43,7 @@ class ExecutionManager:
             wait (bool): If True, blocks until finished. If False, returns Popen object.
             check (bool): If True and wait is True, raises error on non-zero exit.
             suppress_codes (list): List of exit codes to treat as success
+            cwd: Sets the current directory before the child is executed (useful for some VNs)
         """
         if suppress_codes is None:
             suppress_codes = []
@@ -59,7 +60,8 @@ class ExecutionManager:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
+            cwd=cwd
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)
