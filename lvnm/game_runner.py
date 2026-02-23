@@ -187,7 +187,7 @@ class GameRunner:
 
         return False
 
-    def stop(self):
+    def stop(self, running_count = 1):
         """Gracefully attempts to terminate the running game process."""
         if not self.is_running():
             print(f"Game '{self.name}' is not running.")
@@ -205,12 +205,15 @@ class GameRunner:
         if self.is_proton:
             runner_path = Path(self.prefix_info["runner"])
             wineserver_bin = runner_path / "files" / "bin" / "wineserver"
-            print(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
-            self._kill_wineserver(wineserver_bin, runner_path)
         else:
             runner_path = Path(self.prefix_info["runner"])
             wineserver_bin = runner_path / "bin" / "wineserver"
-            print(f"Calling _kill_wineserver wine {wineserver_bin} {runner_path}")
+
+        print(f"runnign count {running_count}")
+        if (running_count <= 1):
+            # Only kill wineserver if 1 game left no not stop other running games in same prefix
+            # TODO: this adds a bug that stills sees is_running still sees the game closed as active
+            print(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
             self._kill_wineserver(wineserver_bin, runner_path)
             
 

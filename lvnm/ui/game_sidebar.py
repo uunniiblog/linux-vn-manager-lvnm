@@ -140,9 +140,9 @@ class GameSidebar(QFrame):
 
         # Check the registry to set the button state correctly
         if self.current_game.name in self.active_runners:
-            self._set_ui_stop_state()
+            self.set_ui_stop_state()
         else:
-            self._set_ui_start_state()
+            self.set_ui_start_state()
 
         # Filling General fields
         self.edit_name.setText(card.name)
@@ -256,17 +256,27 @@ class GameSidebar(QFrame):
         if game_name in self.active_runners:
             # Game is running, so we stop it
             self.stop_game(game_name)
-            self._set_ui_start_state()
+            self.set_ui_start_state()
         else:
             # Game is not running, so we start it
             self.start_game(game_name)
-            self._set_ui_stop_state()
+            self.set_ui_stop_state()
 
     def stop_game(self, name):
-        """Calls the runner's stop logic."""
+        """
+        Calls the runner's stop logic.
+        Sends number of games running in same prefix
+        """
         runner = self.active_runners.get(name)
         if runner:
-            runner.stop()
+            target_prefix_path = runner.prefix_info["path"]
+            prefix_count = 0
+            for active_runner in self.active_runners.values():
+                active_path = active_runner.prefix_info.get("path")
+                if active_path == target_prefix_path:
+                    prefix_count += 1
+            runner.stop(prefix_count)
+            
             # dont update last played timer here, let check_active_runners handle it
             # self.active_runners.pop(name, None)
             # self.current_game.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
@@ -275,13 +285,21 @@ class GameSidebar(QFrame):
 
     def start_game(self, name):
         """Initializes the runner and starts the process."""
+
+        # Avoid launching same game multiple times
+        if name in self.active_runners:
+            print(f"[Debug] {name} is already running. Ignoring launch request.")
+            return False
+
         try:
             runner = GameRunner(name)
             if runner.run():
                 self.active_runners[name] = runner
                 print(f"Started {name}. Total running: {len(self.active_runners)}")
+                return True
         except Exception as e:
-            print(f"Failed to start {name}: {e}")
+            print(f"[Error] Failed to start {name}: {e}")
+            return False
 
     def check_game_status(self):
         """Polls the runner to see if the game is still alive."""
@@ -450,13 +468,25 @@ class GameSidebar(QFrame):
                 # If the sidebar is currently showing THIS game, sync the UI object
                 if self.current_game and self.current_game.name == name:
                     self.current_game.last_played = game_to_update.last_played
-                    self._set_ui_start_state()
+                    self.set_ui_start_state()
+        
+        if self.current_game:
+            is_running = self.current_game.name in self.active_runners
+            current_text = self.launch_btn.text()
             
-    def _set_ui_stop_state(self):
+            # If the game is running but the button doesn't say "Stop Game", fix it
+            if is_running and current_text != self.tr("Stop Game"):
+                self.set_ui_stop_state()
+                
+            # If the game is NOT running but the button doesn't say "Start Game", fix it
+            # elif not is_running and current_text != self.tr("Start Game"):
+            #     self.set_ui_start_state()
+            
+    def set_ui_stop_state(self):
         self.launch_btn.setText(self.tr("Stop Game"))
         self.launch_btn.setStyleSheet("background-color: #c62828; color: white; height: 40px; font-weight: bold;")
 
-    def _set_ui_start_state(self):
+    def set_ui_start_state(self):
         self.is_running = False
         self.launch_btn.setText(self.tr("Start Game"))
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")

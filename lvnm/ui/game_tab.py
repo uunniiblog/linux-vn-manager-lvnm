@@ -105,20 +105,33 @@ class GameTab(QWidget):
         
         # Get query from search bar
         query = self.search_bar.text() if hasattr(self, 'search_bar') else None
+        games_dict = GameManager.list_games(name_query=query)
+        game_cards = list(games_dict.values())
+        game_cards.sort(
+            key=lambda card: card.last_played if card.last_played else "0000-00-00 00:00:00", 
+            reverse=True
+        )
         
-        # GameManager.list_games(query) will handle the "like%" logic
-        games = GameManager.list_games(name_query=query)
-        
-        for name, card in games.items():
+        for card in game_cards:
             item = QListWidgetItem(self.game_list)
             widget = GameListItem(card, zoom_factor=self.zoom)
             item.setSizeHint(widget.sizeHint())
             item.setData(Qt.UserRole, card)
+            widget.doubleClicked.connect(self.on_game_launch_requested)
+            widget.requestOpen.connect(self.on_game_selected_from_card)
+            widget.requestRun.connect(self.on_game_launch_requested)
+            widget.requestStop.connect(self.on_game_stop_requested)
+            widget.requestRefresh.connect(self.refresh_list)
             self.game_list.addItem(item)
             self.game_list.setItemWidget(item, widget)
 
     def on_game_selected(self, item):
         self.card = item.data(Qt.UserRole)
+        self.sidebar.load_game(self.card)
+        self.show_sidebar_safely()
+
+    def on_game_selected_from_card(self, card):
+        self.card = card
         self.sidebar.load_game(self.card)
         self.show_sidebar_safely()
 
@@ -159,6 +172,15 @@ class GameTab(QWidget):
         dialog = RunInPrefixDialog(self)
         dialog.exec()
 
+    def on_game_launch_requested(self, game_card):
+        """ Handles launching game from double click/menu """
+        self.sidebar.load_game(game_card)
+        self.show_sidebar_safely()
+        self.sidebar.start_game(game_card.name)
+
+    def on_game_stop_requested(self, game_card):
+        """ Handles stoping game """
+        self.sidebar.stop_game(game_card.name)
 
 class RunInPrefixDialog(QDialog):
     def __init__(self, parent=None):

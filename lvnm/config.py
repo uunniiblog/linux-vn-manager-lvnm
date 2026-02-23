@@ -11,6 +11,7 @@ DATA_DIR = Path.home() / ".local" / "share" / "lvnm"
 WINE_RUNNERS_DIR = DATA_DIR / "runners" / "wine"
 PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
 PREFIXES_DIR = DATA_DIR / "prefixes"
+COVERS_DIR = DATA_DIR / "covers"
 
 # Files
 CODEC_SCRIPT = BASE_DIR / "vn_winestuff" / "codec.sh"

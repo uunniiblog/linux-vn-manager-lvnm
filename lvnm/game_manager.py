@@ -73,8 +73,10 @@ class GameManager:
             del games_dict[name]
             GameManager._save_data(games_dict)
             print(f"Game '{name}' has been removed from the library.")
+            return True
         else:
-            print(f"[Warning] Game '{name}' not found. Nothing to delete.")
+            print(f"[Debug] Game '{name}' not found. Nothing to delete.")
+            return False
 
     @staticmethod
     def update_game(original_name: str, updates: dict):
@@ -161,3 +163,38 @@ class GameManager:
             print(f"Updated {updated_count} game(s) to use new prefix name.")
         else:
             print("No games were using this prefix.")
+
+    @staticmethod
+    def duplicate_game(name: str):
+        """
+        Creates a copy of an existing game with a unique name.
+        """
+        source_card = GameManager.get_game(name)
+        if not source_card:
+            print(f"[Error] Cannot duplicate. Game '{name}' not found.")
+            return False
+
+        games_dict = GameManager._load_data()
+        
+        # Generate a unique name
+        base_name = f"{name} (Copy)"
+        new_name = base_name
+        counter = 1
+        
+        while new_name in games_dict:
+            counter += 1
+            new_name = f"{base_name} {counter}"
+
+        # Create the copy
+        new_data = source_card.to_dict()
+        
+        # Update the metadata for the copy
+        new_data['name'] = new_name
+        new_data['update_date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        new_data['last_played'] = "" # Reset play time for the copy
+
+        games_dict[new_name] = new_data
+        GameManager._save_data(games_dict)
+        
+        print(f"Successfully duplicated '{name}' as '{new_name}'")
+        return True

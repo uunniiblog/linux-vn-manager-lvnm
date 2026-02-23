@@ -4,7 +4,10 @@ import subprocess
 import shutil
 import json
 import config
+from pathlib import Path
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 
 class SystemUtils:
     
@@ -199,3 +202,39 @@ class SystemUtils:
         
         # Apply it globally. All widgets will resize their layouts to fit this text.
         app.setFont(font)
+
+    @staticmethod
+    def browse_files(path: str):
+        if not path:
+            print("[Error] Game has no path to browse to.")
+            return
+
+        # Get the directory containing the file
+        folder_path = os.path.dirname(os.path.abspath(path))
+
+        if os.path.exists(folder_path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
+        else:
+            print(f"[Error] Path does not exist: {folder_path}")
+
+    @staticmethod
+    def get_cover_path(vndb_id: str) -> str:
+        """
+        Searches for a cover image matching the VNDB ID in the covers directory.
+        Returns the absolute path as a string if found, otherwise an empty string.
+        """
+        if not vndb_id:
+            return ""
+
+        covers_dir = Path(config.COVERS_DIR)
+        if not covers_dir.exists():
+            return ""
+
+        # Search for any file extension matching the VNDB ID
+        # glob is used to handle .jpg, .png, .webp, etc.
+        matches = list(covers_dir.glob(f"{vndb_id}.*"))
+        
+        if matches:
+            return str(matches[0].absolute())
+        
+        return ""
