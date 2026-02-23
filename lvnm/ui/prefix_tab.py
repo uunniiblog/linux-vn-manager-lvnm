@@ -190,6 +190,10 @@ class PrefixTab(QWidget):
             # Refresh UI List
             self.refresh_list()
 
+    def refresh_active_tab(self):
+        """Forces the currently visible sub-tab to reload its data"""
+        self.refresh_list()
+
     
 class EditPrefixDialog(QDialog):
     SETTINGS_FILE = config.UI_SETTINGS

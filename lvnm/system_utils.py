@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import json
 import config
+from PySide6.QtWidgets import QApplication
 
 class SystemUtils:
     
@@ -177,3 +178,24 @@ class SystemUtils:
                 json.dump(data, f, indent=4)
         except Exception as e:
             print(f"Error writing settings: {e}")
+
+    @staticmethod
+    def apply_ui_zoom(zoom_factor: float):
+        """
+        Applies a global font-based zoom to the entire application.
+        1.0 = Normal, 1.2 = 20% larger, etc.
+        """
+        app = QApplication.instance()
+        if not app:
+            return
+
+        # Fetch the current global font
+        font = app.font()
+        
+        # Determine a reasonable base size if none is set (usually 9 or 10)
+        # We use pointSizeF to allow for smooth fractional scaling
+        base_size = 10 
+        font.setPointSizeF(base_size * zoom_factor)
+        
+        # Apply it globally. All widgets will resize their layouts to fit this text.
+        app.setFont(font)

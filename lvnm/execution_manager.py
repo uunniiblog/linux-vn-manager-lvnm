@@ -63,7 +63,8 @@ class ExecutionManager:
             universal_newlines=True,
             cwd=cwd,
             encoding='utf-8',
-            errors='replace'
+            errors='replace',
+            start_new_session=True
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)

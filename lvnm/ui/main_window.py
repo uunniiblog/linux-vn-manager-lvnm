@@ -96,6 +96,10 @@ class MainWindow(QMainWindow):
         # Here we refresh stuff on sidebar changes
         if isinstance(widget, RunnerTab):
             widget.refresh_active_tab()
+        elif isinstance(widget, PrefixTab):
+            widget.refresh_active_tab()
+        elif isinstance(widget, GameTab):
+            widget.refresh_active_tab()
 
     def closeEvent(self, event):
         """

@@ -106,7 +106,7 @@ class GameManager:
         # Save under the (potentially new) key
         raw_data[new_name] = current_card.to_dict()
         GameManager._save_data(raw_data)
-        print(f"Successfully updated '{original_name}' -> '{new_name}'.")
+        print(f"Successfully updated '{new_name}'.")
 
     @staticmethod
     def _load_data():

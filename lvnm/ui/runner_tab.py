@@ -196,7 +196,6 @@ class RunnerSubTab(QWidget):
             self.refresh_list()
 
 class RunnerTab(QWidget):
-    """The main view found in the sidebar"""
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)

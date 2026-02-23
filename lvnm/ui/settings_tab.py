@@ -101,6 +101,21 @@ class SettingsTab(QWidget):
         # Add to form layout (Label on left, Combo on right)
         appearance_layout.addRow(QLabel(self.tr("Theme:")), self.theme_combo)
         
+        self.zoom_combo = QComboBox()
+        self.zoom_combo.addItems(["70%", "80%", "90%", "100%", "110%", "125%", "135%", "150%", "175%"])
+        self.zoom_combo.setFixedWidth(200)
+
+        # Set current index based on saved setting
+        current_zoom = self.user_settings.get("ui_zoom", 1.0)
+        zoom_map = {
+            0.7: 0, 0.8: 1, 0.9: 2, 1.0: 3, 1.1: 4, 
+            1.25: 5, 1.35: 6, 1.5: 7, 1.75: 8
+        }
+        self.zoom_combo.setCurrentIndex(zoom_map.get(current_zoom, 2))
+
+        self.zoom_combo.currentIndexChanged.connect(self.change_zoom)
+        appearance_layout.addRow(QLabel(self.tr("UI Zoom:")), self.zoom_combo)
+
         main_layout.addWidget(appearance_group)
 
         # ==========================================
@@ -180,3 +195,14 @@ class SettingsTab(QWidget):
         
         # Flush to JSON
         SystemUtils.save_settings(self.user_settings)
+
+    def change_zoom(self, index):
+        mapping = {
+            0: 0.7, 1: 0.8, 2: 0.9, 3: 1.0, 4: 1.1, 
+            5: 1.25, 6: 1.35, 7: 1.5, 8: 1.75
+        }
+        new_zoom = mapping[index]
+        # Save the setting
+        self.save_setting("ui_zoom", new_zoom)        
+        SystemUtils.apply_ui_zoom(new_zoom)
+        self.theme_manager.update_theme()

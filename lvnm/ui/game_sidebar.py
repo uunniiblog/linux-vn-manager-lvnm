@@ -11,6 +11,7 @@ from game_manager import GameManager
 from game_runner import GameRunner
 from prefix_manager import PrefixManager
 from model.game_card import GameCard, GameScope
+from system_utils import SystemUtils
 
 class GameSidebar(QFrame):
     # Dictionary to track multiple games running
@@ -199,6 +200,9 @@ class GameSidebar(QFrame):
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
         self.current_game = card
+
+        # Load Global Settings for Defaults
+        user_settings = SystemUtils.load_settings()
         
         # Clear General UI Fields
         self.launch_btn.setVisible(False)
@@ -208,9 +212,12 @@ class GameSidebar(QFrame):
         self.edit_umu_store.clear()
         self.edit_umu_id.clear()
         
-        # Reset Gamescope
-        self.gs_enabled.setChecked(False)
-        self.gs_params.clear()
+        # Apply Gamescope Defaults from Settings or leave empty
+        gs_default_enabled = user_settings.get("gamescope_enabled", False)
+        gs_default_params = user_settings.get("gamescope_params", "")
+        
+        self.gs_enabled.setChecked(gs_default_enabled)
+        self.gs_params.setText(gs_default_params)
 
         # Reload Prefixes to an empty selection
         self.combo_prefix.blockSignals(True)
@@ -224,8 +231,22 @@ class GameSidebar(QFrame):
         # Default visibility (UMU hidden for new entries until prefix is picked)
         self.update_umu_visibility("wine")
 
+        # --- Apply Global Winetricks/Env Var Defaults ---
+        # We look at the 'global_wt' dict from settings and find matches in config.ENV_VARIABLES
+        global_wt = user_settings.get("global_wt", {})
+        
+        # Create a temp dict to simulate active env vars for the refresh method
+        default_env_vars = {}
+        
+        # This part assumes your config.ENV_VARIABLES entries have an ID 
+        # that matches the keys in global_wt (like 'jp_locale' or 'jp_timezone')
+        for var in config.ENV_VARIABLES:
+            var_id = var.get("id")
+            if global_wt.get(var_id): # If 'jp_locale' is True in settings
+                default_env_vars[var["key"]] = var["value"]
+
         # Clear Env Var checkboxes
-        self.refresh_env_vars("wine", {})
+        self.refresh_env_vars("wine", default_env_vars)
     
     def toggle_game(self):
         if not self.current_game:
@@ -246,8 +267,8 @@ class GameSidebar(QFrame):
         runner = self.active_runners.get(name)
         if runner:
             runner.stop()
-            # TODO: dont update last played timer here, try to do it through check_active_runners
-            self.active_runners.pop(name, None)
+            # dont update last played timer here, let check_active_runners handle it
+            # self.active_runners.pop(name, None)
             # self.current_game.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
             # update = self.current_game.to_dict()
             # GameManager.update_game(self.current_game.name, update)
@@ -409,15 +430,13 @@ class GameSidebar(QFrame):
         """Polls ALL active runners. Cleans up those that finished."""
         finished_games = []
 
-        print("check_active_runners")
-
         for name, runner in self.active_runners.items():
-            print(f"check_active_runners {name}")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - check_active_runners {name}")
             if not runner.is_running():
                 finished_games.append(name)
 
         for name in finished_games:
-            print(f"Game {name} exited. Cleaning up...")
+            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - Game {name} exited. Cleaning up...")
             self.active_runners.pop(name)
             # Get the actual GameCard for the game that finished
             game_to_update = GameManager.get_game(name) 

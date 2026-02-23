@@ -1,4 +1,5 @@
 import os
+import signal
 import json
 import config
 import subprocess
@@ -17,6 +18,7 @@ class GameRunner:
         self.prefix_info: dict = None
         self.env: dict = {}
         self.cmd: list = []
+        self._manual_stop = False
         
         # The "worker" reference to track the running process
         self.process = None 
@@ -151,6 +153,7 @@ class GameRunner:
 
     def is_running(self) -> bool:
         """Checks if the game process is currently active."""
+
         if self.process is None:
             return False
         
@@ -191,15 +194,20 @@ class GameRunner:
             return
 
         print(f"Stopping game '{self.name}'...")
+
+        try:
+            # Kill entire process group to avoid gamescope/wine leftovers
+            pgid = os.getpgid(self.process.pid)
+            os.killpg(pgid, signal.SIGKILL)
+        except Exception as e:
+            print(f"Error killing process {self.name}: {e}")
         
         if self.is_proton:
-            self.process.terminate()
             runner_path = Path(self.prefix_info["runner"])
             wineserver_bin = runner_path / "files" / "bin" / "wineserver"
             print(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
             self._kill_wineserver(wineserver_bin, runner_path)
         else:
-            self.process.terminate()
             runner_path = Path(self.prefix_info["runner"])
             wineserver_bin = runner_path / "bin" / "wineserver"
             print(f"Calling _kill_wineserver wine {wineserver_bin} {runner_path}")

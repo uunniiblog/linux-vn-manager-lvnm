@@ -1,42 +1,21 @@
 import ctypes
 import ctypes.util
 import sys
+import os
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTranslator, QLocale
 from ui.main_window import MainWindow
-
-# Remove later:
-import time
-from prefix_manager import PrefixManager
-from runner_manager_kron4ek import RunnerManagerKron4ek
-from runner_manager_protonge import RunnerManagerProtonGE
-from game_manager import GameManager
-from game_runner import GameRunner
 from system_utils import SystemUtils
 
-
 def main():
-    sys_data = SystemUtils.get_system_info()
-    software = SystemUtils.get_software_support()
-    print(sys_data)
-    print(software)
-
-    # istoria_session = GameRunner("Carnival")
-
-    # if istoria_session.run():
-    #     print("Launching...")
-        
-    #     # Keep program alive to keep game alive
-    #     try:
-    #         while istoria_session.is_running():
-    #             print("game running...")
-    #             time.sleep(1) # Wait and keep checking
-    #     except KeyboardInterrupt:
-    #         print("\nShutting down...")
-    #         istoria_session.stop()
-    #     print(f"Game exited with code: {istoria_session.process.returncode}")
+    set_process_name("linux-vn-manager-lvnm")
     
-
+    # os.environ["QT_SCALE_FACTOR"] = "1.5"
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
+    
     app = QApplication(sys.argv)
     
     # TODO
@@ -44,7 +23,10 @@ def main():
     if translator.load(QLocale.system(), "lvnm", "_", "locale"):
         app.installTranslator(translator)
 
-    set_process_name("launcher")
+    # Load UI size
+    settings = SystemUtils.load_settings()
+    zoom = settings.get("ui_zoom", 1.0) # Default to 1.0
+    SystemUtils.apply_ui_zoom(zoom)
 
     # Launch UI
     window = MainWindow()

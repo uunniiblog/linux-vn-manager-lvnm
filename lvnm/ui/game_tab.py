@@ -10,12 +10,15 @@ from prefix_manager import PrefixManager
 from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
 from model.game_card import GameCard
+from system_utils import SystemUtils
 
 class GameTab(QWidget):
     SETTINGS_FILE = config.UI_SETTINGS
 
     def __init__(self):
         super().__init__()
+        self.card = None
+        self.zoom = SystemUtils.load_settings().get("ui_zoom", 1.0)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -82,6 +85,20 @@ class GameTab(QWidget):
         self._restore_state()
         self.refresh_list()
 
+    def refresh_active_tab(self):
+        """Forces the currently visible sub-tab to reload its data"""
+        if self.card is not None:
+            fresh_card = GameManager.get_game(self.card.name)
+            if fresh_card:
+                self.card = fresh_card
+                self.sidebar.load_game(self.card)
+
+        # Reload list if zoom changed
+        new_zoom = SystemUtils.load_settings().get("ui_zoom", 1.0)
+        if new_zoom != self.zoom:
+            self.zoom = new_zoom
+            self.refresh_list()
+
     def refresh_list(self):
         """Clears and repopulates the game list, filtered by the search bar."""
         self.game_list.clear()
@@ -94,16 +111,15 @@ class GameTab(QWidget):
         
         for name, card in games.items():
             item = QListWidgetItem(self.game_list)
-            item.setSizeHint(GameListItem(card).sizeHint())
+            widget = GameListItem(card, zoom_factor=self.zoom)
+            item.setSizeHint(widget.sizeHint())
             item.setData(Qt.UserRole, card)
-            
-            widget = GameListItem(card)
             self.game_list.addItem(item)
             self.game_list.setItemWidget(item, widget)
 
     def on_game_selected(self, item):
-        card = item.data(Qt.UserRole)
-        self.sidebar.load_game(card)
+        self.card = item.data(Qt.UserRole)
+        self.sidebar.load_game(self.card)
         self.show_sidebar_safely()
 
     def on_add_game_clicked(self):
