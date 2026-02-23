@@ -2,6 +2,7 @@ import ctypes
 import ctypes.util
 import sys
 import os
+import signal
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTranslator, QLocale
@@ -10,8 +11,11 @@ from system_utils import SystemUtils
 
 def main():
     set_process_name("linux-vn-manager-lvnm")
+
+    # Close with ctrl c in terminal
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     
-    # os.environ["QT_SCALE_FACTOR"] = "1.5"
+    # Scale with system scale (?)
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

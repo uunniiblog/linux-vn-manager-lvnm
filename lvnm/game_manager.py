@@ -6,6 +6,7 @@ from runner_manager import RunnerManagerInterface
 from pathlib import Path
 from dataclasses import asdict
 from model.game_card import GameCard, GameScope
+from vndb_manager import VndbManager
 
 class GameManager:
     GAME_FILE = config.GAMES_DATA
@@ -38,6 +39,7 @@ class GameManager:
         games_dict[name] = new_card.to_dict()
         
         GameManager._save_data(games_dict)
+        VndbManager.fetch_and_store_vn(vndb_id=vndb)
         print(f"Successfully added game '{name}'")
 
     @staticmethod
@@ -108,6 +110,7 @@ class GameManager:
         # Save under the (potentially new) key
         raw_data[new_name] = current_card.to_dict()
         GameManager._save_data(raw_data)
+        VndbManager.fetch_and_store_vn(vndb_id=current_card.vndb)
         print(f"Successfully updated '{new_name}'.")
 
     @staticmethod

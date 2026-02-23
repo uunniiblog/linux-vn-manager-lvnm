@@ -23,6 +23,7 @@ USER_SETTINGS = DATA_DIR / ".userconf.json"
 # URLS
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
 PROTONGE_API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
+VNDB_API_URL = "https://api.vndb.org/kana"
 
 # Codec List
 CODEC_LIST = [
@@ -106,3 +107,4 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 WINE_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
 PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
 PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
+COVERS_DIR.mkdir(parents=True, exist_ok=True)

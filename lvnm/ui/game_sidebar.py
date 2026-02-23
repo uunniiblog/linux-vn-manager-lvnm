@@ -276,7 +276,7 @@ class GameSidebar(QFrame):
                 if active_path == target_prefix_path:
                     prefix_count += 1
             runner.stop(prefix_count)
-            
+
             # dont update last played timer here, let check_active_runners handle it
             # self.active_runners.pop(name, None)
             # self.current_game.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
@@ -478,6 +478,7 @@ class GameSidebar(QFrame):
             if is_running and current_text != self.tr("Stop Game"):
                 self.set_ui_stop_state()
                 
+            # dont think this can ever happen
             # If the game is NOT running but the button doesn't say "Start Game", fix it
             # elif not is_running and current_text != self.tr("Start Game"):
             #     self.set_ui_start_state()
