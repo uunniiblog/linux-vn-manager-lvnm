@@ -311,9 +311,30 @@ class EditPrefixDialog(QDialog):
         return group
 
     def browse_path(self):
-        new_dir = QFileDialog.getExistingDirectory(self, self.tr("Select Prefix Directory"), self.path_edit.text())
+        current_path = self.path_edit.text().strip()
+        new_dir = QFileDialog.getExistingDirectory(
+            parent = self,
+            caption = self.tr("Select Prefix Directory"),
+            dir = current_path
+        )
         if new_dir:
             self.path_edit.setText(new_dir)
+
+    def browse_path_qt(self):
+        dialog = QFileDialog(self)
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        dialog.setWindowTitle(self.tr("Select Prefix Directory"))
+        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setViewMode(QFileDialog.Detail)
+        
+        current_path = self.path_edit.text().strip()
+        if current_path:
+            dialog.setDirectory(current_path)
+
+        if dialog.exec():
+            selected = dialog.selectedFiles()
+            if selected:
+                self.path_edit.setText(selected[0])
 
     def get_data(self):
         """Returns the current state of the UI fields"""

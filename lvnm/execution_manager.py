@@ -61,7 +61,9 @@ class ExecutionManager:
             text=True,
             bufsize=1,
             universal_newlines=True,
-            cwd=cwd
+            cwd=cwd,
+            encoding='utf-8',
+            errors='replace'
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)
@@ -72,6 +74,8 @@ class ExecutionManager:
                     # so the output appears in our terminal
                     sys.stdout.write(line)
                     sys.stdout.flush()
+            except Exception as e:
+                print(f"\n[Log Thread Error] {e}")
             finally:
                 pipe.close()
 

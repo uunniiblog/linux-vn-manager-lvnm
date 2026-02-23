@@ -11,9 +11,9 @@ class GameRunner:
     GAME_DATA = Path(config.GAMES_DATA)
     LOG_LEVEL = config.LOG_LEVEL
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, card_override: GameCard = None):
         self.name = name
-        self.game: GameCard = None
+        self.game: GameCard = card_override
         self.prefix_info: dict = None
         self.env: dict = {}
         self.cmd: list = []
@@ -22,11 +22,15 @@ class GameRunner:
         self.process = None 
 
         # Attempt to load data immediately upon instantiation
-        self._load_data()
+        # self._load_data()
 
     def _load_data(self):
         """Loads game and prefix data into the instance."""
-        self.game = self._get_game_card(self.name)
+
+        # Only fetch from the registry if we didn't provide a card manually
+        if not self.game:
+            self.game = self._get_game_card(self.name)
+
         if not self.game:
             raise ValueError(f"Game '{self.name}' not found in registry.")
 
@@ -71,8 +75,30 @@ class GameRunner:
             gs_params = self.game.gamescope.parameters.split()
             self.cmd = ["gamescope"] + gs_params + ["--"] + self.cmd
 
+    def run_in_prefix(self, exe_path: str, prefix_name: str):
+        """
+        Bypasses JSON loading to run an arbitrary executable in a selected prefix.
+        Perfect for installers or configuration tools.
+        """
+        try:
+            # Manually fetch prefix info
+            self.prefix_info = self._get_prefix_info(prefix_name)
+            if not self.prefix_info:
+                raise ValueError(f"Prefix '{prefix_name}' not found.")
+            
+            # Call same logic as run
+            self.prepare_environment()
+            self._log_run_command(Path(self.prefix_info["runner"]))
+            self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
+            return True
+            
+        except Exception as e:
+            print(f"[Error] Ad-hoc run failed: {e}")
+            return False
+    
     def run(self):
         """Prepares, logs, and executes the game, keeping a reference to the worker."""
+        self._load_data()
         try:
             # Only prepare if we haven't already
             if not self.cmd or not self.env:
@@ -82,8 +108,6 @@ class GameRunner:
             return False
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-
-        #self.process = ProcessLogger.run(self.cmd, self.env)
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
 
         print(f"self.process {self.process}")

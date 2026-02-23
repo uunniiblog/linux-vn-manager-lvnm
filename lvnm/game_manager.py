@@ -77,17 +77,17 @@ class GameManager:
             print(f"[Warning] Game '{name}' not found. Nothing to delete.")
 
     @staticmethod
-    def update_game(name: str, updates: dict):
+    def update_game(original_name: str, updates: dict):
         """
-        Updates an existing game entry.
+        Updates an existing game entry
         """
         raw_data = GameManager._load_data()
         
-        if name not in raw_data:
-            print(f"[Error] Game '{name}' not found. Cannot update.")
+        if original_name not in raw_data:
+            print(f"[Error] Game '{original_name}' not found. Cannot update.")
             return
 
-        current_card = GameCard.from_dict(name, raw_data[name])
+        current_card = GameCard.from_dict(original_name, raw_data[original_name])
         current_card.update_date = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
         for key, value in updates.items():
@@ -97,9 +97,16 @@ class GameManager:
             elif hasattr(current_card, key):
                 setattr(current_card, key, value)
 
-        raw_data[name] = current_card.to_dict()
+        new_name = current_card.name
+
+        # Handle renaming: remove the old key if the name changed
+        if new_name != original_name:
+            del raw_data[original_name]
+
+        # Save under the (potentially new) key
+        raw_data[new_name] = current_card.to_dict()
         GameManager._save_data(raw_data)
-        print(f"Successfully updated '{name}'.")
+        print(f"Successfully updated '{original_name}' -> '{new_name}'.")
 
     @staticmethod
     def _load_data():
@@ -121,6 +128,16 @@ class GameManager:
                 json.dump(data, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"[Error] Failed to save to {GameManager.GAME_FILE}: {e}")
+
+    @staticmethod
+    def get_game(name: str) -> Optional[GameCard]:
+        """ Fetches a single game by name and returns it as a GameCard. """
+        raw_data = GameManager._load_data()
+        data = raw_data.get(name)
+        
+        if data:
+            return GameCard.from_dict(name, data)
+        return None
 
     @staticmethod
     def update_prefix_references(old_name: str, new_name: str):
