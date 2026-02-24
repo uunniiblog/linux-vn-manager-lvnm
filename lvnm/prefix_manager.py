@@ -3,6 +3,12 @@ import subprocess
 import json
 import shutil
 import config
+import requests
+import tarfile
+import tempfile
+import logging
+logger = logging.getLogger(__name__)
+from pathlib import Path
 from datetime import datetime
 from pathlib import Path
 from model.prefix import Prefix
@@ -41,7 +47,7 @@ class PrefixManager:
             self._setup_env()
             return True
 
-        print(f"Prefix {self.name} does not exist yet")
+        logger.debug(f"Prefix {self.name} does not exist yet")
         return False
 
     def _setup_env(self):
@@ -62,7 +68,7 @@ class PrefixManager:
 
     def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", executor=None):
         """Physical creation and initialization of the prefix."""
-        print(f"--- Creating Prefix: {self.name} ---")
+        logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
         self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
         self.codecs = codecs
@@ -72,14 +78,14 @@ class PrefixManager:
         try:
             self.prefix_path.mkdir(parents=True, exist_ok=True)
             
-            print("Initializing prefix (wineboot)...")
+            logger.info("Initializing prefix (wineboot)...")
             cmd = self.runner_command + ["wineboot", "-u"]
             desc = f"Initializing prefix {self.name} (wineboot)"
 
             # Callback method
             def finalize_creation():
                 self._save_metadata()
-                print(f"Prefix {self.name} ready.")
+                logger.info(f"Prefix {self.name} ready.")
 
             if executor:
                 # Add wineboot to the queue
@@ -101,7 +107,7 @@ class PrefixManager:
             return True
 
         except Exception as e:
-            print(f"[Error] Creation failed: {e}")
+            logger.error(f"Creation failed: {e}")
             # Clean up if it's a 'zombie' prefix (dir exists but no drive_c)
             if self.prefix_path.exists() and not (self.prefix_path / "drive_c").exists():
                 shutil.rmtree(self.prefix_path)
@@ -110,10 +116,10 @@ class PrefixManager:
     def install_codecs(self, codecs_list: str, executor=None):
         """Installs or updates codecs in an existing prefix."""
         if not self.CODEC_SH.exists():
-            print(f"Warning: Codec script missing at {self.CODEC_SH}")
+            logger.debug(f"Codec script missing at {self.CODEC_SH}")
             return False
 
-        print(f"Installing codecs into {self.name}: {codecs_list}")
+        logger.info(f"Installing codecs into {self.name}: {codecs_list}")
         desc = f"Installing codecs: {codecs_list}"
         cmd = ["sh", str(self.CODEC_SH)] + codecs_list.split()
 
@@ -133,10 +139,10 @@ class PrefixManager:
         """Installs winetricks components into the prefix."""
         winetricks_bin = shutil.which("winetricks")
         if not winetricks_bin:
-            print("[Error] winetricks not found in PATH.")
+            logger.error("winetricks not found in PATH.")
             return False
 
-        print(f"Installing winetricks into {self.name}: {winetricks_list}")
+        logger.info(f"Installing winetricks into {self.name}: {winetricks_list}")
         desc = f"Installing winetricks: {winetricks_list}"
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
 
@@ -165,7 +171,7 @@ class PrefixManager:
 
         def finalize():
             self.fonts = True
-            print("Fonts symlinked sucessfully")
+            logger.info("Fonts symlinked sucessfully")
             self._save_metadata()
 
         if executor:
@@ -218,7 +224,7 @@ class PrefixManager:
     def rename_prefix(self, new_name: str):
         """Renames the prefix folder and updates the json entry."""
         if self.get_prefix_info(new_name):
-            print(f"Error: A prefix named '{new_name}' already exists in the json_file.")
+            logger.error(f"A prefix named '{new_name}' already exists in the json_file.")
             return False
 
         from game_manager import GameManager
@@ -248,7 +254,7 @@ class PrefixManager:
                     with open(self.PREFIXES_FILE, "w") as f:
                         json.dump(json_file, f, indent=4)
                     
-                    print(f"json_file updated: '{old_name}' is now '{new_name}'")
+                    logger.info(f"json_file updated: '{old_name}' is now '{new_name}'")
                     
                     # Update games to new prefix name
                     GameManager.update_prefix_references(old_name, new_name)
@@ -256,8 +262,86 @@ class PrefixManager:
             return True
 
         except Exception as e:
-            print(f"[Error] Failed to rename prefix: {e}")
+            logger.error(f"Failed to rename prefix: {e}")
             return False
+
+    def install_dxvk(self, executor=None):
+        """
+        Downloads latest DXVK and installs DLLs into the prefix.
+        """
+        logger.info(f"--- Installing DXVK into {self.name} ---")
+        
+        def run_dxvk_logic(logger=None):
+            def log_to_ui(msg):
+                if logger:
+                    logger(msg) # Call the signal to show in the Dialog
+                import logging
+                logging.getLogger(__name__).debug(f"[DXVK] {msg}")
+            try:
+                # Get latest release URL
+                api_url = config.DXVK_API_URL
+                response = requests.get(api_url, timeout=10)
+                response.raise_for_status()
+                release_data = response.json()
+                
+                # Find the .tar.gz asset
+                download_url = next(
+                    asset["browser_download_url"] 
+                    for asset in release_data["assets"] 
+                    if asset["name"].endswith(".tar.gz")
+                )
+                
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    tmp_path = Path(tmpdir)
+                    archive_path = tmp_path / "dxvk.tar.gz"
+                    
+                    # Download
+                    log_to_ui(f"Downloading DXVK from {download_url}...")
+                    r = requests.get(download_url, stream=True)
+                    with open(archive_path, 'wb') as f:
+                        shutil.copyfileobj(r.raw, f)
+                    
+                    # Extract
+                    with tarfile.open(archive_path, "r:gz") as tar:
+                        tar.extractall(path=tmp_path)
+                    
+                    # DXVK extracts into a folder named 'dxvk-v2.x'
+                    extracted_folder = next(tmp_path.glob("dxvk-*"))
+                    
+                    # Copy DLLs
+                    # system32 = 64-bit DLLs
+                    # syswow64 = 32-bit DLLs (required for WoW64 to run 32-bit games)
+                    sys32 = self.prefix_path / "drive_c" / "windows" / "system32"
+                    syswow64 = self.prefix_path / "drive_c" / "windows" / "syswow64"
+                    
+                    dlls = ["d3d9.dll", "d3d10core.dll", "d3d11.dll", "dxgi.dll"]
+                    
+                    log_to_ui("Copying DXVK DLLs to prefix...")
+                    # 64-bit
+                    for dll in dlls:
+                        src = extracted_folder / "x64" / dll
+                        if src.exists():
+                            shutil.copy(src, sys32 / dll)
+                    
+                    # 32-bit
+                    if syswow64.exists():
+                        for dll in dlls:
+                            src = extracted_folder / "x32" / dll
+                            if src.exists():
+                                shutil.copy(src, syswow64 / dll)
+
+                log_to_ui("DXVK installed successfully.")
+                return True
+
+            except Exception as e:
+                log_to_ui(f"DXVK installation failed: {e}")
+                return False
+
+        if executor:
+            logger.debug("adding task: Downloading and Installing DXVK")
+            executor.add_task(run_dxvk_logic, self.env, "Downloading and Installing DXVK")
+        else:
+            run_dxvk_logic()
 
     def check_prefix_exists(self):
         if Path(self.prefix_path).exists():

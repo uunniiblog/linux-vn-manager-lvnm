@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, 
-                             QListWidget, QStackedWidget, QSplitter)
+                             QListWidget, QStackedWidget, QSplitter,
+                             QApplication)
 from PySide6.QtCore import Qt, QSettings, QByteArray
 import config
 
@@ -9,8 +10,6 @@ from ui.runner_tab import RunnerTab
 from ui.stats_tab import StatsTab
 from ui.settings_tab import SettingsTab
 from ui.theme_manager import ThemeManager
-
-
 
 class MainWindow(QMainWindow):
     SETTINGS_FILE = config.UI_SETTINGS
@@ -38,7 +37,8 @@ class MainWindow(QMainWindow):
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
         self.sidebar.setMinimumWidth(120)
-        
+
+                
         # Sidebar items
         self.sidebar.addItem(self.tr("Games"))
         self.sidebar.addItem(self.tr("Prefixes"))
@@ -91,7 +91,6 @@ class MainWindow(QMainWindow):
     def on_sidebar_change(self, index):
         self.content_stack.setCurrentIndex(index)
         widget = self.content_stack.widget(index)
-        # print("on_sidebar_change")
 
         # Here we refresh stuff on sidebar changes
         if isinstance(widget, RunnerTab):
@@ -110,5 +109,11 @@ class MainWindow(QMainWindow):
         self.settings.setValue("mainSplitter", self.splitter.saveState())
         
         super().closeEvent(event)
+
+    def update_sidebar_font(self):
+        app_font = QApplication.instance().font()
+        app_font.setPointSizeF(app_font.pointSizeF() * 1.5)
+        print(app_font)
+        self.sidebar.setFont(app_font)
     
     

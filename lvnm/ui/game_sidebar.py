@@ -1,5 +1,6 @@
 import config
 import urllib.parse
+import logging
 from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
@@ -14,6 +15,10 @@ from game_runner import GameRunner
 from prefix_manager import PrefixManager
 from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
+from ui.prefix_tab import PrefixTab, CreatePrefixDialog
+from ui.console_dialog import ConsoleDialog
+
+logger = logging.getLogger(__name__)
 
 class GameSidebar(QFrame):
     VNDB_SITE_URL = config.VNDB_SITE_URL
@@ -98,10 +103,23 @@ class GameSidebar(QFrame):
         path_row.addWidget(self.edit_path)
         path_row.addWidget(self.btn_path)
         
+        # Prefix combo
         self.combo_prefix = QComboBox()
         self.combo_prefix.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.combo_prefix.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.combo_prefix.currentTextChanged.connect(self.on_prefix_changed)
+
+        # Create prefix button
+        self.btn_add_prefix = QPushButton("+")
+        self.btn_add_prefix.setFixedSize(32, 32)
+        self.btn_add_prefix.clicked.connect(self.open_create_prefix_dialog)
+
+        # Create a horizontal layout to hold both the combo box and the button
+        prefix_row = QHBoxLayout()
+        prefix_row.setContentsMargins(0, 0, 0, 0)
+        prefix_row.setSpacing(5)
+        prefix_row.addWidget(self.combo_prefix)
+        prefix_row.addWidget(self.btn_add_prefix)
 
         # Warning label for missing prefix
         self.prefix_warning = QLabel()
@@ -118,7 +136,7 @@ class GameSidebar(QFrame):
 
         gen_form.addRow(self.tr("Name:"), self.edit_name)
         gen_form.addRow(self.tr("Path:"), path_row)
-        gen_form.addRow(self.tr("Prefix:"), self.combo_prefix)
+        gen_form.addRow(self.tr("Prefix:"), prefix_row)
         gen_form.addRow("", self.prefix_warning)
         gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
         gen_form.addRow(self.label_umu_store, self.edit_umu_store) # Use the stored label
@@ -258,7 +276,7 @@ class GameSidebar(QFrame):
             if req and req != prefix_type:
                 continue
             
-            cb = QCheckBox(var["id"])
+            cb = QCheckBox(var.get("name") or var["id"])
             # Check if current game has this specific key/value pair
             if active_vars.get(var["key"]) == var["value"]:
                 cb.setChecked(True)
@@ -362,23 +380,23 @@ class GameSidebar(QFrame):
 
         # Avoid launching same game multiple times
         if name in self.active_runners:
-            print(f"[Debug] {name} is already running. Ignoring launch request.")
+            logger.debug(f"[Debug] {name} is already running. Ignoring launch request.")
             return False
 
         try:
             runner = GameRunner(name)
             if runner.run():
                 self.active_runners[name] = runner
-                print(f"Started {name}. Total running: {len(self.active_runners)}")
+                logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
                 return True
         except Exception as e:
-            print(f"[Error] Failed to start {name}: {e}")
+            logger.error(f"Failed to start {name}: {e}")
             return False
 
     def check_game_status(self):
         """Polls the runner to see if the game is still alive."""
         if self.runner and not self.runner.is_running():
-            print("Game exited naturally. Cleaning up UI...")
+            logger.debug("Game exited naturally. Cleaning up UI...")
             self.monitor_timer.stop()
             self.runner = None
             
@@ -438,7 +456,7 @@ class GameSidebar(QFrame):
 
         # Execute Save
         if is_new_game:
-            print(f"[Debug] Creating game: {self.current_game.name}")
+            logger.debug(f"Creating game: {self.current_game.name}")
             GameManager.add_game(
                 exe=self.current_game.path,
                 name=self.current_game.name,
@@ -449,7 +467,7 @@ class GameSidebar(QFrame):
             GameManager.update_game(self.current_game.name, self.current_game.to_dict())
             self.launch_btn.setVisible(True)
         else:
-            print(f"[Debug] Updating game: {original_name}")
+            logger.debug(f"Updating game: {original_name}")
             GameManager.update_game(original_name, self.current_game.to_dict())
 
         # Finalize UI
@@ -475,6 +493,14 @@ class GameSidebar(QFrame):
         self.update_umu_visibility(prefix_type)
         
         if self.current_game:
+            # Keep current selected shit
+            current_ui_vars = {}
+            for var in config.ENV_VARIABLES:
+                cb = self.env_checkboxes.get(var["id"])
+                if cb and cb.isChecked():
+                    current_ui_vars[var["key"]] = var["value"]
+            
+            self.current_game.envvar = current_ui_vars            
             self.refresh_env_vars(prefix_type, self.current_game.envvar)
 
     def show_saved_feedback(self):
@@ -519,17 +545,47 @@ class GameSidebar(QFrame):
             # Close the sidebar
             self.on_close()
 
+    def open_create_prefix_dialog(self):        
+        created_name = PrefixTab.create_new_prefix_flow(self)
+        if created_name:
+            self.refresh_prefix_combo()
+            
+            # Auto-select the newly created prefix
+            index = self.combo_prefix.findText(created_name)
+            if index >= 0:
+                self.combo_prefix.setCurrentIndex(index)
+
+    def refresh_prefix_combo(self):
+        """Refreshes the prefix list and retains the current selection."""
+        from prefix_manager import PrefixManager
+        
+        self.prefixes = PrefixManager.get_prefix_json()
+        current_selection = self.combo_prefix.currentText()
+        
+        # Block signals so clear() doesn't trigger on_prefix_changed and wipe env vars
+        self.combo_prefix.blockSignals(True)
+        self.combo_prefix.clear()
+        
+        self.combo_prefix.addItems(self.prefixes.keys())
+        
+        # Restore previous selection if it still exists
+        index = self.combo_prefix.findText(current_selection)
+        if index >= 0:
+            self.combo_prefix.setCurrentIndex(index)
+            
+        self.combo_prefix.blockSignals(False)
+
     def check_active_runners(self):
         """Polls ALL active runners. Cleans up those that finished."""
         finished_games = []
 
         for name, runner in self.active_runners.items():
-            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - check_active_runners {name}")
+            logger.debug(f"[check_active_runners {name}")
             if not runner.is_running():
                 finished_games.append(name)
 
         for name in finished_games:
-            print(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - Game {name} exited. Cleaning up...")
+            logging.debug(f"[Game {name} exited. Cleaning up...")
             self.active_runners.pop(name)
             # Get the actual GameCard for the game that finished
             game_to_update = GameManager.get_game(name) 

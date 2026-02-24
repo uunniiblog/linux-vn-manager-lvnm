@@ -15,7 +15,7 @@ class ThemeManager:
         outline: none;
     }}
     QListWidget#sidebar::item {{
-        padding: 12px 20px;
+        padding: 15px 20px;
     }}
     QListWidget#sidebar::item:selected {{
         background-color: {bg_sidebar_sel};
@@ -29,7 +29,7 @@ class ThemeManager:
         color: {text_main};
     }}
     
-    /* --- NEW STYLES FOR SETTINGS SECTIONS --- */
+    /* --- SETTINGS SECTIONS --- */
     QGroupBox {{
         border: 1px solid {border_color};
         border-radius: 6px;
@@ -91,6 +91,16 @@ class ThemeManager:
         
         # Apply to the WHOLE application
         QApplication.instance().setStyleSheet(full_qss)
+
+        # Re-apply sidebar font override after stylesheet resets it
+        # if hasattr(self, '_sidebar_font_override'):
+        #     self._sidebar_font_override()
+
+        from ui.main_window import MainWindow
+        for widget in QApplication.instance().topLevelWidgets():
+            if isinstance(widget, MainWindow):
+                widget.update_sidebar_font()
+                break
 
     def get_theme_mode(self):
         """Returns 'light', 'dark', or 'auto' based on settings."""

@@ -1,9 +1,14 @@
+import threading
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
-from PySide6.QtCore import QProcess, QProcessEnvironment, Signal
+from PySide6.QtCore import QProcess, QProcessEnvironment, Signal, Slot
 from PySide6.QtGui import QTextCursor
+import logging
+logger = logging.getLogger(__name__)
 
 class ConsoleDialog(QDialog):
     finished_all = Signal() # Signal emitted when the queue is empty
+    task_finished = Signal()
+    append_text_signal = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -25,6 +30,8 @@ class ConsoleDialog(QDialog):
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
         self.process.readyReadStandardError.connect(self.handle_stderr)
         self.process.finished.connect(self._on_process_finished)
+        self.task_finished.connect(self._on_process_finished)
+        self.append_text_signal.connect(self.console.append)
 
         self.task_queue = []
         self.current_callback = None
@@ -49,24 +56,43 @@ class ConsoleDialog(QDialog):
     def _run_next(self):
         if self.task_queue:
             task = self.task_queue.pop(0)
+            logger.debug(f"[debug] Starting task {task["desc"]}")
             self.current_callback = task["callback"]
             
             self.console.append(f"\n>>> {task['desc']}...")
-            
-            # Setup environment
-            qenv = QProcessEnvironment.systemEnvironment()
-            for k, v in task["env"].items():
-                qenv.insert(k, str(v))
-            self.process.setProcessEnvironment(qenv)
-            
-            self.process.start(task["cmd"][0], task["cmd"][1:])
+
+            cmd = task["cmd"]
+
+            try:
+                if isinstance(cmd, list):
+                    qenv = QProcessEnvironment.systemEnvironment()
+                    for k, v in task["env"].items():
+                        qenv.insert(k, str(v))
+                    self.process.setProcessEnvironment(qenv)
+                    self.process.start(cmd[0], cmd[1:])
+                elif callable(cmd):
+                    def wrapper():
+                        try:
+                            # Pass the logger to methods queued up so it shows up in the dialog
+                           cmd(logger=self.append_text_signal.emit)
+                        except Exception as e:
+                            self.append_text_signal.emit(f"[Thread Error] {e}")
+                        
+                        # Tell the main thread this task is done so it can run the next one
+                        self.task_finished.emit()
+
+                    threading.Thread(target=wrapper, daemon=True).start()
+            except Exception as e:
+                logger.error(f"[Error] Task failed: {e}")
+
         else:
             self.console.append("\n--- All tasks completed successfully ---")
             self.close_btn.setEnabled(True)
             self.finished_all.emit()
 
     def _on_process_finished(self):
-        # Run the internal logic (like updating JSON) before moving to next task
+        # Run callback then move to next task
+        logger.debug(f"Task finished")
         if self.current_callback:
             self.current_callback()
         self._run_next()

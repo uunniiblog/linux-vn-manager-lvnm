@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QTabWidget, QGroupBox, QListWidget, QPushButton, 
                              QDialog, QMessageBox, QProgressBar, QApplication)

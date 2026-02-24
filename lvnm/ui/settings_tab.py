@@ -4,6 +4,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QComboBox,
                                QCheckBox, QFileDialog)
 from system_utils import SystemUtils
 import config
+import logging
+from logging_manager import setup_logging
+logger = logging.getLogger(__name__)
 
 class SettingsTab(QWidget):
     CONFIG_FILE = config.USER_SETTINGS
@@ -80,6 +83,19 @@ class SettingsTab(QWidget):
         wt_layout.addWidget(self.wt_jp_locale)
         wt_layout.addWidget(self.wt_jp_timezone)
         settings_layout.addRow(QLabel(self.tr("Global Winetricks:")), wt_layout)
+
+        # Log Level
+        self.log_level_combo = QComboBox()
+        self.log_level_combo.addItems(["DEBUG", "INFO", "ERROR"])
+        self.log_level_combo.setFixedWidth(200)
+        
+        # Set current index based on saved setting (default to INFO)
+        current_log = self.user_settings.get("log_level", "INFO").upper()
+        log_map = {"DEBUG": 0, "INFO": 1, "ERROR": 2}
+        self.log_level_combo.setCurrentIndex(log_map.get(current_log, 1))
+        
+        self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
+        settings_layout.addRow(QLabel(self.tr("Debug Level:")), self.log_level_combo)
 
         main_layout.addWidget(settings_group)
 
@@ -206,3 +222,11 @@ class SettingsTab(QWidget):
         self.save_setting("ui_zoom", new_zoom)        
         SystemUtils.apply_ui_zoom(new_zoom)
         self.theme_manager.update_theme()
+
+    def change_log_level(self, index):
+        mapping = {0: "DEBUG", 1: "INFO", 2: "ERROR"}
+        new_level = mapping[index]
+        
+        self.save_setting("log_level", new_level)        
+        config.LOG_LEVEL = new_level
+        setup_logging(new_level)

@@ -1,4 +1,6 @@
 import config
+import logging
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
 
@@ -12,7 +14,7 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
     def get_runner_all_releases(self, page=1, per_page=30):
         """ Fetches wine releases and identifies arch availability """
         query_url = f"{self.API_URL}?page={page}&per_page={per_page}"
-        print(f"Fetching page {page} of Kron4ek releases...")
+        logger.info(f"Fetching page {page} of Kron4ek releases...")
         data = self.fetch_json(query_url)
         
         if not data: return []
@@ -39,7 +41,7 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
         tag = release_data['tag']
         key = "has_amd64" if arch == "amd64" else "has_wow64"
         if not release_data.get(key):
-            print(f"[Error] Architecture '{arch}' not available for {tag}.")
+            logger.error(f"Architecture '{arch}' not available for {tag}.")
             return
 
         # Fetch asset details
@@ -53,7 +55,7 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
         assets = {a["name"]: a for a in data.get("assets", [])}
 
         if target_name not in assets:
-            print(f"[Error] Could not find {target_name} in release assets.")
+            logger.error(f"Could not find {target_name} in release assets.")
             return
 
         target_asset = assets[target_name]
@@ -65,11 +67,11 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """
         tag = release_data['tag']
-        print(f"\n--- Release Information for {tag} ---")
+        logger.info(f"\n--- Release Information for {tag} ---")
         url = f"{self.API_URL}/tags/{tag}"
         data = self.fetch_json(url)
         if not data: return
 
         for asset in data.get("assets", []):
             size_mb = asset.get("size", 0) / (1024 * 1024)
-            print(f"  - {asset.get('name'):<45} ({size_mb:.2f} MB)")
+            logger.info(f"  - {asset.get('name'):<45} ({size_mb:.2f} MB)")

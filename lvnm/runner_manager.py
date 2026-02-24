@@ -4,6 +4,8 @@ import tarfile
 import urllib.request
 import urllib.error
 import config
+import logging
+logger = logging.getLogger(__name__)
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -28,14 +30,14 @@ class RunnerManagerInterface:
                 if response.status == 200:
                     return json.loads(response.read().decode())
         except urllib.error.URLError as e:
-            print(f"[Error] Failed to connect to GitHub: {e}")
+            logger.error(f"Failed to connect to GitHub: {e}")
         return None
 
     @staticmethod
     def download_file(url, dest_path, progress_callback=None):
         """Helper to download a file with a progress bar"""
         try:
-            print(f"Downloading: {url}...")
+            logger.info(f"Downloading: {url}...")
             with urllib.request.urlopen(url) as response:
                 total_size = int(response.info().get('Content-Length', 0))
                 block_size = 8192
@@ -51,7 +53,7 @@ class RunnerManagerInterface:
                         
                         if total_size > 0:
                             percent = downloaded * 100 / total_size
-                            print(f"\rProgress: [{percent:.1f}%] {downloaded}/{total_size} bytes", end='')
+                            logger.info(f"\rProgress: [{percent:.1f}%] {downloaded}/{total_size} bytes", end='')
 
                         # Gui
                         if progress_callback and total_size > 0:
@@ -60,7 +62,7 @@ class RunnerManagerInterface:
 
             return True
         except Exception as e:
-            print(f"\n[Error] Download failed: {e}")
+            logger.error(f"Download failed: {e}")
             if dest_path.exists():
                 os.remove(dest_path)
             return False
@@ -68,7 +70,7 @@ class RunnerManagerInterface:
     @staticmethod
     def extract_tar(tar_path, dest_dir, tag, compression="gz"):
         """Handles extraction and cleanup for .tar.gz (gz) or .tar.xz (xz)"""
-        print(f"\nExtracting...")
+        logger.info(f"\nExtracting...")
         mode = f"r:{compression}"
         try:
             with tarfile.open(tar_path, mode) as tar:
@@ -76,12 +78,12 @@ class RunnerManagerInterface:
                 root_folder = members[0].name.split('/')[0] if members else f"runner-{tag}"
                 tar.extractall(path=dest_dir)
                 
-            print(f"Success! Runner installed at: {dest_dir / root_folder}")
+            logger.info(f"Success! Runner installed at: {dest_dir / root_folder}")
             if tar_path.exists():
                 os.remove(tar_path)
             return True
         except Exception as e:
-            print(f"[Error] Extraction failed: {e}")
+            logger.error(f"Extraction failed: {e}")
             return False
     
     @staticmethod

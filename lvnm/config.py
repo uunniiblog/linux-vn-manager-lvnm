@@ -3,7 +3,6 @@ from pathlib import Path
 
 VERSION = 'v0.0.1'
 GIT_URL = ''
-LOG_LEVEL = "debug"
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
@@ -23,6 +22,7 @@ USER_SETTINGS = DATA_DIR / ".userconf.json"
 # URLS
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
 PROTONGE_API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
+DXVK_API_URL = "https://api.github.com/repos/doitsujin/dxvk/releases/latest"
 VNDB_API_URL = "https://api.vndb.org/kana"
 VNDB_SITE_URL = "https://vndb.org/{vndbid}"
 EGS_SITE_URL = "https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/kensaku.php?category=game&word_category=name&word={jpname}"
@@ -53,15 +53,21 @@ ENV_VARIABLES = [
         "value": "Asia/Tokyo"
     },
     {
-        "id": "disable_umu_update",
-        "name": "Disable umu runtime update",
-        "key": "UMU_RUNTIME_UPDATE",
-        "value": "0",
+        "id": "Enable DXVK",
+        "key": "WINEDLLOVERRIDES",
+        "value": "d3d11,d3d10,d3d9,dxgi=n,b",
+        "req": "wine"
+    },
+    {
+        "id": "proton_use_wined3d",
+        "name": "Proton Use WineD3D (Disable DXVK)",
+        "key": "PROTON_USE_WINED3D",
+        "value": "1",
         "req": "proton"
     },
     {
         "id": "enable_proton_gst",
-        "name": "Old proton-ge gstreamer implementation",
+        "name": "Old proton-ge Gstreamer implementation",
         "key": "PROTON_MEDIA_USE_GST",
         "value": "1",
         "req": "proton"
@@ -75,15 +81,21 @@ ENV_VARIABLES = [
     },
     {
         "id": "pulse_latency_msec",
-        "name": "Winepulse Latency (Reduce Crackling)+",
+        "name": "Winepulse Latency (Reduce Crackling)",
         "key": "PULSE_LATENCY_MSEC",
         "value": "120"
     },
+    # {
+    #     "id": "Disable DXVK",
+    #     "key": "WINEDLLOVERRIDES",
+    #     "value": "d3d11,d3d10,d3d9,dxgi=b",
+    #     "req": "wine"
+    # },
     {
-        "id": "proton_use_wined3d",
-        "name": "Enable WINED3D",
-        "key": "PROTON_USE_WINED3D",
-        "value": "1",
+        "id": "disable_umu_update",
+        "name": "Disable UMU runtime update",
+        "key": "UMU_RUNTIME_UPDATE",
+        "value": "0",
         "req": "proton"
     },
     {

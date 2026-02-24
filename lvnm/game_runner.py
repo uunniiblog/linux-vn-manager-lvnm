@@ -3,14 +3,18 @@ import signal
 import json
 import config
 import subprocess
+import logging
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from model.game_card import GameCard
 from execution_manager import ExecutionManager
+from system_utils import SystemUtils
+settings = SystemUtils.load_settings()
 
 class GameRunner:
     PREFIXES_DATA = Path(config.PREFIXES_DATA)
     GAME_DATA = Path(config.GAMES_DATA)
-    LOG_LEVEL = config.LOG_LEVEL
+    LOG_LEVEL = settings.get("log_level", "info")
 
     def __init__(self, name: str, card_override: GameCard = None):
         self.name = name
@@ -95,7 +99,7 @@ class GameRunner:
             return True
             
         except Exception as e:
-            print(f"[Error] Ad-hoc run failed: {e}")
+            logging.error(f"Run in prefix failed: {e}")
             return False
     
     def run(self):
@@ -106,20 +110,20 @@ class GameRunner:
             if not self.cmd or not self.env:
                 self.prepare_environment()
         except Exception as e:
-            print(f"[Error] Preparation failed: {e}")
+            logging.error(f"Preparation failed: {e}")
             return False
 
         self._log_run_command(Path(self.prefix_info["runner"]))
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
 
-        print(f"self.process {self.process}")
+        logging.debug(f"self.process {self.process}")
         return True
 
     def _handle_wine(self, runner_path: Path) -> list:
         """Specific logic for Wine runners"""
         wine_bin = runner_path / "bin" / "wine"
         if not wine_bin.exists():
-            print(f"[Error] Wine binary missing at: {wine_bin}")
+            logging.error(f"Wine binary missing at: {wine_bin}")
             return []
             
         self.env["WINE"] = str(wine_bin)
@@ -183,24 +187,24 @@ class GameRunner:
                 except (PermissionError, FileNotFoundError, ProcessLookupError):
                     continue
         except Exception as e:
-            print(f"Debug: _is_prefix_active error: {e}")
+            logging.error(f"is_prefix_active error: {e}")
 
         return False
 
     def stop(self, running_count = 1):
         """Gracefully attempts to terminate the running game process."""
         if not self.is_running():
-            print(f"Game '{self.name}' is not running.")
+            logging.error(f"Game '{self.name}' is not running.")
             return
 
-        print(f"Stopping game '{self.name}'...")
+        logging.info(f"Stopping game '{self.name}'...")
 
         try:
             # Kill entire process group to avoid gamescope/wine leftovers
             pgid = os.getpgid(self.process.pid)
             os.killpg(pgid, signal.SIGKILL)
         except Exception as e:
-            print(f"Error killing process {self.name}: {e}")
+            logging.error(f"Error killing process {self.name}: {e}")
         
         if self.is_proton:
             runner_path = Path(self.prefix_info["runner"])
@@ -209,22 +213,22 @@ class GameRunner:
             runner_path = Path(self.prefix_info["runner"])
             wineserver_bin = runner_path / "bin" / "wineserver"
 
-        print(f"runnign count {running_count}")
+        logging.debug(f"running count {running_count}")
         if (running_count <= 1):
             # Only kill wineserver if 1 game left no not stop other running games in same prefix
             # TODO: this adds a bug that stills sees is_running still sees the game closed as active
-            print(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
+            logging.debug(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
             self._kill_wineserver(wineserver_bin, runner_path)
             
 
     def _kill_wineserver(self, wineserver_bin, runner_path): 
         """ Kills all processes associated with this prefix """
         if wineserver_bin.exists():
-            print("[_kill_wineserver] wineserver_bin exists")
+            logging.debug("[_kill_wineserver] wineserver_bin exists")
             subprocess.run([str(wineserver_bin), "-k"], env={"WINEPREFIX": self.env["WINEPREFIX"]})
         else:
             # Search for wineserver in the runner path
-            print("[_kill_wineserver] wineserver_bin not found")
+            logging.debug("[_kill_wineserver] wineserver_bin not found")
             found = list(runner_path.glob("**/bin/wineserver"))
             if found:
                 wineserver_bin = found[0]
@@ -234,27 +238,27 @@ class GameRunner:
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
         if GameRunner.LOG_LEVEL.lower() == "debug":
-            print("\n" + "="*60)
-            print(f"LAUNCHING: {self.name}")
-            print("="*60)
-            print(f"Game Path:   {self.game.path}")
-            print(f"Prefix Path: {self.env['WINEPREFIX']}")
-            print(f"Runner:      {runner_path}")
+            logging.debug("\n" + "="*60)
+            logging.debug(f"LAUNCHING: {self.name}")
+            logging.debug("="*60)
+            logging.debug(f"Game Path:   {self.game.path}")
+            logging.debug(f"Prefix Path: {self.env['WINEPREFIX']}")
+            logging.debug(f"Runner:      {runner_path}")
             
-            print("\nEnvironment Variables:")
+            logging.debug("\nEnvironment Variables:")
             for var in self.env:
-                print(f"   {var:<18}: {self.env[var]}")
+                logging.debug(f"   {var:<18}: {self.env[var]}")
             
             if self.game.envvar:
-                print("Custom Vars:")
+                logging.debug("Custom Vars:")
                 for k, v in self.game.envvar.items():
-                    print(f"   {k:<18}: {v}")
+                    logging.debug(f"   {k:<18}: {v}")
 
-            print("\nGamescope:")
-            print(f"   Enabled:         {self.game.gamescope.enabled}")
+            logging.debug("\nGamescope:")
+            logging.debug(f"   Enabled:         {self.game.gamescope.enabled}")
             if self.game.gamescope.enabled.lower() == "true":
-                print(f"   Parameters:      {self.game.gamescope.parameters}")
+                logging.debug(f"   Parameters:      {self.game.gamescope.parameters}")
 
-            print("\nExecution Command:")
-            print(f"   {' '.join(self.cmd)}")
-            print("="*60 + "\n")
+            logging.debug("\nExecution Command:")
+            logging.debug(f"   {' '.join(self.cmd)}")
+            logging.debug("="*60 + "\n")

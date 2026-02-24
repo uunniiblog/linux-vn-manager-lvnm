@@ -1,4 +1,6 @@
 import config
+import logging
+logger = logging.getLogger(__name__)
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
                              QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
                              QPushButton, QComboBox, QFileDialog, QDialog)
@@ -246,10 +248,10 @@ class RunInPrefixDialog(QDialog):
         prefix_name = self.combo_prefix.currentText()
 
         if not exe_path or not prefix_name:
-            print("Please select both an executable and a prefix.")
+            logger.debug("Please select both an executable and a prefix.")
             return
 
-        print(f"Running installer ad-hoc: {exe_path} in {prefix_name}")
+        logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
 
         # Create a temporary GameCard in memory
         dummy_card = GameCard(
@@ -267,11 +269,11 @@ class RunInPrefixDialog(QDialog):
             
             # runner.run() handles the environment, paths, and ExecutionManager calls
             if runner.run():
-                print("Ad-hoc process launched successfully.")
+                logger.debug("Running in prefix launched successfully.")
             else:
-                print("Failed to launch ad-hoc process.")
+                logger.debug("Failed to launch process.")
         except Exception as e:
-            print(f"[Error] Failed to run in prefix: {e}")
+            logger.error(f"[Error] Failed to run in prefix: {e}")
 
         # Close the dialog
         self.accept()

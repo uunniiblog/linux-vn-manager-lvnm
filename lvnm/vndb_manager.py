@@ -1,6 +1,8 @@
 import os
 import requests
 import config
+import logging
+logger = logging.getLogger(__name__)
 from system_utils import SystemUtils
 
 class VndbManager:
@@ -16,7 +18,7 @@ class VndbManager:
 
         existing_path = SystemUtils.get_cover_path(vndb_id)
         # if existing_path:
-        #     print(f"[VNDB] Local cover found at {existing_path}. Skipping API call.")
+        #     logger.info(f"[VNDB] Local cover found at {existing_path}. Skipping API call.")
         #     return []
 
         endpoint = f"{VndbManager.API_URL}/vn"
@@ -27,7 +29,7 @@ class VndbManager:
         elif name:
             filters = ["search", "=", name]
         else:
-            print("[VNDB] Error: No search criteria provided.")
+            logger.error("[VNDB] Error: No search criteria provided.")
             return None
 
         payload = {
@@ -36,22 +38,22 @@ class VndbManager:
         }
 
         try:
-            print(f"[VNDB] calling {endpoint} payload {payload}")
+            logger.info(f"[VNDB] calling {endpoint} payload {payload}")
             response = requests.post(endpoint, json=payload, timeout=5)
             response.raise_for_status()
             data = response.json()
 
             results = data.get("results", [])
             if not results:
-                print(f"[VNDB] No results found for ID: {vndb_id} / Name: {name}")
+                logger.info(f"[VNDB] No results found for ID: {vndb_id} / Name: {name}")
                 return []
 
-            print(f"\n[VNDB] Found {len(results)} results. Processing...")
+            logger.info(f"\n[VNDB] Found {len(results)} results. Processing...")
 
             for vn in results:
                 # Print full raw data for this entry
-                print(f"\n [VNDB] --- Data for {vn.get('id')} ({vn.get('title')}) ---")
-                print(f"[VNDB] {vn}")
+                logger.debug(f"\n [VNDB] --- Data for {vn.get('id')} ({vn.get('title')}) ---")
+                logger.debug(f"[VNDB] {vn}")
 
                 # Download cover if URL exists and image doesn't
                 if vn.get("image") and vn["image"].get("url") and not existing_path:
@@ -60,7 +62,7 @@ class VndbManager:
             return results
 
         except Exception as e:
-            print(f"[VNDB Error] API Request failed: {e}")
+            logger.error(f"[VNDB Error] API Request failed: {e}")
             return None
 
     @staticmethod
@@ -77,12 +79,12 @@ class VndbManager:
                 img_data = requests.get(url, timeout=5).content
                 with open(target_path, 'wb') as handler:
                     handler.write(img_data)
-                print(f"Saved cover: {target_path.name}")
+                logger.info(f"Saved cover: {target_path.name}")
             else:
-                print(f"Cover already exists: {target_path.name}")
+                logger.info(f"Cover already exists: {target_path.name}")
 
         except Exception as e:
-            print(f"[Error] Could not download {url}: {e}")
+            logger.error(f"[Error] Could not download {url}: {e}")
 
     @staticmethod
     def get_original_title(data):

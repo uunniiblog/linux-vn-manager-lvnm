@@ -2,27 +2,31 @@ import sys
 import subprocess
 import threading
 import config
+import logging
+logger = logging.getLogger(__name__)
+from system_utils import SystemUtils
+settings = SystemUtils.load_settings()
 
 class ExecutionManager:
     @staticmethod
     def _get_verbosity_env(base_env: dict) -> dict:
-        """Augments environment variables based on config.LOG_LEVEL."""
+        """Augments environment variables based LOG_LEVEL."""
         env = base_env.copy()
-        level = getattr(config, "LOG_LEVEL", "info").lower()
+        log_level = settings.get("log_level", "info")
 
-        if level == "debug":
+        if log_level == "debug":
             # Show everything
             env["UMU_LOG"] = "1"
             # everything else default should be good ? TODO
         
-        elif level == "info":
+        elif log_level == "info":
             # Show only errors and major fixmes
             if "WINEDEBUG" not in env:
                 env["WINEDEBUG"] = "-all,err+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             
-        elif level == "none":
+        elif log_level == "none":
             # Reduce logging as much as possible
             env["WINEDEBUG"] = "-all"
             env["UMU_LOG"] = "0"
@@ -51,6 +55,8 @@ class ExecutionManager:
         # Apply automatic verbosity overrides
         final_env = ExecutionManager._get_verbosity_env(env)
 
+        logger.info(f"Executing: {' '.join(cmd)}")
+
         # Start Process
         # We merge stderr into stdout for cleaner unified logging
         proc = subprocess.Popen(
@@ -71,12 +77,13 @@ class ExecutionManager:
         def log_reader(pipe):
             try:
                 for line in pipe:
+                    logging.info(line.strip())
                     # Even with env variables, we keep sys.stdout.write 
                     # so the output appears in our terminal
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
+                    # sys.stdout.write(line)
+                    # sys.stdout.flush()
             except Exception as e:
-                print(f"\n[Log Thread Error] {e}")
+                logger.error(f"Log Thread Error: {e}")
             finally:
                 pipe.close()
 

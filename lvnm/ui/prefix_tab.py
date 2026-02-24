@@ -1,14 +1,17 @@
 import config
+import logging
+logger = logging.getLogger(__name__)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
                             QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
                             QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
-                            QPlainTextEdit, QGridLayout, QComboBox)
+                            QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy)
 from PySide6.QtCore import Qt, QProcess, QSettings
 from datetime import datetime
 from prefix_manager import PrefixManager
 from game_manager import GameManager
 from ui.console_dialog import ConsoleDialog
 from system_utils import SystemUtils
+from runner_manager import RunnerManagerInterface
 
 class PrefixTab(QWidget):
     def __init__(self):
@@ -90,7 +93,7 @@ class PrefixTab(QWidget):
     def on_edit(self):
         current = self.prefixes_list.currentItem()
         if not current:
-            print("[Debug] No prefix Selected")
+            logger.debug("No prefix Selected")
             return
 
         prefix_str = current.text().split(" (")[0]
@@ -105,7 +108,7 @@ class PrefixTab(QWidget):
 
             # Check if path exists
             if prefix.check_prefix_exists() is False:
-                print("[Error] Prefix Path doesn't exist")
+                logger.error("[Error] Prefix Path doesn't exist")
                 QMessageBox.critical(self, self.tr("Error"), self.tr("Prefix Path does not exist"))
                 return
             
@@ -142,7 +145,7 @@ class PrefixTab(QWidget):
                 console.start_queue()
                 console.exec()
             else:
-                print("[Debug] No changes in prefix")
+                logger.debug("No changes in prefix")
 
             # Update the date and metadata one last time
             prefix.card.update_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -151,7 +154,12 @@ class PrefixTab(QWidget):
             self.refresh_list()
 
     def on_add(self):
-        dialog = CreatePrefixDialog(self)
+        created_name = self.create_new_prefix_flow(self)
+        if created_name:
+            self.refresh_list()
+    @staticmethod
+    def create_new_prefix_flow(parent_widget):
+        dialog = CreatePrefixDialog(parent_widget)
         if dialog.exec():
             data = dialog.get_data()
             name = data["name"]
@@ -159,15 +167,15 @@ class PrefixTab(QWidget):
             
             # Check if it already exists in JSON
             if PrefixManager.get_prefix_info(name):
-                QMessageBox.warning(self, self.tr("Error"), self.tr(f"Prefix '{name}' already exists."))
-                return
+                QMessageBox.warning(parent_widget, parent_widget.tr("Error"), parent_widget.tr(f"Prefix '{name}' already exists."))
+                return None
                 
             # Instantiate Manager
             prefix = PrefixManager(name)
             
             # Prepare the Console
-            console = ConsoleDialog(self)
-            console.setWindowTitle(self.tr(f"Creating Prefix: {name}"))
+            console = ConsoleDialog(parent_widget)
+            console.setWindowTitle(parent_widget.tr(f"Creating Prefix: {name}"))
             
             # Add tasks to queue
             success = prefix.create_prefix(
@@ -180,15 +188,16 @@ class PrefixTab(QWidget):
             if success:
                 if fonts_path:
                     prefix.add_fonts(fonts_path, executor=console)
-                # console.set_header_info(str(config.PREFIXES_DIR / name), data["runner_path"])
-                # console.show()
+                if prefix.type == "wine":
+                    prefix.install_dxvk(executor=console)
+                    
                 console.start_queue()
-                console.exec() # Locks UI, plays the log
+                console.exec()
+                return name
             else:
-                QMessageBox.warning(self, self.tr("Error"), self.tr("Failed to prepare prefix creation."))
-
-            # Refresh UI List
-            self.refresh_list()
+                QMessageBox.warning(parent_widget, parent_widget.tr("Error"), parent_widget.tr("Failed to prepare prefix creation."))
+                return None
+        return None
 
     def refresh_active_tab(self):
         """Forces the currently visible sub-tab to reload its data"""
@@ -399,9 +408,8 @@ class CreatePrefixDialog(QDialog):
         form_layout.addRow(self.tr("Path:"), self.path_label)
 
         # --- Runner Selection ---
-        self.runner_combo = QComboBox()
-        # Ensure RunnerManagerInterface is imported at the top of the file
-        from runner_manager import RunnerManagerInterface 
+        self.runner_combo = QComboBox() 
+        self.runner_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.available_runners = RunnerManagerInterface.get_all_installed_runners()
         self.runner_combo.addItems(self.available_runners.keys())
         form_layout.addRow(self.tr("Runner:"), self.runner_combo)

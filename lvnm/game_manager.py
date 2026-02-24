@@ -1,5 +1,7 @@
 import config
 import json
+import logging
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from prefix_manager import PrefixManager
 from runner_manager import RunnerManagerInterface
@@ -14,18 +16,18 @@ class GameManager:
     @staticmethod
     def add_game(exe, name, prefix, vndb):
         """ Adds a new game entry to the JSON data file. """
-        print(f"[Debug] add_game exe: {exe} name: {name} prefix: {prefix} vndb: {vndb}")
+        logging.debug(f"add_game exe: {exe} name: {name} prefix: {prefix} vndb: {vndb}")
 
         # Validate Prefix Existence
         prefix_data = PrefixManager.get_prefix_info(prefix)
         if not prefix_data:
-            print(f"[Error] Prefix '{prefix}' does not exist in registry.")
+            logging.error(f"Prefix '{prefix}' does not exist in registry.")
             return False
 
         # Validate Runner Existence
         runner_path = prefix_data.get("runner")
         if not RunnerManagerInterface.is_runner_valid(runner_path):
-            print(f"[Error] Runner for prefix '{prefix}' is missing at: {runner_path}")
+            logging.error(f"Runner for prefix '{prefix}' is missing at: {runner_path}")
             return False
 
         games_dict = GameManager._load_data()
@@ -40,7 +42,7 @@ class GameManager:
         games_dict[name] = new_card.to_dict()
         
         GameManager._save_data(games_dict)
-        print(f"Successfully added game '{name}'")
+        logging.info(f"Successfully added game '{name}'")
 
     @staticmethod
     def list_games(name_query=None):
@@ -74,10 +76,10 @@ class GameManager:
         if name in games_dict:
             del games_dict[name]
             GameManager._save_data(games_dict)
-            print(f"Game '{name}' has been removed from the library.")
+            logging.info(f"Game '{name}' has been removed from the library.")
             return True
         else:
-            print(f"[Debug] Game '{name}' not found. Nothing to delete.")
+            logging.debug(f"Game '{name}' not found. Nothing to delete.")
             return False
 
     @staticmethod
@@ -88,7 +90,7 @@ class GameManager:
         raw_data = GameManager._load_data()
         
         if original_name not in raw_data:
-            print(f"[Error] Game '{original_name}' not found. Cannot update.")
+            logging.error(f"Game '{original_name}' not found. Cannot update.")
             return
 
         current_card = GameCard.from_dict(original_name, raw_data[original_name])
@@ -96,7 +98,7 @@ class GameManager:
         old_vndb = current_card.vndb
 
         for key, value in updates.items():
-            if key == "gamescope" and isinstance(value, dict):
+            if key == "gamescope"and isinstance(value, dict):
                 for gs_key, gs_val in value.items():
                     setattr(current_card.gamescope, gs_key, gs_val)
             elif hasattr(current_card, key):
@@ -105,7 +107,7 @@ class GameManager:
         new_vndb = current_card.vndb
         # Fetch if ID changed OR if ID exists but ogtitle is empty
         if new_vndb and (new_vndb != old_vndb or not current_card.ogtitle):
-            print(f"[Debug] Updating metadata for VNDB ID: {new_vndb}")
+            logging.debug(f"Updating metadata for VNDB ID: {new_vndb}")
             results = VndbManager.fetch_and_store_vn(vndb_id=new_vndb)
             if results and len(results) > 0:
                 current_card.ogtitle = VndbManager.get_original_title(results[0])
@@ -119,7 +121,7 @@ class GameManager:
         raw_data[new_name] = current_card.to_dict()
         GameManager._save_data(raw_data)
         VndbManager.fetch_and_store_vn(vndb_id=current_card.vndb)
-        print(f"Successfully updated '{new_name}'.")
+        logging.info(f"Successfully updated '{new_name}'.")
 
     @staticmethod
     def _load_data():
@@ -140,7 +142,7 @@ class GameManager:
             with open(GameManager.GAME_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[Error] Failed to save to {GameManager.GAME_FILE}: {e}")
+            logging.error(f"Failed to save to {GameManager.GAME_FILE}: {e}")
 
     @staticmethod
     def get_game(name: str) -> Optional[GameCard]:
@@ -158,7 +160,7 @@ class GameManager:
         if not GameManager.GAME_FILE.exists():
             return
 
-        print(f"Updating game references: '{old_name}' -> '{new_name}'")
+        logging.info(f"Updating game references: '{old_name}' -> '{new_name}'")
         
         games_data = GameManager._load_data()
 
@@ -171,9 +173,9 @@ class GameManager:
         
         if updated_count > 0:
             GameManager._save_data(games_data)
-            print(f"Updated {updated_count} game(s) to use new prefix name.")
+            logging.info(f"Updated {updated_count} game(s) to use new prefix name.")
         else:
-            print("No games were using this prefix.")
+            logging.info("No games were using this prefix.")
 
     @staticmethod
     def duplicate_game(name: str):
@@ -182,7 +184,7 @@ class GameManager:
         """
         source_card = GameManager.get_game(name)
         if not source_card:
-            print(f"[Error] Cannot duplicate. Game '{name}' not found.")
+            logging.error(f"Cannot duplicate. Game '{name}' not found.")
             return False
 
         games_dict = GameManager._load_data()
@@ -207,5 +209,5 @@ class GameManager:
         games_dict[new_name] = new_data
         GameManager._save_data(games_dict)
         
-        print(f"Successfully duplicated '{name}' as '{new_name}'")
+        logging.info(f"Successfully duplicated '{name}' as '{new_name}'")
         return True

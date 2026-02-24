@@ -3,6 +3,8 @@ import ctypes.util
 import sys
 import os
 import signal
+import logging
+from logging_manager import setup_logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTranslator, QLocale
@@ -11,9 +13,13 @@ from system_utils import SystemUtils
 
 def main():
     set_process_name("linux-vn-manager-lvnm")
+    settings = SystemUtils.load_settings()
 
     # Close with ctrl c in terminal
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    log_level = settings.get("log_level", "info")
+    setup_logging(log_level)
     
     # Scale with system scale (?)
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -28,7 +34,6 @@ def main():
         app.installTranslator(translator)
 
     # Load UI size
-    settings = SystemUtils.load_settings()
     zoom = settings.get("ui_zoom", 1.0) # Default to 1.0
     SystemUtils.apply_ui_zoom(zoom)
 

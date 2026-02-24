@@ -4,10 +4,13 @@ import subprocess
 import shutil
 import json
 import config
+import logging
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
+
 
 class SystemUtils:
     
@@ -134,31 +137,31 @@ class SystemUtils:
     @staticmethod
     def print_diagnostic_report():
         """Helper to print a nicely formatted console report."""
-        print("="*50)
-        print(" LVNM SYSTEM DIAGNOSTICS")
-        print("="*50)
+        logger.debug("="*50)
+        logger.debug(" LVNM SYSTEM DIAGNOSTICS")
+        logger.debug("="*50)
         
         sys_info = SystemUtils.get_system_info()
-        print("\n--- System Information ---")
-        print(f"App Version : {sys_info['app_version']}")
-        print(f"OS          : {sys_info['os']}")
-        print(f"Kernel      : {sys_info['kernel']}")
-        print(f"Desktop     : {sys_info['desktop_environment']} ({sys_info['session_type']})")
-        print(f"CPU         : {sys_info['cpu']}")
-        print(f"GPU         : {sys_info['gpu']}")
+        logger.debug("\n--- System Information ---")
+        logger.debug(f"App Version : {sys_info['app_version']}")
+        logger.debug(f"OS          : {sys_info['os']}")
+        logger.debug(f"Kernel      : {sys_info['kernel']}")
+        logger.debug(f"Desktop     : {sys_info['desktop_environment']} ({sys_info['session_type']})")
+        logger.debug(f"CPU         : {sys_info['cpu']}")
+        logger.debug(f"GPU         : {sys_info['gpu']}")
 
         software = SystemUtils.get_software_support()
-        print("\n--- Software & Compatibility ---")
-        print(f"Vulkan Support : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
-        print(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}")
-        print(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}")
-        print(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}")
+        logger.debug("\n--- Software & Compatibility ---")
+        logger.debug(f"Vulkan Support : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
+        logger.debug(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}")
+        logger.debug(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}")
+        logger.debug(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}")
 
-        print("\n--- GStreamer Packages ---")
+        logger.debug("\n--- GStreamer Packages ---")
         for pkg, installed in software['gstreamer_packages'].items():
             status = "✅" if installed else "❌"
-            print(f"{status} {pkg}")
-        print("="*50)
+            logger.debug(f"{status} {pkg}")
+        logger.debug("="*50)
     
     @staticmethod
     def load_settings() -> dict:
@@ -168,7 +171,7 @@ class SystemUtils:
                 with open(config.USER_SETTINGS, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                print(f"Error reading settings: {e}")
+                logger.error(f"Error reading settings: {e}")
         return {}
 
     @staticmethod
@@ -180,7 +183,7 @@ class SystemUtils:
             with open(config.USER_SETTINGS, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
-            print(f"Error writing settings: {e}")
+            logger.error(f"Error writing settings: {e}")
 
     @staticmethod
     def apply_ui_zoom(zoom_factor: float):
@@ -203,10 +206,18 @@ class SystemUtils:
         # Apply it globally. All widgets will resize their layouts to fit this text.
         app.setFont(font)
 
+        # from ui.main_window import MainWindow
+        # # Then find the MainWindow instance and update sidebar
+        # from ui.main_window import MainWindow
+        # for widget in app.topLevelWidgets():
+        #     if isinstance(widget, MainWindow):
+        #         widget.update_sidebar_font()
+        #         break
+
     @staticmethod
     def browse_files(path: str):
         if not path:
-            print("[Error] Game has no path to browse to.")
+            logger.error("[Error] Game has no path to browse to.")
             return
 
         # Get the directory containing the file
@@ -215,7 +226,7 @@ class SystemUtils:
         if os.path.exists(folder_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
         else:
-            print(f"[Error] Path does not exist: {folder_path}")
+            logger.error(f"[Error] Path does not exist: {folder_path}")
 
     @staticmethod
     def get_cover_path(vndb_id: str) -> str:
