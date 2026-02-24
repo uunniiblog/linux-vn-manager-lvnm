@@ -14,6 +14,7 @@ class GameManager:
     @staticmethod
     def add_game(exe, name, prefix, vndb):
         """ Adds a new game entry to the JSON data file. """
+        print(f"[Debug] add_game exe: {exe} name: {name} prefix: {prefix} vndb: {vndb}")
 
         # Validate Prefix Existence
         prefix_data = PrefixManager.get_prefix_info(prefix)
@@ -39,7 +40,6 @@ class GameManager:
         games_dict[name] = new_card.to_dict()
         
         GameManager._save_data(games_dict)
-        VndbManager.fetch_and_store_vn(vndb_id=vndb)
         print(f"Successfully added game '{name}'")
 
     @staticmethod
@@ -93,6 +93,7 @@ class GameManager:
 
         current_card = GameCard.from_dict(original_name, raw_data[original_name])
         current_card.update_date = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        old_vndb = current_card.vndb
 
         for key, value in updates.items():
             if key == "gamescope" and isinstance(value, dict):
@@ -101,8 +102,15 @@ class GameManager:
             elif hasattr(current_card, key):
                 setattr(current_card, key, value)
 
-        new_name = current_card.name
+        new_vndb = current_card.vndb
+        # Fetch if ID changed OR if ID exists but ogtitle is empty
+        if new_vndb and (new_vndb != old_vndb or not current_card.ogtitle):
+            print(f"[Debug] Updating metadata for VNDB ID: {new_vndb}")
+            results = VndbManager.fetch_and_store_vn(vndb_id=new_vndb)
+            if results and len(results) > 0:
+                current_card.ogtitle = VndbManager.get_original_title(results[0])
 
+        new_name = current_card.name
         # Handle renaming: remove the old key if the name changed
         if new_name != original_name:
             del raw_data[original_name]

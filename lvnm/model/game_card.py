@@ -20,6 +20,7 @@ class GameCard:
     umu_store: str = "none"
     coverpath: str = ""
     last_played: str = ""
+    ogtitle: str = ""
     envvar: Dict[str, str] = field(default_factory=dict)
     dlloverride: Dict[str, str] = field(default_factory=dict)
     gamescope: GameScope = field(default_factory=GameScope)

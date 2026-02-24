@@ -15,9 +15,9 @@ class VndbManager:
         """
 
         existing_path = SystemUtils.get_cover_path(vndb_id)
-        if existing_path:
-            print(f"[VNDB] Local cover found at {existing_path}. Skipping API call.")
-            return []
+        # if existing_path:
+        #     print(f"[VNDB] Local cover found at {existing_path}. Skipping API call.")
+        #     return []
 
         endpoint = f"{VndbManager.API_URL}/vn"
         
@@ -32,10 +32,7 @@ class VndbManager:
 
         payload = {
             "filters": filters,
-            "fields": (
-                "id, title, released, languages, platforms, "
-                "image.url, description, rating, votecount"
-            )
+            "fields": "id, title, titles.lang, titles.title, titles.latin, released, languages, image.url, description, rating, votecount"
         }
 
         try:
@@ -56,8 +53,8 @@ class VndbManager:
                 print(f"\n [VNDB] --- Data for {vn.get('id')} ({vn.get('title')}) ---")
                 print(f"[VNDB] {vn}")
 
-                # Download cover if URL exists
-                if vn.get("image") and vn["image"].get("url"):
+                # Download cover if URL exists and image doesn't
+                if vn.get("image") and vn["image"].get("url") and not existing_path:
                     VndbManager._download_cover(vn["id"], vn["image"]["url"])
             
             return results
@@ -86,3 +83,19 @@ class VndbManager:
 
         except Exception as e:
             print(f"[Error] Could not download {url}: {e}")
+
+    @staticmethod
+    def get_original_title(data):
+        """
+        Extracts the Japanese title from the titles array.
+        """
+        if 'titles' not in data:
+            return data.get('title') # Fallback to main title
+
+        # Look for the Japanese entry
+        for t in data['titles']:
+            if t.get('lang') == 'ja':
+                return t.get('title') # This is the original script (Kanji/Kana)
+
+        # If no 'ja' found, return the main title
+        return data.get('title')

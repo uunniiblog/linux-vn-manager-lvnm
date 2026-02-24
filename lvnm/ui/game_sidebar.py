@@ -1,4 +1,5 @@
 import config
+import urllib.parse
 from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
@@ -6,6 +7,7 @@ from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
     QMessageBox
 )
+from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer
 from game_manager import GameManager
 from game_runner import GameRunner
@@ -14,6 +16,9 @@ from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
 
 class GameSidebar(QFrame):
+    VNDB_SITE_URL = config.VNDB_SITE_URL
+    EGS_SITE_URL = config.EGS_SITE_URL
+    
     # Dictionary to track multiple games running
     active_runners = {}
 
@@ -27,11 +32,53 @@ class GameSidebar(QFrame):
         
         layout = QVBoxLayout(self)
         
-        # Launch Section
+        # --- TOP SECTION ---
+        top_layout = QVBoxLayout()
+        top_layout.setContentsMargins(10, 10, 10, 10)
+        top_layout.setSpacing(2)
+
+        # Game Name Row
+        self.lbl_display_name = QLabel()
+        self.lbl_display_name.setAlignment(Qt.AlignCenter)
+        self.lbl_display_name.setWordWrap(True)
+        self.lbl_display_name.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 15px;")
+        top_layout.addWidget(self.lbl_display_name)
+
+        # Cover and Links Row
+        self.media_container = QWidget()
+        media_layout = QHBoxLayout(self.media_container)
+        media_layout.setContentsMargins(0, 0, 0, 10)
+        media_layout.setAlignment(Qt.AlignTop)
+
+        self.lbl_cover = CoverLabel()
+        media_layout.addWidget(self.lbl_cover)
+
+        links_col = QVBoxLayout()
+        links_col.setAlignment(Qt.AlignTop)
+        links_col.setContentsMargins(15, 0, 0, 0)
+        
+        self.lbl_vndb_link = QLabel()
+        self.lbl_vndb_link.setOpenExternalLinks(True)
+        self.lbl_vndb_link.setStyleSheet("font-size: 14px;margin-top: 20px")
+        
+        self.lbl_egs_link = QLabel()
+        self.lbl_egs_link.setOpenExternalLinks(True)
+        self.lbl_egs_link.setStyleSheet("font-size: 14px;")
+        
+        links_col.addWidget(self.lbl_vndb_link)
+        links_col.addWidget(self.lbl_egs_link)
+        media_layout.addLayout(links_col)
+        media_layout.addStretch() 
+        
+        top_layout.addWidget(self.media_container)
+
+        # Launch Button Row
         self.launch_btn = QPushButton(self.tr("Start Game"))
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
         self.launch_btn.clicked.connect(self.toggle_game)
-        layout.addWidget(self.launch_btn)
+        top_layout.addWidget(self.launch_btn)
+        
+        layout.addLayout(top_layout)
 
         # Scrollable Edit Section 
         scroll = QScrollArea()
@@ -144,6 +191,28 @@ class GameSidebar(QFrame):
         else:
             self.set_ui_start_state()
 
+        # Update Top Header Name
+        self.lbl_display_name.setText(card.name)
+
+        # --- Handle Dynamic Visibility based on VNDB ---
+        if card.vndb and card.vndb.strip():
+            self.media_container.show()
+            
+            # Update Cover
+            display_path = SystemUtils.get_cover_path(card.vndb)
+            self.lbl_cover.set_pixmap_from_path(display_path)
+
+            # Update Links
+            vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
+            self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
+            
+            jp_encoded_name = urllib.parse.quote(card.ogtitle)
+            egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
+            self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+        else:
+            # Hide entire section if no VNDB ID
+            self.media_container.hide()
+
         # Filling General fields
         self.edit_name.setText(card.name)
         self.edit_path.setText(card.path)
@@ -200,6 +269,11 @@ class GameSidebar(QFrame):
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
         self.current_game = card
+
+        # Clear Header UI Fields
+        self.lbl_display_name.setText(self.tr("New Game"))
+        self.media_container.hide() # Hide media for new games by default
+        self.launch_btn.setVisible(False)
 
         # Load Global Settings for Defaults
         user_settings = SystemUtils.load_settings()
@@ -338,49 +412,50 @@ class GameSidebar(QFrame):
         if not self.current_game:
             return
 
+        # Record if this is a new game before we overwrite the original name
+        is_new_game = not self.current_game.name 
         original_name = self.current_game.name
 
-        # Gather environment variables from checkboxes
-        new_env = {}
-        for var in config.ENV_VARIABLES:
-            cb = self.env_checkboxes.get(var["id"])
-            if cb and cb.isChecked():
-                new_env[var["key"]] = var["value"]
-
-        # Update the dataclass
+        # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
         self.current_game.umu_store = self.edit_umu_store.text()
         self.current_game.umu_gameid = self.edit_umu_id.text()
+        
+        # Env Vars
+        new_env = {}
+        for var in config.ENV_VARIABLES:
+            cb = self.env_checkboxes.get(var["id"])
+            if cb and cb.isChecked():
+                new_env[var["key"]] = var["value"]
         self.current_game.envvar = new_env
         
-        # Update Gamescope 
+        # Gamescope
         self.current_game.gamescope.enabled = "true" if self.gs_enabled.isChecked() else "false"
         self.current_game.gamescope.parameters = self.gs_params.text()
 
-        updates = self.current_game.to_dict()
-        
-        if not original_name:
-            # CREATE MODE
+        # Execute Save
+        if is_new_game:
+            print(f"[Debug] Creating game: {self.current_game.name}")
             GameManager.add_game(
                 exe=self.current_game.path,
                 name=self.current_game.name,
                 prefix=self.current_game.prefix,
                 vndb=self.current_game.vndb
             )
-
-            # Update to save env vars & gamescope TODO: do in one method only
-            GameManager.update_game(self.current_game.name, updates)
+            # After adding, we need to save the extra fields (envvars, etc)
+            GameManager.update_game(self.current_game.name, self.current_game.to_dict())
             self.launch_btn.setVisible(True)
         else:
-            # --- UPDATE MODE ---
-            GameManager.update_game(original_name, updates)
-        
+            print(f"[Debug] Updating game: {original_name}")
+            GameManager.update_game(original_name, self.current_game.to_dict())
+
+        # Finalize UI
+        self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
         self.show_saved_feedback()
-        # self.on_close()
 
     def update_umu_visibility(self, prefix_type):
         is_proton = (prefix_type == "proton")
@@ -491,3 +566,50 @@ class GameSidebar(QFrame):
         self.is_running = False
         self.launch_btn.setText(self.tr("Start Game"))
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
+
+class CoverLabel(QLabel):
+    """
+    A custom QLabel that automatically scales its pixmap 
+    to fit its size while maintaining the aspect ratio.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.original_pixmap = None
+        self.setAlignment(Qt.AlignCenter)
+        # Give it a much bigger default starting size (2:3 aspect ratio)
+        self.setMinimumSize(240, 360) 
+        self.setMaximumSize(540, 810)
+        # self.setMinimumSize(135, 202) 
+        # self.setMaximumSize(250, 375)
+        # self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        # Maybe do something with this later
+        self.setStyleSheet("""
+            background-color: None; 
+            border-radius: 6px; 
+            border: 0px solid #444;
+        """)
+
+    def set_pixmap_from_path(self, path):
+        if path:
+            self.original_pixmap = QPixmap(path)
+        else:
+            self.original_pixmap = None
+        self.update_scaled()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_scaled()
+
+    def update_scaled(self):
+        if self.original_pixmap and not self.original_pixmap.isNull():
+            # Scale dynamically keeping the entire image visible
+            scaled = self.original_pixmap.scaled(
+                self.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            super().setPixmap(scaled)
+        else:
+            super().clear()
