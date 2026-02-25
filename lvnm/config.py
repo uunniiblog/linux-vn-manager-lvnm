@@ -32,6 +32,7 @@ CODEC_LIST = [
     {"id": "wmp11", "name": ""},
     {"id": "quartz2", "name": ""},
     {"id": "mf", "name": ""},
+    {"id": "lavfilters", "name": ""},
     {"id": "quartz_dx", "name": ""},
     {"id": "mciqtz32", "name": ""},
     {"id": "xaudio29", "name": ""},
@@ -105,24 +106,23 @@ ENV_VARIABLES = [
         "value": "1",
         "req": "proton"
     },
-    {
-        "id": "run_in_prefix",
-        "name": "Proton Verb Run in prefix (Two games same prefix)",
-        "key": "PROTON_VERB",
-        "value": "runinprefix",
-        "req": "proton"
-    },
-    # Same as run in prefix (?)
+    # {
+    #     "id": "run_in_prefix",
+    #     "name": "Proton Verb Run in prefix (Two games same prefix)",
+    #     "key": "PROTON_VERB",
+    #     "value": "runinprefix",
+    #     "req": "proton"
+    # },
     {
         "id": "proton_verb_run",
-        "name": "Proton Verb Run",
+        "name": "Proton Verb Run (Two games same prefix)",
         "key": "PROTON_VERB",
         "value": "run",
         "req": "proton"
     },
     {
         "id": "pressure_vessel_shell_after",
-        "name": "PRESSURE_VESSEL_SHELL after (Run Terminal same memory as game)",
+        "name": "PRESSURE Vessel after (Run Terminal same memory as game)",
         "key": "PRESSURE_VESSEL_SHELL",
         "value": "after",
         "req": "proton"
@@ -133,8 +133,16 @@ ENV_VARIABLES = [
 WINETRICKS_LIST = [
     {"id": "vcrun2012", "name": "Visual C++ 2012"},
     {"id": "vcrun2022", "name": "Visual C++ 2015-2022"},
-    {"id": "wmp9", "name": "Windows Media Player 9"},
-    {"id": "d3dx9", "name": "DirectX 9"}
+    {"id": "cjkfonts", "name": "bunch of fonts"},
+    {"id": "amstream", "name": "amstream"},
+    {"id": "devenum", "name": "devenum"},
+    {"id": "quartz", "name": "quartz"},
+    {"id": "xact", "name": "xact"},
+    # wmp10 and 9 only work in 32 bit
+    # {"id": "wmp10", "name": "Windows Media Player 10"},
+    # {"id": "wmp9", "name": "Windows Media Player 9"},
+    {"id": "d3dx9", "name": "DirectX 9"},
+    {"id": "wsh57", "name": "Windows scripting host (SRPG Studio)"},
 ]
 
 
