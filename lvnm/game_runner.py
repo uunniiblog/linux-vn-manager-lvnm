@@ -49,8 +49,11 @@ class GameRunner:
         self.env = os.environ.copy()
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
-        self.game_dir = str(Path(self.game.path).parent)
-        #self.env["PWD"] = self.game_dir
+
+        if "wineconsole" in self.game.name: 
+            self.game_dir = str(Path(self.prefix_info["path"]))
+        else:
+            self.game_dir = str(Path(self.game.path).parent)
         
         # Add user-defined environment variables
         for key, val in self.game.envvar.items():
@@ -84,13 +87,21 @@ class GameRunner:
     def run_in_prefix(self, exe_path: str, prefix_name: str):
         """
         Bypasses JSON loading to run an arbitrary executable in a selected prefix.
-        Perfect for installers or configuration tools.
+        Useful for installers or utility stuff
         """
         try:
             # Manually fetch prefix info
             self.prefix_info = self._get_prefix_info(prefix_name)
+            
             if not self.prefix_info:
                 raise ValueError(f"Prefix '{prefix_name}' not found.")
+
+            self.game = GameCard(
+                name=f"Util-{exe_path}",
+                path=exe_path,
+                prefix=prefix_name,
+                vndb="",
+            )
             
             # Call same logic as run
             self.prepare_environment()
@@ -156,20 +167,54 @@ class GameRunner:
             return data.get(prefix_name)
 
     def is_running(self) -> bool:
-        """Checks if the game process is currently active."""
-
-        if self.process is None:
-            return False
-        
-        # Check if the initial process is still alive
-        if self.process.poll() is None:
+        """Checks if the specific game is active."""
+        # Check the standard process handle first
+        if self.process and self.process.poll() is None:
             return True
+        
+        # Actual check
+        return self._is_game_process_in_proc()
+        # return len(self._get_game_pids()) > 0
 
-        # Check by scanning /proc for spawn subprocesses, seems to be needed for wine runners
-        return self._is_prefix_active()
+    def _is_game_process_in_proc(self) -> bool:
+        """
+        Scans /proc to see if this specific game's EXE is running.
+        """
+        # Get the filename (e.g., 'Demonbane.exe')
+        exe_name = Path(self.game.path).name
+        prefix_path = self.env.get("WINEPREFIX", "")
+
+        try:
+            for pid_dir in Path("/proc").iterdir():
+                if not pid_dir.name.isdigit():
+                    continue
+                
+                try:
+                    # To be 100% sure, we check if the process belongs 
+                    # to our prefix AND matches our EXE name
+                    with open(pid_dir / "cmdline", "rb") as f:
+                        cmdline = f.read().replace(b'\x00', b' ').decode(errors='ignore')
+                    
+                    if exe_name in cmdline:
+                        # Optional: Verify it's the correct prefix to avoid false positives 
+                        # if the user has the same game open in two different prefixes
+                        with open(pid_dir / "environ", "rb") as f:
+                            env = f.read()
+                            if f"WINEPREFIX={prefix_path}".encode() in env:
+                                return True
+                                
+                except (PermissionError, FileNotFoundError, ProcessLookupError):
+                    continue
+        except Exception as e:
+            logging.error(f"Error scanning /proc: {e}")
+
+        return False
 
     def _is_prefix_active(self) -> bool:
-        """Check if any process is still running in the Wine prefix by scanning /proc."""
+        """
+        Check if any process is still running in the Wine prefix by scanning /proc.
+        Unusued maybe useful later
+        """
         prefix_path = self.env.get("WINEPREFIX", "")
         if not prefix_path:
             return False
@@ -183,6 +228,7 @@ class GameRunner:
                 try:
                     environ_data = (pid_dir / "environ").read_bytes().split(b'\x00')
                     if target in environ_data:
+                        logger.debug(f"target {target} in environ for game {self.game}")
                         return True
                 except (PermissionError, FileNotFoundError, ProcessLookupError):
                     continue
@@ -191,35 +237,62 @@ class GameRunner:
 
         return False
 
-    def stop(self, running_count = 1):
+    def stop(self, running_prefix_count = 1):
         """Gracefully attempts to terminate the running game process."""
         if not self.is_running():
             logging.error(f"Game '{self.name}' is not running.")
             return
 
-        logging.info(f"Stopping game '{self.name}'...")
-
         try:
-            # Kill entire process group to avoid gamescope/wine leftovers
-            pgid = os.getpgid(self.process.pid)
-            os.killpg(pgid, signal.SIGKILL)
+            logging.info(f"Stopping game '{self.name}'...")
+            # pgid = os.getpgid(self.process.pid)
+            # os.killpg(pgid, signal.SIGKILL)
+            self._kill_specific_prefix_processes_by_cmdline()
+            runner_path = Path(self.prefix_info["runner"])
+
+            if (running_prefix_count <= 1):
+                # Only kill wineserver if 1 game left no not stop other running games in same prefix
+                wineserver_bin = runner_path / ("files/bin/wineserver" if self.is_proton else "bin/wineserver")
+                logging.debug(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
+                self._kill_wineserver(wineserver_bin, runner_path)
         except Exception as e:
             logging.error(f"Error killing process {self.name}: {e}")
-        
-        if self.is_proton:
-            runner_path = Path(self.prefix_info["runner"])
-            wineserver_bin = runner_path / "files" / "bin" / "wineserver"
-        else:
-            runner_path = Path(self.prefix_info["runner"])
-            wineserver_bin = runner_path / "bin" / "wineserver"
 
-        logging.debug(f"running count {running_count}")
-        if (running_count <= 1):
-            # Only kill wineserver if 1 game left no not stop other running games in same prefix
-            # TODO: this adds a bug that stills sees is_running still sees the game closed as active
-            logging.debug(f"Calling _kill_wineserver proton {wineserver_bin} {runner_path}")
-            self._kill_wineserver(wineserver_bin, runner_path)
-            
+    def _kill_specific_prefix_processes(self):
+        """Kills only the processes belonging to this specific game."""
+        pids = self._get_game_pids()
+        logger.debug(f"Killing PIDs for {self.game.name}: {pids}")
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                continue
+
+    def _kill_specific_prefix_processes_by_cmdline(self):
+        """Finds and kills all PIDs asociated to the game or umu."""
+        prefix_path = self.env.get("WINEPREFIX", "")
+        game_exe_name = Path(self.game.path).name
+        if not prefix_path:
+            return
+
+        targets = [game_exe_name]
+        logger.debug(f"_kill_specific_prefix_processes target {targets}")
+
+        for pid_dir in Path("/proc").iterdir():
+            if not pid_dir.name.isdigit():
+                continue
+            try:
+                pid = int(pid_dir.name)
+                if pid == os.getpid(): continue
+                with open(pid_dir / "cmdline", "rb") as f:
+                    cmdline = f.read().replace(b'\x00', b' ').decode(errors='ignore')
+                    # If the cmdline mentions the game exe or umu
+                    if any(t in cmdline for t in targets):
+                        logging.debug(f"Killing by Cmdline ({game_exe_name}): {pid}")
+                        os.kill(pid, signal.SIGKILL)
+            except (PermissionError, FileNotFoundError, ProcessLookupError) as e:
+                logger.debug(f"Error killing process {e}")
+                continue
 
     def _kill_wineserver(self, wineserver_bin, runner_path): 
         """ Kills all processes associated with this prefix """
@@ -233,6 +306,33 @@ class GameRunner:
             if found:
                 wineserver_bin = found[0]
                 subprocess.run([str(wineserver_bin), "-k"], env={"WINEPREFIX": self.env["WINEPREFIX"]})
+
+    def _get_game_pids(self) -> list[int]:
+        """Returns all PIDs matching this specific game EXE and this specific prefix."""
+        prefix_path = self.env.get("WINEPREFIX", "")
+        game_exe_name = Path(self.game.path).name
+        target_env = f"WINEPREFIX={prefix_path}".encode()
+        
+        found_pids = []
+
+        for pid_dir in Path("/proc").iterdir():
+            if not pid_dir.name.isdigit(): continue
+            try:
+                # 1. Check Prefix (Is this process in our WINEPREFIX?)
+                with open(pid_dir / "environ", "rb") as f:
+                    if target_env not in f.read().split(b'\x00'):
+                        continue
+                
+                # 2. Check Identity (Is this our game EXE or its launcher?)
+                with open(pid_dir / "cmdline", "rb") as f:
+                    cmdline = f.read().replace(b'\x00', b' ').decode(errors='ignore')
+                    # Match the EXE name OR the umu-run process for this specific EXE
+                    if game_exe_name in cmdline:
+                        found_pids.append(int(pid_dir.name))
+
+            except (PermissionError, FileNotFoundError, ProcessLookupError):
+                continue
+        return found_pids
 
 
     def _log_run_command(self, runner_path: Path):

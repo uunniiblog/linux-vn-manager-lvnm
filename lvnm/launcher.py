@@ -1,9 +1,8 @@
-import ctypes
-import ctypes.util
 import sys
 import os
 import signal
 import logging
+import setproctitle
 from logging_manager import setup_logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
@@ -12,7 +11,7 @@ from ui.main_window import MainWindow
 from system_utils import SystemUtils
 
 def main():
-    set_process_name("linux-vn-manager-lvnm")
+    setproctitle.setproctitle("linux-vn-manager-lvnm")
     settings = SystemUtils.load_settings()
 
     # Close with ctrl c in terminal
@@ -42,11 +41,6 @@ def main():
     window.show()
     
     sys.exit(app.exec())
-
-def set_process_name(name):
-    libc = ctypes.CDLL(ctypes.util.find_library('c'))
-    byte_name = name.encode('utf-8')[:15]
-    libc.prctl(15, byte_name, 0, 0, 0)
 
 if __name__ == "__main__":
     main()

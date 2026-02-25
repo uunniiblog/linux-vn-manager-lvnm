@@ -348,11 +348,11 @@ class GameSidebar(QFrame):
         if game_name in self.active_runners:
             # Game is running, so we stop it
             self.stop_game(game_name)
-            self.set_ui_start_state()
+            # self.set_ui_start_state()
         else:
             # Game is not running, so we start it
             self.start_game(game_name)
-            self.set_ui_stop_state()
+            # self.set_ui_stop_state()
 
     def stop_game(self, name):
         """

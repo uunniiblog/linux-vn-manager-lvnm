@@ -113,7 +113,6 @@ class MainWindow(QMainWindow):
     def update_sidebar_font(self):
         app_font = QApplication.instance().font()
         app_font.setPointSizeF(app_font.pointSizeF() * 1.5)
-        print(app_font)
         self.sidebar.setFont(app_font)
     
     

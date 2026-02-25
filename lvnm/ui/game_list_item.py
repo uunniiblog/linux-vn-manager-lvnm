@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, Signal
 from game_manager import GameManager
 from system_utils import SystemUtils
 from ui.game_sidebar import GameSidebar
+from game_runner import GameRunner
 
 class GameListItem(QWidget):
     """Custom widget for the game list rows"""
@@ -146,6 +147,9 @@ class GameListItem(QWidget):
 
         act_open = menu.addAction(self.tr("Open Sidebar"))
         act_browse = menu.addAction(self.tr("Browse Files"))
+        act_regedit = menu.addAction(self.tr("Open Regedit"))
+        act_winecfg = menu.addAction(self.tr("Open Winecfg"))
+        act_cmd = menu.addAction(self.tr("Open wineconsole"))
         act_dup = menu.addAction(self.tr("Duplicate"))
         menu.addSeparator()
         act_del = menu.addAction(self.tr("Delete"))
@@ -163,6 +167,15 @@ class GameListItem(QWidget):
 
         elif action == act_browse:
             self.browse_game(self.game_card.path)
+
+        elif action == act_regedit:
+            self.run_in_prefix("regedit")
+
+        elif action == act_winecfg:
+            self.run_in_prefix("winecfg")
+
+        elif action == act_cmd:
+            self.run_in_prefix("wineconsole")
             
         elif action == act_dup:
             self.duplicate_game(self.game_card.name)
@@ -180,3 +193,8 @@ class GameListItem(QWidget):
 
     def browse_game(self, path):
         SystemUtils.browse_files(path)
+
+    def run_in_prefix(self, command: str):
+        print(f"run_in_prefix {command} {self.game_card.prefix}")
+        runner = GameRunner("UtilityMode")
+        runner.run_in_prefix(command, self.game_card.prefix)

@@ -104,8 +104,9 @@ class GameManager:
             elif hasattr(current_card, key):
                 setattr(current_card, key, value)
 
-        new_vndb = current_card.vndb
+        
         # Fetch if ID changed OR if ID exists but ogtitle is empty
+        new_vndb = current_card.vndb
         if new_vndb and (new_vndb != old_vndb or not current_card.ogtitle):
             logging.debug(f"Updating metadata for VNDB ID: {new_vndb}")
             results = VndbManager.fetch_and_store_vn(vndb_id=new_vndb)
@@ -120,7 +121,6 @@ class GameManager:
         # Save under the (potentially new) key
         raw_data[new_name] = current_card.to_dict()
         GameManager._save_data(raw_data)
-        VndbManager.fetch_and_store_vn(vndb_id=current_card.vndb)
         logging.info(f"Successfully updated '{new_name}'.")
 
     @staticmethod
