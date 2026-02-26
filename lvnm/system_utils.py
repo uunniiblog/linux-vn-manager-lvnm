@@ -249,3 +249,14 @@ class SystemUtils:
             return str(matches[0].absolute())
         
         return ""
+
+    @staticmethod
+    def get_default_terminal():
+        term_options = [
+            "x-terminal-emulator", "gnome-terminal", "konsole", 
+            "xfce4-terminal", "alacritty", "kitty", "xterm"
+        ]
+        for t in term_options:
+            if shutil.which(t):
+                return t
+        

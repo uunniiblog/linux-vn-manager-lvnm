@@ -3,6 +3,7 @@ import requests
 import config
 import logging
 logger = logging.getLogger(__name__)
+from PySide6.QtCore import QThread, Signal
 from system_utils import SystemUtils
 
 class VndbManager:
@@ -92,12 +93,29 @@ class VndbManager:
         Extracts the Japanese title from the titles array.
         """
         if 'titles' not in data:
+            logger.debug(f"data.get('title') {data.get('title')}")
             return data.get('title') # Fallback to main title
 
         # Look for the Japanese entry
         for t in data['titles']:
             if t.get('lang') == 'ja':
-                return t.get('title') # This is the original script (Kanji/Kana)
+                logger.debug(f"[VNDB] found original title {t.get('title')}")
+                return t.get('title')
 
         # If no 'ja' found, return the main title
+        logger.debug(f"If no 'ja' found, return the main title {data.get['title']}")
         return data.get('title')
+
+class VndbWorker(QThread):
+    # Signal that sends (game_name, results_list)
+    finished = Signal(str, list)
+
+    def __init__(self, game_name, vndb_id):
+        super().__init__()
+        self.game_name = game_name
+        self.vndb_id = vndb_id
+
+    def run(self):
+        # This runs in a separate thread
+        results = VndbManager.fetch_and_store_vn(vndb_id=self.vndb_id)
+        self.finished.emit(self.game_name, results or [])

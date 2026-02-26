@@ -9,6 +9,7 @@ BASE_DIR = Path(__file__).parent.resolve()
 DATA_DIR = Path.home() / ".local" / "share" / "lvnm" 
 WINE_RUNNERS_DIR = DATA_DIR / "runners" / "wine"
 PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
+DXVK_DIR = DATA_DIR / "runners" / "dxvk"
 PREFIXES_DIR = DATA_DIR / "prefixes"
 COVERS_DIR = DATA_DIR / "covers"
 
@@ -126,7 +127,20 @@ ENV_VARIABLES = [
         "key": "PRESSURE_VESSEL_SHELL",
         "value": "after",
         "req": "proton"
+    },
+    {
+        "id": "mangohud",
+        "name": "Mangohud",
+        "key": "MANGOHUD",
+        "value": "1",
+    },
+    {
+        "id": "dxvk_hud",
+        "name": "DXVK HUD",
+        "key": "DXVK_HUD",
+        "value": "full",
     }
+
 ]
 
 # Winetricks

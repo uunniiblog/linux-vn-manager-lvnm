@@ -8,7 +8,6 @@ from runner_manager import RunnerManagerInterface
 from pathlib import Path
 from dataclasses import asdict
 from model.game_card import GameCard, GameScope
-from vndb_manager import VndbManager
 
 class GameManager:
     GAME_FILE = config.GAMES_DATA
@@ -105,13 +104,13 @@ class GameManager:
                 setattr(current_card, key, value)
 
         
-        # Fetch if ID changed OR if ID exists but ogtitle is empty
-        new_vndb = current_card.vndb
-        if new_vndb and (new_vndb != old_vndb or not current_card.ogtitle):
-            logging.debug(f"Updating metadata for VNDB ID: {new_vndb}")
-            results = VndbManager.fetch_and_store_vn(vndb_id=new_vndb)
-            if results and len(results) > 0:
-                current_card.ogtitle = VndbManager.get_original_title(results[0])
+        # # Fetch if ID changed OR if ID exists but ogtitle is empty
+        # new_vndb = current_card.vndb
+        # if new_vndb and (new_vndb != old_vndb or not current_card.ogtitle):
+        #     logging.debug(f"Updating metadata for VNDB ID: {new_vndb}")
+        #     results = VndbManager.fetch_and_store_vn(vndb_id=new_vndb)
+        #     if results and len(results) > 0:
+        #         current_card.ogtitle = VndbManager.get_original_title(results[0])
 
         new_name = current_card.name
         # Handle renaming: remove the old key if the name changed

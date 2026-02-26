@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QComboBox, 
                                QLabel, QGroupBox, QFormLayout,
                                QHBoxLayout, QLineEdit, QPushButton,
-                               QCheckBox, QFileDialog)
+                               QCheckBox, QFileDialog, QScrollArea, QFrame)
 from system_utils import SystemUtils
 import config
 import logging
@@ -17,9 +17,17 @@ class SettingsTab(QWidget):
 
         # Load existing settings
         self.user_settings = SystemUtils.load_settings()
-        
+
         # Main layout for the entire tab
-        main_layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        
+        # Container widget to hold all stuff
+        container = QWidget()
+        main_layout = QVBoxLayout(container)
         main_layout.setContentsMargins(20, 20, 20, 20) # Add breathing room around the edges
         main_layout.setSpacing(20) # Space between the different sections
         
@@ -70,19 +78,19 @@ class SettingsTab(QWidget):
         
         # Global Winetricks
         wt_layout = QHBoxLayout()
-        global_wt = self.user_settings.get("global_wt", {}) # Get the dict or empty dict
+        global_env_var = self.user_settings.get("global_env_var", {}) # Get the dict or empty dict
 
         self.wt_jp_locale = QCheckBox(self.tr("Japanese Locale (jp_locale)"))
-        # Read from nested dict: global_wt -> jp_locale
-        self.wt_jp_locale.setChecked(global_wt.get("jp_locale", False))
+        # Read from nested dict: global_env_var -> jp_locale
+        self.wt_jp_locale.setChecked(global_env_var.get("jp_locale", False))
 
         self.wt_jp_timezone = QCheckBox(self.tr("Japanese Timezone (jp_timezone)"))
-        # Read from nested dict: global_wt -> jp_timezone
-        self.wt_jp_timezone.setChecked(global_wt.get("jp_timezone", False))
+        # Read from nested dict: global_env_var -> jp_timezone
+        self.wt_jp_timezone.setChecked(global_env_var.get("jp_timezone", False))
 
         wt_layout.addWidget(self.wt_jp_locale)
         wt_layout.addWidget(self.wt_jp_timezone)
-        settings_layout.addRow(QLabel(self.tr("Global Winetricks:")), wt_layout)
+        settings_layout.addRow(QLabel(self.tr("Global Env variables:")), wt_layout)
 
         # Log Level
         self.log_level_combo = QComboBox()
@@ -165,6 +173,9 @@ class SettingsTab(QWidget):
         
         main_layout.addStretch()
 
+        scroll.setWidget(container)
+        outer_layout.addWidget(scroll)
+
         # ==========================================
         # Connect Signals for Auto-Save
         self.font_btn.clicked.connect(self.browse_font_folder)
@@ -175,10 +186,10 @@ class SettingsTab(QWidget):
         
         self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
         self.wt_jp_locale.stateChanged.connect(
-            lambda s: self.save_nested_setting("global_wt", "jp_locale", bool(s))
+            lambda s: self.save_nested_setting("global_env_var", "jp_locale", bool(s))
         )
         self.wt_jp_timezone.stateChanged.connect(
-            lambda s: self.save_nested_setting("global_wt", "jp_timezone", bool(s))
+            lambda s: self.save_nested_setting("global_env_var", "jp_timezone", bool(s))
         )
 
     def change_theme(self, index):

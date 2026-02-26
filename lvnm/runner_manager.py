@@ -4,6 +4,7 @@ import tarfile
 import urllib.request
 import urllib.error
 import config
+import re
 import logging
 logger = logging.getLogger(__name__)
 from abc import ABC, abstractmethod
@@ -141,13 +142,17 @@ class RunnerManagerInterface:
     @staticmethod
     def get_all_installed_runners():
         """Returns a dict mapping 'Runner Name' to its full path"""
-        runners = {}
-        # Fetch Wine runners
-        if config.WINE_RUNNERS_DIR.exists():
-            for d in config.WINE_RUNNERS_DIR.iterdir():
-                if d.is_dir(): runners[d.name] = str(d)
-        # Fetch Proton runners
-        if config.PROTON_RUNNERS_DIR.exists():
-            for d in config.PROTON_RUNNERS_DIR.iterdir():
-                if d.is_dir(): runners[d.name] = str(d)
-        return runners
+        runner_dirs = [config.WINE_RUNNERS_DIR, config.PROTON_RUNNERS_DIR]
+        runners = [
+            (d.name, str(d))
+            for base in runner_dirs
+            if base.exists()
+            for d in base.iterdir()
+            if d.is_dir()
+        ]
+        runners.sort(key=RunnerManagerInterface._natural_sort_key, reverse=True)
+        return dict(runners)
+    
+    @staticmethod
+    def _natural_sort_key(item: tuple[str, str]) -> list:
+        return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', item[0])]

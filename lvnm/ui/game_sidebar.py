@@ -17,6 +17,7 @@ from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
 from ui.prefix_tab import PrefixTab, CreatePrefixDialog
 from ui.console_dialog import ConsoleDialog
+from vndb_manager import VndbManager, VndbWorker
 
 logger = logging.getLogger(__name__)
 
@@ -211,25 +212,7 @@ class GameSidebar(QFrame):
 
         # Update Top Header Name
         self.lbl_display_name.setText(card.name)
-
-        # --- Handle Dynamic Visibility based on VNDB ---
-        if card.vndb and card.vndb.strip():
-            self.media_container.show()
-            
-            # Update Cover
-            display_path = SystemUtils.get_cover_path(card.vndb)
-            self.lbl_cover.set_pixmap_from_path(display_path)
-
-            # Update Links
-            vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
-            self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
-            
-            jp_encoded_name = urllib.parse.quote(card.ogtitle)
-            egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
-            self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
-        else:
-            # Hide entire section if no VNDB ID
-            self.media_container.hide()
+        self.update_game_cover()
 
         # Filling General fields
         self.edit_name.setText(card.name)
@@ -324,17 +307,17 @@ class GameSidebar(QFrame):
         self.update_umu_visibility("wine")
 
         # --- Apply Global Winetricks/Env Var Defaults ---
-        # We look at the 'global_wt' dict from settings and find matches in config.ENV_VARIABLES
-        global_wt = user_settings.get("global_wt", {})
+        # We look at the 'global_env_var' dict from settings and find matches in config.ENV_VARIABLES
+        global_env_var = user_settings.get("global_env_var", {})
         
         # Create a temp dict to simulate active env vars for the refresh method
         default_env_vars = {}
         
         # This part assumes your config.ENV_VARIABLES entries have an ID 
-        # that matches the keys in global_wt (like 'jp_locale' or 'jp_timezone')
+        # that matches the keys in global_env_var (like 'jp_locale' or 'jp_timezone')
         for var in config.ENV_VARIABLES:
             var_id = var.get("id")
-            if global_wt.get(var_id): # If 'jp_locale' is True in settings
+            if global_env_var.get(var_id): # If 'jp_locale' is True in settings
                 default_env_vars[var["key"]] = var["value"]
 
         # Clear Env Var checkboxes
@@ -433,6 +416,7 @@ class GameSidebar(QFrame):
         # Record if this is a new game before we overwrite the original name
         is_new_game = not self.current_game.name 
         original_name = self.current_game.name
+        old_vndb = self.current_game.vndb
 
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
@@ -470,7 +454,14 @@ class GameSidebar(QFrame):
             logger.debug(f"Updating game: {original_name}")
             GameManager.update_game(original_name, self.current_game.to_dict())
 
+        # Check if we need to fetch VNDB metadata
+        new_vndb = self.edit_vndb.text()
+        if new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle):
+            logger.debug("Fetching VNDB data")
+            self.fetch_vndb_async(self.current_game.name, new_vndb)
+
         # Finalize UI
+        self.update_game_cover()
         self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
         self.show_saved_feedback()
@@ -574,6 +565,51 @@ class GameSidebar(QFrame):
             self.combo_prefix.setCurrentIndex(index)
             
         self.combo_prefix.blockSignals(False)
+
+    def fetch_vndb_async(self, game_name, vndb_id):
+        # Create and start the thread
+        self.vndb_thread = VndbWorker(game_name, vndb_id)
+        self.vndb_thread.finished.connect(self.on_vndb_finished)
+        self.vndb_thread.start()
+
+    def on_vndb_finished(self, game_name, results):
+        if results:
+            # Get the jp title
+            og_title = VndbManager.get_original_title(results[0])
+            
+            # Update the JSON with jp title
+            game_card = GameManager.get_game(game_name)
+            if game_card:
+                game_card.ogtitle = og_title
+                GameManager.update_game(game_name, game_card.to_dict())
+
+            self.on_metadata_updated(game_name)
+            
+            # If looking at this game, refresh the cover/links
+            if self.current_game and self.current_game.name == game_name:
+                self.current_game.ogtitle = og_title
+                self.update_game_cover()
+                logger.info(f"Background metadata update complete for {game_name}")
+
+    def update_game_cover(self):
+        """Updates only the cover and links based on the current VNDB ID."""
+        card = self.current_game
+        if card and card.vndb and card.vndb.strip():
+            self.media_container.show()
+            
+            display_path = SystemUtils.get_cover_path(card.vndb)
+            self.lbl_cover.set_pixmap_from_path(display_path)
+
+            # Update Links
+            vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
+            self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
+            
+            jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
+            egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
+            self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+        else:
+            self.media_container.hide()
+            self.lbl_cover.set_pixmap_from_path(None)
 
     def check_active_runners(self):
         """Polls ALL active runners. Cleans up those that finished."""

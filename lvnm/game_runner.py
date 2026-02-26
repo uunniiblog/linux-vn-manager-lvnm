@@ -4,6 +4,7 @@ import json
 import config
 import subprocess
 import logging
+import shutil
 logger = logging.getLogger(__name__)
 from pathlib import Path
 from model.game_card import GameCard
@@ -44,13 +45,52 @@ class GameRunner:
         if not self.prefix_info:
             raise ValueError(f"Prefix '{self.game.prefix}' (required for {self.name}) not found.")
 
+    def open_terminal(self, prefix_name: str):
+        """Opens the system terminal with the game's environment pre-loaded."""
+        # Manually fetch prefix info
+        self.prefix_info = self._get_prefix_info(prefix_name)
+        logger.debug(f"open_terminal {self.prefix_info}")
+
+        if not self.prefix_info:
+            raise ValueError(f"Prefix '{prefix_name}' not found.")
+
+        self.game = GameCard(
+            name=f"util-bash",
+            path="",
+            prefix=prefix_name,
+            vndb="",
+        )
+        
+        try:
+            self.prepare_environment()
+            logger.debug(self.name)
+
+            # Maybe useful
+            self.env["RUN_GAME"] = " ".join(self.cmd)
+            self.env["UMU_LOG"] = "1"
+
+            # Find the user's terminal emulator
+            term = SystemUtils.get_default_terminal()
+            
+            if not term:
+                logging.error("Could not find a terminal emulator.")
+                return False
+
+            logging.debug(f"Opening {term} in {self.game_dir} with game environment.")
+            self.process = ExecutionManager.run(term, self.env, wait=False, cwd=self.game_dir)
+            return True
+
+        except Exception as e:
+            logging.error(f"Failed to open terminal: {e}")
+            return False
+
     def prepare_environment(self):
         """Builds the environment and the final command list."""
         self.env = os.environ.copy()
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
 
-        if "wineconsole" in self.game.name: 
+        if "wineconsole" or "util-bash" in self.game.name: 
             self.game_dir = str(Path(self.prefix_info["path"]))
         else:
             self.game_dir = str(Path(self.game.path).parent)
@@ -84,7 +124,7 @@ class GameRunner:
             gs_params = self.game.gamescope.parameters.split()
             self.cmd = ["gamescope"] + gs_params + ["--"] + self.cmd
 
-    def run_in_prefix(self, exe_path: str, prefix_name: str):
+    def run_in_prefix(self, exe_path: str, prefix_name: str, env_vars: dict = None):
         """
         Bypasses JSON loading to run an arbitrary executable in a selected prefix.
         Useful for installers or utility stuff
@@ -102,6 +142,9 @@ class GameRunner:
                 prefix=prefix_name,
                 vndb="",
             )
+
+            if env_vars:
+                self.game.envvar = env_vars
             
             # Call same logic as run
             self.prepare_environment()

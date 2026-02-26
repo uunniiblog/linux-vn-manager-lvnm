@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
                             QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
                             QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
-                            QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy)
+                            QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy, QMenu)
 from PySide6.QtCore import Qt, QProcess, QSettings
 from datetime import datetime
 from prefix_manager import PrefixManager
@@ -12,6 +12,7 @@ from game_manager import GameManager
 from ui.console_dialog import ConsoleDialog
 from system_utils import SystemUtils
 from runner_manager import RunnerManagerInterface
+from game_runner import GameRunner
 
 class PrefixTab(QWidget):
     def __init__(self):
@@ -27,22 +28,50 @@ class PrefixTab(QWidget):
         group_layout.addWidget(self.prefixes_list)
         main_layout.addWidget(prefix_group)
 
-        # Buttons
+        # Row 1 Buttons
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton(self.tr("Create Prefix"))
         self.edit_btn = QPushButton(self.tr("Edit Prefix"))
         self.del_btn = QPushButton(self.tr("Delete Prefix"))
         
-        btn_layout.addWidget(self.edit_btn)
-        btn_layout.addWidget(self.add_btn)
-        btn_layout.addWidget(self.del_btn)
+        btn_layout.addWidget(self.edit_btn, stretch=2)
+        btn_layout.addWidget(self.add_btn, stretch=2)
+        btn_layout.addWidget(self.del_btn, stretch=1)
         main_layout.addLayout(btn_layout)
+
+        # Visual Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #444;") # Optional: match your dark theme
+        main_layout.addWidget(separator)
+
+        # Row 2 Buttons
+        btn_layout_2 = QHBoxLayout()
+        self.regedit_btn = QPushButton(self.tr("Regedit"))
+        self.winecfg_btn = QPushButton(self.tr("Winecfg"))
+        self.console_btn = QPushButton(self.tr("Cmd"))
+        self.bash_btn = QPushButton(self.tr("Bash"))
+        
+        btn_layout_2.addWidget(self.regedit_btn)
+        btn_layout_2.addWidget(self.winecfg_btn)
+        btn_layout_2.addWidget(self.console_btn)
+        btn_layout_2.addWidget(self.bash_btn)
+        main_layout.addLayout(btn_layout_2)
 
         # Signals
         self.edit_btn.clicked.connect(self.on_edit)
         self.add_btn.clicked.connect(self.on_add)
         self.del_btn.clicked.connect(self.on_delete)
         self.prefixes_list.itemDoubleClicked.connect(self.on_edit)
+
+        self.regedit_btn.clicked.connect(lambda: self.run_utility("regedit"))
+        self.winecfg_btn.clicked.connect(lambda: self.run_utility("winecfg"))
+        self.console_btn.clicked.connect(lambda: self.run_utility("wineconsole"))
+        self.bash_btn.clicked.connect(self.run_bash_utility)
+
+        self.prefixes_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.prefixes_list.customContextMenuRequested.connect(self.open_context_menu)
 
         self.refresh_list()
 
@@ -77,11 +106,8 @@ class PrefixTab(QWidget):
         self.prefixes_list.addItems(display_list)
 
     def on_delete(self):
-        current = self.prefixes_list.currentItem()
-        if not current: return
+        prefix_str = self.get_selected_prefix()
         
-        # Select prefix wtihout games
-        prefix_str = current.text().split(" (")[0]
         prefix = PrefixManager(prefix_str)
         confirm = QMessageBox.question(self, self.tr("Delete?"), 
                                      f"{self.tr('Delete Prefix')} {prefix_str}?")
@@ -91,12 +117,7 @@ class PrefixTab(QWidget):
             self.refresh_list()
 
     def on_edit(self):
-        current = self.prefixes_list.currentItem()
-        if not current:
-            logger.debug("No prefix Selected")
-            return
-
-        prefix_str = current.text().split(" (")[0]
+        prefix_str = self.get_selected_prefix()
         prefix = PrefixManager(prefix_str)
 
         dialog = EditPrefixDialog(prefix, self)
@@ -157,6 +178,7 @@ class PrefixTab(QWidget):
         created_name = self.create_new_prefix_flow(self)
         if created_name:
             self.refresh_list()
+            
     @staticmethod
     def create_new_prefix_flow(parent_widget):
         dialog = CreatePrefixDialog(parent_widget)
@@ -199,6 +221,67 @@ class PrefixTab(QWidget):
                 return None
         return None
 
+    def get_selected_prefix(self):
+        """Helper to get the raw prefix name from the list selection"""
+        current = self.prefixes_list.currentItem()
+        if not current:
+            return None
+        # Split to handle the "PrefixName (Game1, Game2)" display format
+        return current.text().split(" (")[0]
+
+    def run_utility(self, command: str):
+        prefix_name = self.get_selected_prefix()
+        if not prefix_name:
+            logger.debug("No prefix selected for utility.")
+            return
+        runner = GameRunner("UtilityMode")
+        runner.run_in_prefix(command, prefix_name)
+
+    def run_bash_utility(self):
+        prefix_name = self.get_selected_prefix()
+        if not prefix_name:
+            logger.debug("No prefix selected for utility.")
+            return
+        runner = GameRunner("UtilityMode")
+        runner.open_terminal(prefix_name)
+    
+    def open_context_menu(self, position):
+        """Creates and shows the right-click menu for prefixes"""
+        item = self.prefixes_list.itemAt(position)
+        if not item:
+            return
+
+        prefix_name = self.get_selected_prefix()
+        menu = QMenu(self)
+
+        # Management Actions
+        act_edit = menu.addAction(self.tr("Edit Prefix"))
+        act_del = menu.addAction(self.tr("Delete Prefix"))
+        menu.addSeparator()
+
+        # Utility Actions
+        act_regedit = menu.addAction(self.tr("Open Regedit"))
+        act_winecfg = menu.addAction(self.tr("Open Winecfg"))
+        act_cmd = menu.addAction(self.tr("Open Windows Cmd"))
+        act_bash = menu.addAction(self.tr("Open Bash Terminal"))
+
+        # Execute Menu
+        action = menu.exec(self.prefixes_list.viewport().mapToGlobal(position))
+
+        # Handle Choices
+        if action == act_edit:
+            self.on_edit()
+        elif action == act_del:
+            self.on_delete()
+        elif action == act_regedit:
+            self.run_utility("regedit")
+        elif action == act_winecfg:
+            self.run_utility("winecfg")
+        elif action == act_cmd:
+            self.run_utility("wineconsole")
+        elif action == act_bash:
+            self.run_bash_utility()
+    
     def refresh_active_tab(self):
         """Forces the currently visible sub-tab to reload its data"""
         self.refresh_list()
@@ -411,7 +494,7 @@ class CreatePrefixDialog(QDialog):
         self.runner_combo = QComboBox() 
         self.runner_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.available_runners = RunnerManagerInterface.get_all_installed_runners()
-        self.runner_combo.addItems(self.available_runners.keys())
+        self.runner_combo.addItems(self.available_runners)
         form_layout.addRow(self.tr("Runner:"), self.runner_combo)
 
         self.layout.addLayout(form_layout)

@@ -19,6 +19,8 @@ class PrefixManager:
     CODEC_SH = config.CODEC_SCRIPT
     DATA_ROOT = config.PREFIXES_DIR
     PREFIXES_FILE = config.PREFIXES_DATA
+    DXVK_DIR = config.DXVK_DIR
+    DXVK_API_URL = config.DXVK_API_URL
 
     def __init__(self, name: str):
         self.name = name
@@ -267,68 +269,78 @@ class PrefixManager:
 
     def install_dxvk(self, executor=None):
         """
-        Downloads latest DXVK and installs DLLs into the prefix.
+        Download and install DXVK into prefix
         """
         logger.info(f"--- Installing DXVK into {self.name} ---")
         
         def run_dxvk_logic(logger=None):
             def log_to_ui(msg):
                 if logger:
-                    logger(msg) # Call the signal to show in the Dialog
+                    logger(msg)
                 import logging
                 logging.getLogger(__name__).debug(f"[DXVK] {msg}")
+
             try:
-                # Get latest release URL
-                api_url = config.DXVK_API_URL
-                response = requests.get(api_url, timeout=10)
+                # Get latest release metadata
+                response = requests.get(self.DXVK_API_URL, timeout=5)
                 response.raise_for_status()
                 release_data = response.json()
                 
-                # Find the .tar.gz asset
-                download_url = next(
-                    asset["browser_download_url"] 
-                    for asset in release_data["assets"] 
-                    if asset["name"].endswith(".tar.gz")
-                )
+                version_tag = release_data["tag_name"]
+                cache_folder = self.DXVK_DIR / version_tag 
                 
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    tmp_path = Path(tmpdir)
-                    archive_path = tmp_path / "dxvk.tar.gz"
+                # Download latest version if not exists
+                if not cache_folder.exists():
+                    log_to_ui(f"Downloading DXVK {version_tag}...")
                     
-                    # Download
-                    log_to_ui(f"Downloading DXVK from {download_url}...")
-                    r = requests.get(download_url, stream=True)
-                    with open(archive_path, 'wb') as f:
-                        shutil.copyfileobj(r.raw, f)
+                    download_url = next(
+                        asset["browser_download_url"] 
+                        for asset in release_data["assets"] 
+                        if asset["name"].endswith(".tar.gz")
+                    )
                     
-                    # Extract
-                    with tarfile.open(archive_path, "r:gz") as tar:
-                        tar.extractall(path=tmp_path)
-                    
-                    # DXVK extracts into a folder named 'dxvk-v2.x'
-                    extracted_folder = next(tmp_path.glob("dxvk-*"))
-                    
-                    # Copy DLLs
-                    # system32 = 64-bit DLLs
-                    # syswow64 = 32-bit DLLs (required for WoW64 to run 32-bit games)
-                    sys32 = self.prefix_path / "drive_c" / "windows" / "system32"
-                    syswow64 = self.prefix_path / "drive_c" / "windows" / "syswow64"
-                    
-                    dlls = ["d3d9.dll", "d3d10core.dll", "d3d11.dll", "dxgi.dll"]
-                    
-                    log_to_ui("Copying DXVK DLLs to prefix...")
-                    # 64-bit
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        tmp_path = Path(tmpdir)
+                        archive_path = tmp_path / "dxvk.tar.gz"
+                        
+                        # Stream download
+                        r = requests.get(download_url, stream=True)
+                        with open(archive_path, 'wb') as f:
+                            shutil.copyfileobj(r.raw, f)
+                        
+                        # Extract
+                        with tarfile.open(archive_path, "r:gz") as tar:
+                            tar.extractall(path=tmp_path)
+                        
+                        # Find extracted folder (usually dxvk-v2.x)
+                        extracted = next(tmp_path.glob("dxvk-*"))
+                        
+                        # Save to folder
+                        self.DXVK_DIR.mkdir(parents=True, exist_ok=True)
+                        shutil.copytree(extracted, cache_folder)
+                        log_to_ui(f"Saved DXVK {version_tag} to {self.DXVK_DIR}")
+                else:
+                    log_to_ui(f"Using DXVK version: {version_tag}")
+
+                # Copy DLLs to Prefix
+                sys32 = self.prefix_path / "drive_c" / "windows" / "system32"
+                syswow64 = self.prefix_path / "drive_c" / "windows" / "syswow64"
+                dlls = ["d3d9.dll", "d3d10core.dll", "d3d11.dll", "dxgi.dll"]
+                
+                log_to_ui("Copying DXVK DLLs to prefix...")
+                
+                # Copy 64-bit
+                for dll in dlls:
+                    src = cache_folder / "x64" / dll
+                    if src.exists():
+                        shutil.copy2(src, sys32 / dll)
+                
+                # Copy 32-bit
+                if syswow64.exists():
                     for dll in dlls:
-                        src = extracted_folder / "x64" / dll
+                        src = cache_folder / "x32" / dll
                         if src.exists():
-                            shutil.copy(src, sys32 / dll)
-                    
-                    # 32-bit
-                    if syswow64.exists():
-                        for dll in dlls:
-                            src = extracted_folder / "x32" / dll
-                            if src.exists():
-                                shutil.copy(src, syswow64 / dll)
+                            shutil.copy2(src, syswow64 / dll)
 
                 log_to_ui("DXVK installed successfully.")
                 return True

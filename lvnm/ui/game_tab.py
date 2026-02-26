@@ -69,6 +69,7 @@ class GameTab(QWidget):
         self.sidebar.setVisible(False)
         self.sidebar.on_close = self.close_sidebar
         self.sidebar.on_saved = self.refresh_list
+        self.sidebar.on_metadata_updated = self.update_item_metadata
 
         # Add widgets to the splitter
         self.splitter.addWidget(self.list_container)
@@ -100,6 +101,26 @@ class GameTab(QWidget):
         if new_zoom != self.zoom:
             self.zoom = new_zoom
             self.refresh_list()
+
+    def update_item_metadata(self, game_name):
+        """Updates only the widget of a specific game without reloading the whole list."""
+        for i in range(self.game_list.count()):
+            item = self.game_list.item(i)
+            card = item.data(Qt.UserRole)
+
+            if card.name == game_name:
+                # Get the latest data from the Manager
+                updated_card = GameManager.get_game(game_name)
+                if not updated_card:
+                    return
+
+                # Update the data stored in the item
+                item.setData(Qt.UserRole, updated_card)
+                widget = self.game_list.itemWidget(item)
+                widget.update_ui(updated_card)
+                
+                logger.debug(f"Targeted UI update for {game_name} complete.")
+                return
 
     def refresh_list(self):
         """Clears and repopulates the game list, filtered by the search bar."""
@@ -251,27 +272,23 @@ class RunInPrefixDialog(QDialog):
             logger.debug("Please select both an executable and a prefix.")
             return
 
+        user_settings = SystemUtils.load_settings()
+        global_env_var = user_settings.get("global_env_var", {})
+        env_vars = {}
+        for wt_id, is_enabled in global_env_var.items():
+            if is_enabled:
+                for var in config.ENV_VARIABLES:
+                    if var.get("id") == wt_id:
+                        env_vars[var["key"]] = var["value"]
+                        break
         logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
-
-        # Create a temporary GameCard in memory
-        dummy_card = GameCard(
-            name="Temp_Installer",
-            path=exe_path,
-            prefix=prefix_name,
-            vndb="",
-            umu_store="",
-            umu_gameid=""
-        )
+        if env_vars:
+            logger.debug(f"Applying Global Env Vars: {env_vars}")
 
         try:
             # Instantiate GameRunner with our dummy card
-            runner = GameRunner(name="Ad-Hoc Installer", card_override=dummy_card)
-            
-            # runner.run() handles the environment, paths, and ExecutionManager calls
-            if runner.run():
-                logger.debug("Running in prefix launched successfully.")
-            else:
-                logger.debug("Failed to launch process.")
+            runner = GameRunner("Temp_Installer")
+            runner.run_in_prefix(exe_path, prefix_name, env_vars=env_vars)
         except Exception as e:
             logger.error(f"[Error] Failed to run in prefix: {e}")
 
