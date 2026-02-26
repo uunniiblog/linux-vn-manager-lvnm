@@ -86,6 +86,18 @@ class SystemUtils:
             "gstreamer_packages": {}
         }
 
+        # Update the config module variables
+        mapping = {
+            "gamescope": "GAMESCOPE_INSTALLED",
+            "vulkan_support": "VULKAN_INSTALLED",
+            "umu_run": "UMU_RUN_INSTALLED",
+            "winetricks": "WINETRICKS_INSTALLED"
+        }
+
+        for support_key, config_var in mapping.items():
+            is_supported = support.get(support_key, False)
+            setattr(config, config_var, is_supported)
+
         # Check all GStreamer packages
         for pkg in SystemUtils.GSTREAMER_PACKAGES:
             support["gstreamer_packages"][pkg] = SystemUtils._is_package_installed(pkg)

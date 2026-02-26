@@ -51,6 +51,9 @@ class SettingsTab(QWidget):
         self.gs_checkbox.setChecked(self.user_settings.get("gamescope_enabled", False))
         self.gs_params = QLineEdit(self.user_settings.get("gamescope_params", ""))
         self.gs_params.setPlaceholderText(self.tr("Parameters (e.g., -W 1920 -H 1080)"))
+        if not config.GAMESCOPE_INSTALLED:
+            self.gs_checkbox.setDisabled(True)
+            self.gs_params.setDisabled(True)
         gs_layout.addWidget(self.gs_checkbox)
         gs_layout.addWidget(self.gs_params)
         settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
@@ -80,11 +83,11 @@ class SettingsTab(QWidget):
         wt_layout = QHBoxLayout()
         global_env_var = self.user_settings.get("global_env_var", {}) # Get the dict or empty dict
 
-        self.wt_jp_locale = QCheckBox(self.tr("Japanese Locale (jp_locale)"))
+        self.wt_jp_locale = QCheckBox(self.tr("Japanese Locale"))
         # Read from nested dict: global_env_var -> jp_locale
         self.wt_jp_locale.setChecked(global_env_var.get("jp_locale", False))
 
-        self.wt_jp_timezone = QCheckBox(self.tr("Japanese Timezone (jp_timezone)"))
+        self.wt_jp_timezone = QCheckBox(self.tr("Japanese Timezone"))
         # Read from nested dict: global_env_var -> jp_timezone
         self.wt_jp_timezone.setChecked(global_env_var.get("jp_timezone", False))
 

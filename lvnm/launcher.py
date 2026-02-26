@@ -19,6 +19,8 @@ def main():
 
     log_level = settings.get("log_level", "info")
     setup_logging(log_level)
+    logger = logging.getLogger(__name__)
+    logger.debug(SystemUtils.print_diagnostic_report())
     
     # Scale with system scale (?)
     QApplication.setHighDpiScaleFactorRoundingPolicy(

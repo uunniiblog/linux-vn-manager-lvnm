@@ -152,6 +152,9 @@ class GameSidebar(QFrame):
         self.gs_params = QLineEdit()
         gs_form.addRow(self.gs_enabled)
         gs_form.addRow(self.tr("Params:"), self.gs_params)
+        if not config.GAMESCOPE_INSTALLED:
+            self.gs_enabled.setDisabled(True)
+            self.gs_params.setDisabled(True)
         form.addWidget(gs_group)
 
         # Environment Variables
@@ -437,6 +440,7 @@ class GameSidebar(QFrame):
         # Gamescope
         self.current_game.gamescope.enabled = "true" if self.gs_enabled.isChecked() else "false"
         self.current_game.gamescope.parameters = self.gs_params.text()
+
 
         # Execute Save
         if is_new_game:

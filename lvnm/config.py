@@ -159,6 +159,11 @@ WINETRICKS_LIST = [
     {"id": "wsh57", "name": "Windows scripting host (SRPG Studio)"},
 ]
 
+# User config
+GAMESCOPE_INSTALLED = False
+VULKAN_INSTALLED = False
+UMU_RUN_INSTALLED = False
+WINETRICKS_INSTALLED = False
 
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
