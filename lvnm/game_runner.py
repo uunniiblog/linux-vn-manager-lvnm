@@ -30,10 +30,10 @@ class GameRunner:
         # Track running
         self.process = None 
 
-    def _load_data(self):
+    def load_data(self):
         """Loads game and prefix data into the instance."""
 
-        # Only fetch from the registry if we didn't provide a card manually
+        # Only fetch from the json if we didn't provide a card manually
         if not self.game:
             self.game = self._get_game_card(self.name)
 
@@ -43,45 +43,6 @@ class GameRunner:
         self.prefix_info = self._get_prefix_info(self.game.prefix)
         if not self.prefix_info:
             raise ValueError(f"Prefix '{self.game.prefix}' (required for {self.name}) not found.")
-
-    def open_terminal(self, prefix_name: str):
-        """Opens the system terminal with the game's environment pre-loaded."""
-        # Manually fetch prefix info
-        self.prefix_info = self._get_prefix_info(prefix_name)
-        logger.debug(f"open_terminal {self.prefix_info}")
-
-        if not self.prefix_info:
-            raise ValueError(f"Prefix '{prefix_name}' not found.")
-
-        self.game = GameCard(
-            name=f"util-bash",
-            path="",
-            prefix=prefix_name,
-            vndb="",
-        )
-        
-        try:
-            self.prepare_environment()
-            logger.debug(self.name)
-
-            # Maybe useful
-            self.env["RUN_GAME"] = " ".join(self.cmd)
-            self.env["UMU_LOG"] = "1"
-
-            # Find the user's terminal emulator
-            term = SystemUtils.get_default_terminal()
-            
-            if not term:
-                logging.error("Could not find a terminal emulator.")
-                return False
-
-            logging.debug(f"Opening {term} in {self.game_dir} with game environment.")
-            self.process = ExecutionManager.run(term, self.env, wait=False, cwd=self.game_dir)
-            return True
-
-        except Exception as e:
-            logging.error(f"Failed to open terminal: {e}")
-            return False
 
     def prepare_environment(self):
         """Builds the environment and the final command list."""
@@ -155,9 +116,9 @@ class GameRunner:
             logging.error(f"Run in prefix failed: {e}")
             return False
     
-    def run(self):
-        """Prepares, logs, and executes the game, keeping a reference to the worker."""
-        self._load_data()
+    def run(self, headless=False):
+        """Prepares, logs, and executes the game"""
+        self.load_data()
         try:
             # Only prepare if we haven't already
             if not self.cmd or not self.env:
@@ -167,7 +128,7 @@ class GameRunner:
             return False
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not headless)
 
         logging.debug(f"self.process {self.process}")
         return True
@@ -376,6 +337,45 @@ class GameRunner:
                 continue
         return found_pids
 
+    def open_terminal(self, prefix_name: str):
+        """Opens the system terminal with the game's environment pre-loaded."""
+        # Manually fetch prefix info
+        self.prefix_info = self._get_prefix_info(prefix_name)
+        logger.debug(f"open_terminal {self.prefix_info}")
+
+        if not self.prefix_info:
+            raise ValueError(f"Prefix '{prefix_name}' not found.")
+
+        self.game = GameCard(
+            name=f"util-bash",
+            path="",
+            prefix=prefix_name,
+            vndb="",
+        )
+        
+        try:
+            self.prepare_environment()
+            logger.debug(self.name)
+
+            # Maybe useful
+            self.env["RUN_GAME"] = " ".join(self.cmd)
+            self.env["UMU_LOG"] = "1"
+
+            # Find the user's terminal emulator
+            term = SystemUtils.get_default_terminal()
+            
+            if not term:
+                logging.error("Could not find a terminal emulator.")
+                return False
+
+            logging.debug(f"Opening {term} in {self.game_dir} with game environment.")
+            self.process = ExecutionManager.run(term, self.env, wait=False, cwd=self.game_dir)
+            return True
+
+        except Exception as e:
+            logging.error(f"Failed to open terminal: {e}")
+            return False
+    
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""
         self.logs.append(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - {line}")

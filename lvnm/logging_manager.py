@@ -20,4 +20,4 @@ def setup_logging(level=logging.INFO):
         ]
     )
 
-    logging.info(f"Initialized at log level {level}")
+    logging.debug(f"Initialized at log level {level}")

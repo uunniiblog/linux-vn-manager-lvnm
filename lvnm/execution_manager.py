@@ -37,7 +37,7 @@ class ExecutionManager:
         return env
 
     @staticmethod
-    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None):
+    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None, detached=True):
         """
         Executes a command with automatic verbosity management.
         
@@ -71,7 +71,7 @@ class ExecutionManager:
             cwd=cwd,
             encoding='utf-8',
             errors='replace',
-            start_new_session=True
+            start_new_session=detached
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)
