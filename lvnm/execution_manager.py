@@ -14,20 +14,20 @@ class ExecutionManager:
         env = base_env.copy()
         log_level = settings.get("log_level", "info")
 
-        if log_level == "debug":
+        if log_level == "DEBUG":
             # Show everything
             env["UMU_LOG"] = "1"
             # everything else default should be good ? TODO
         
-        elif log_level == "info":
+        elif log_level == "INFO":
             # Show only errors and major fixmes
             if "WINEDEBUG" not in env:
                 env["WINEDEBUG"] = "-all,err+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             
-        elif log_level == "none":
-            # Reduce logging as much as possible
+        elif log_level == "ERROR":
+            # TODO
             env["WINEDEBUG"] = "-all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
@@ -37,7 +37,7 @@ class ExecutionManager:
         return env
 
     @staticmethod
-    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None):
+    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None):
         """
         Executes a command with automatic verbosity management.
         
@@ -48,6 +48,7 @@ class ExecutionManager:
             check (bool): If True and wait is True, raises error on non-zero exit.
             suppress_codes (list): List of exit codes to treat as success
             cwd: Sets the current directory before the child is executed (useful for some VNs)
+            log_callback: Callback to store the log in gamerunner.
         """
         if suppress_codes is None:
             suppress_codes = []
@@ -77,11 +78,10 @@ class ExecutionManager:
         def log_reader(pipe):
             try:
                 for line in pipe:
-                    logging.info(line.strip())
-                    # Even with env variables, we keep sys.stdout.write 
-                    # so the output appears in our terminal
-                    # sys.stdout.write(line)
-                    # sys.stdout.flush()
+                    clean_line = line.strip()
+                    logging.info(clean_line)
+                    if log_callback:
+                        log_callback(clean_line)
             except Exception as e:
                 logger.error(f"Log Thread Error: {e}")
             finally:

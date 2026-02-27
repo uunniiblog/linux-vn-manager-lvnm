@@ -1,6 +1,9 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame, QMenu
+from PySide6.QtWidgets import ( 
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
+    QFrame, QMenu, QDialog, QPlainTextEdit, QPushButton
+)
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from game_manager import GameManager
 from system_utils import SystemUtils
 from ui.game_sidebar import GameSidebar
@@ -114,6 +117,9 @@ class GameListItem(QWidget):
         else:
             act_run_stop = menu.addAction(self.tr("Run Game"))
 
+        act_log = menu.addAction(self.tr("Show Logs"))
+        # act_log.setEnabled(is_running)
+
         act_open = menu.addAction(self.tr("Open Sidebar"))
         act_browse = menu.addAction(self.tr("Browse Files"))
         act_regedit = menu.addAction(self.tr("Open Regedit"))
@@ -132,6 +138,9 @@ class GameListItem(QWidget):
             else:
                 self.requestRun.emit(self.game_card)
         
+        elif action == act_log:
+            self.show_log(self.game_card.name)
+
         elif action == act_open:
             self.requestOpen.emit(self.game_card)
 
@@ -156,6 +165,12 @@ class GameListItem(QWidget):
         elif action == act_del:
             self.delete_game(self.game_card.name)
 
+    def show_log(self, name):
+        self.log_dialog = LogViewerDialog(name)       
+        self.log_dialog.show()
+        self.log_dialog.raise_()
+        self.log_dialog.activateWindow()
+
     def duplicate_game(self, name):
         if GameManager.duplicate_game(name):
             self.requestRefresh.emit(self.game_card)
@@ -174,3 +189,69 @@ class GameListItem(QWidget):
     def run_bash(self):
         runner = GameRunner("UtilityMode")
         runner.open_terminal(self.game_card.prefix)
+
+
+class LogViewerDialog(QDialog):
+    def __init__(self, name, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr(f"Execution Logs: {name}"))
+        self.resize(800, 600)
+        self.setModal(False)
+        self.runner = None
+        self.name = name
+        self.history_buffer = ""
+        
+        layout = QVBoxLayout(self)
+        
+        self.text_area = QPlainTextEdit()
+        self.text_area.setReadOnly(True)
+        self.text_area.setLineWrapMode(QPlainTextEdit.NoWrap)
+        
+        # Terminal styling
+        self.text_area.setStyleSheet("""
+            background-color: #1e1e1e; 
+            color: #d4d4d4; 
+            font-family: 'Monospace', 'Courier New';
+        """)
+        
+        layout.addWidget(self.text_area)
+
+        # Timer for live updates
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_logs)
+        self.timer.start(1000)
+        
+        # Initial fill
+        self.update_logs()
+
+    def update_logs(self):
+        new_runner = GameSidebar.runners.get(self.name)
+
+        # Detect game restarts
+        if new_runner and new_runner != self.runner:
+            self.history_buffer += self.text_area.toPlainText() 
+            self.history_buffer += "\n\n\n--- New Instance Started --- \n\n\n"
+            
+            # Switch to the new runner
+            self.runner = new_runner
+
+        if not self.runner:
+            return
+            
+        # Get the logs
+        active_logs = self.runner.get_full_log()
+        full_display_content = self.history_buffer + active_logs
+        
+        # Update
+        if getattr(self, "_last_rendered", "") != full_display_content:
+            scrollbar = self.text_area.verticalScrollBar()
+            at_bottom = scrollbar.value() == scrollbar.maximum()
+            self.text_area.setPlainText(full_display_content)
+            self._last_rendered = full_display_content
+            
+            if at_bottom:
+                scrollbar.setValue(scrollbar.maximum())
+
+    def closeEvent(self, event):
+        self.timer.stop()
+        event.accept()

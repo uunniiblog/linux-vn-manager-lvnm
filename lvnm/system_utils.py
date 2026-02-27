@@ -127,6 +127,7 @@ class SystemUtils:
     def _is_package_installed(pkg_name: str) -> bool:
         """Dynamically checks package managers for installed packages."""
         try:
+
             # Arch Linux (pacman)
             if shutil.which("pacman"):
                 result = subprocess.run(["pacman", "-Qq", pkg_name], capture_output=True)
@@ -154,7 +155,7 @@ class SystemUtils:
         logger.debug("="*50)
         
         sys_info = SystemUtils.get_system_info()
-        logger.debug("\n--- System Information ---")
+        logger.debug("--- System Information ---")
         logger.debug(f"App Version : {sys_info['app_version']}")
         logger.debug(f"OS          : {sys_info['os']}")
         logger.debug(f"Kernel      : {sys_info['kernel']}")
@@ -163,13 +164,13 @@ class SystemUtils:
         logger.debug(f"GPU         : {sys_info['gpu']}")
 
         software = SystemUtils.get_software_support()
-        logger.debug("\n--- Software & Compatibility ---")
+        logger.debug("--- Software & Compatibility ---")
         logger.debug(f"Vulkan Support : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
         logger.debug(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}")
         logger.debug(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}")
         logger.debug(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}")
 
-        logger.debug("\n--- GStreamer Packages ---")
+        logger.debug("--- GStreamer Packages ---")
         for pkg, installed in software['gstreamer_packages'].items():
             status = "✅" if installed else "❌"
             logger.debug(f"{status} {pkg}")

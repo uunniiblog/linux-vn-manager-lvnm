@@ -139,7 +139,14 @@ ENV_VARIABLES = [
         "name": "DXVK HUD",
         "key": "DXVK_HUD",
         "value": "full",
-    }
+    },
+    {
+        "id": "proton_log",
+        "name": "Proton Log",
+        "key": "PROTON_LOG",
+        "value": "1",
+        "req": "proton"
+    },
 
 ]
 

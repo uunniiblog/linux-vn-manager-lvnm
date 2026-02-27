@@ -3,10 +3,12 @@ import signal
 import json
 import config
 import subprocess
-import logging
 import shutil
+import logging
 logger = logging.getLogger(__name__)
 from pathlib import Path
+from datetime import datetime
+from collections import deque
 from model.game_card import GameCard
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
@@ -23,13 +25,10 @@ class GameRunner:
         self.prefix_info: dict = None
         self.env: dict = {}
         self.cmd: list = []
-        self._manual_stop = False
+        self.logs = deque(maxlen=10000)
         
-        # The "worker" reference to track the running process
+        # Track running
         self.process = None 
-
-        # Attempt to load data immediately upon instantiation
-        # self._load_data()
 
     def _load_data(self):
         """Loads game and prefix data into the instance."""
@@ -168,7 +167,7 @@ class GameRunner:
             return False
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line)
 
         logging.debug(f"self.process {self.process}")
         return True
@@ -377,18 +376,25 @@ class GameRunner:
                 continue
         return found_pids
 
+    def _add_log_line(self, line):
+        """Callback used by ExecutionManager"""
+        self.logs.append(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - {line}")
+
+    def get_full_log(self):
+        """Returns the entire buffer as a single string for a UI text box"""
+        return "\n".join(self.logs)
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
         if GameRunner.LOG_LEVEL.lower() == "debug":
-            logging.debug("\n" + "="*60)
+            logging.debug("" + "="*60)
             logging.debug(f"LAUNCHING: {self.name}")
             logging.debug("="*60)
             logging.debug(f"Game Path:   {self.game.path}")
             logging.debug(f"Prefix Path: {self.env['WINEPREFIX']}")
             logging.debug(f"Runner:      {runner_path}")
             
-            logging.debug("\nEnvironment Variables:")
+            logging.debug("Environment Variables:")
             for var in self.env:
                 logging.debug(f"   {var:<18}: {self.env[var]}")
             
@@ -397,11 +403,11 @@ class GameRunner:
                 for k, v in self.game.envvar.items():
                     logging.debug(f"   {k:<18}: {v}")
 
-            logging.debug("\nGamescope:")
+            logging.debug("Gamescope:")
             logging.debug(f"   Enabled:         {self.game.gamescope.enabled}")
             if self.game.gamescope.enabled.lower() == "true":
                 logging.debug(f"   Parameters:      {self.game.gamescope.parameters}")
 
-            logging.debug("\nExecution Command:")
+            logging.debug("Execution Command:")
             logging.debug(f"   {' '.join(self.cmd)}")
-            logging.debug("="*60 + "\n")
+            logging.debug("="*60)

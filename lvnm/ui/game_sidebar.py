@@ -25,8 +25,9 @@ class GameSidebar(QFrame):
     VNDB_SITE_URL = config.VNDB_SITE_URL
     EGS_SITE_URL = config.EGS_SITE_URL
     
-    # Dictionary to track multiple games running
+    # Dictionary to track games running
     active_runners = {}
+    runners = {}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -373,6 +374,7 @@ class GameSidebar(QFrame):
             runner = GameRunner(name)
             if runner.run():
                 self.active_runners[name] = runner
+                self.runners[name] = runner
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
                 return True
         except Exception as e:
@@ -634,7 +636,9 @@ class GameSidebar(QFrame):
                 game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
                 GameManager.update_game(name, game_to_update.to_dict())
                 # Update last played column
-                self.on_saved()
+                # self.on_saved()
+                if hasattr(self, 'on_metadata_updated'):
+                    self.on_metadata_updated(name)
                 
                 # If the sidebar is currently showing THIS game, sync the UI object
                 if self.current_game and self.current_game.name == name:
