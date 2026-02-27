@@ -126,9 +126,11 @@ class GameListItem(QWidget):
         act_winecfg = menu.addAction(self.tr("Open Winecfg"))
         act_cmd = menu.addAction(self.tr("Open windows cmd"))
         act_bash = menu.addAction(self.tr("Open Bash Terminal"))
-        act_dup = menu.addAction(self.tr("Duplicate"))
         menu.addSeparator()
+        act_dup = menu.addAction(self.tr("Duplicate"))
         act_del = menu.addAction(self.tr("Delete"))
+        menu.addSeparator()
+        act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
 
         action = menu.exec(event.globalPos())
 
@@ -165,6 +167,9 @@ class GameListItem(QWidget):
         elif action == act_del:
             self.delete_game(self.game_card.name)
 
+        elif action == act_shortcut:
+            self.shortcut()
+
     def show_log(self, name):
         self.log_dialog = LogViewerDialog(name)       
         self.log_dialog.show()
@@ -189,6 +194,9 @@ class GameListItem(QWidget):
     def run_bash(self):
         runner = GameRunner("UtilityMode")
         runner.open_terminal(self.game_card.prefix)
+
+    def shortcut(self):
+        SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.vndb)
 
 
 class LogViewerDialog(QDialog):

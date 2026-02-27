@@ -1,4 +1,5 @@
 import os
+import sys
 import platform
 import subprocess
 import shutil
@@ -272,4 +273,42 @@ class SystemUtils:
         for t in term_options:
             if shutil.which(t):
                 return t
+
+    @staticmethod
+    def create_desktop_shortcut(game, cover):
+        """Generates a .desktop file on the user's desktop."""
+        try:
+            # Define paths
+            desktop_path = Path(os.path.expanduser("~/Desktop"))
+            shortcut_file = desktop_path / f"lvnm-{game}.desktop"
+            
+            # Get the path to your current executable/script
+            app_path = os.path.abspath(sys.argv[0])
+            python_path = sys.executable
+            
+
+            exec_cmd = f"{python_path} {app_path} -r \"{game}\""
+            
+            # Get Icon path (using VNDB cover as icon if available)
+            icon_path = SystemUtils.get_cover_path(cover) or "applications-games"
+
+            # Create the .desktop content
+            content = [
+                "[Desktop Entry]",
+                "Type=Application",
+                f"Name=lvnm-{game}",
+                f"Exec={exec_cmd}",
+                f"Icon={icon_path}",
+                "Terminal=false",  # Set to true if you want to see the logs in a console
+                "Categories=Game;",
+                f"Comment=Launch {game} via LVNM",
+            ]
+
+            # Write the file
+            with open(shortcut_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(content))
+            
+            logging.info(f"Shortcut created at: {shortcut_file}")
+        except Exception as e:
+            logging.error(f"Failed to create shortcut: {e}")
         

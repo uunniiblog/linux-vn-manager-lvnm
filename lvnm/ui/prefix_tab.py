@@ -50,7 +50,7 @@ class PrefixTab(QWidget):
         btn_layout_2 = QHBoxLayout()
         self.regedit_btn = QPushButton(self.tr("Regedit"))
         self.winecfg_btn = QPushButton(self.tr("Winecfg"))
-        self.console_btn = QPushButton(self.tr("Cmd"))
+        self.console_btn = QPushButton(self.tr("wineboot cmd"))
         self.bash_btn = QPushButton(self.tr("Bash"))
         
         btn_layout_2.addWidget(self.regedit_btn)
