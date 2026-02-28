@@ -147,8 +147,8 @@ class PrefixManager:
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
 
         logging.debug("Environment Variables:")
-        for var in clean_env:
-            logging.debug(f"   {var:<18}: {clean_env[var]}")
+        for var in self.env:
+            logging.debug(f"   {var:<18}: {self.env[var]}")
 
         def finalize():
             new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
