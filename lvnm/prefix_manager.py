@@ -167,9 +167,9 @@ class PrefixManager:
             self._save_metadata()
 
         if executor:
-            executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
+            executor.add_task(cmd, winetricks_env, desc, on_finished_callback=finalize)
         else:
-            ExecutionManager.run(cmd, self.env, wait=True)
+            ExecutionManager.run(cmd, winetricks_env, wait=True)
             finalize()
 
         return True

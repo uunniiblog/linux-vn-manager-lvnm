@@ -66,7 +66,7 @@ class ConsoleDialog(QDialog):
 
             try:
                 if isinstance(cmd, list):
-                    qenv = QProcessEnvironment.systemEnvironment()
+                    qenv = QProcessEnvironment()
                     for k, v in task["env"].items():
                         qenv.insert(k, str(v))
                     self.process.setProcessEnvironment(qenv)
