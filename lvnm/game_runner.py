@@ -192,7 +192,6 @@ class GameRunner:
         """
         Scans /proc to see if this specific game's EXE is running.
         """
-        # Get the filename (e.g., 'Demonbane.exe')
         exe_name = Path(self.game.path).name
         prefix_path = self.env.get("WINEPREFIX", "")
 
@@ -202,14 +201,10 @@ class GameRunner:
                     continue
                 
                 try:
-                    # To be 100% sure, we check if the process belongs 
-                    # to our prefix AND matches our EXE name
                     with open(pid_dir / "cmdline", "rb") as f:
                         cmdline = f.read().replace(b'\x00', b' ').decode(errors='ignore')
                     
                     if exe_name in cmdline:
-                        # Optional: Verify it's the correct prefix to avoid false positives 
-                        # if the user has the same game open in two different prefixes
                         with open(pid_dir / "environ", "rb") as f:
                             env = f.read()
                             if f"WINEPREFIX={prefix_path}".encode() in env:
