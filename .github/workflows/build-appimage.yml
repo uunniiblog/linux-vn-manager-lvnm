@@ -51,6 +51,7 @@ jobs:
           # Copy whatever .pyz or script is extracted
           cp umu/umu-run LVNM.AppDir/usr/bin/tools/umu-run
           chmod +x LVNM.AppDir/usr/bin/tools/umu-run
+          ls LVNM.AppDir/usr/bin/tools/
 
       - name: Bundle Winetricks
         run: |

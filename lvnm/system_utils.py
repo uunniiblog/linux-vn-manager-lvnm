@@ -345,21 +345,10 @@ class SystemUtils:
             bundled_path = Path(appdir) / "usr" / "bin" / "tools" / tool_name
             if bundled_path.exists():
                 logger.debug(f"using {tool_name} bundled {bundled_path}")
-                # Zipapp needs to be run via system python3, not directly
-                if bundled_path.suffix == ".pyz" or _is_zipapp(bundled_path):
-                    return f"python3 {bundled_path}"
                 return str(bundled_path)
+
         logger.debug(f"using {tool_name} from system path")
         return tool_name
-
-    def _is_zipapp(path: Path) -> bool:
-        """Check if file is a Python zipapp (starts with shebang or PK magic)."""
-        try:
-            with open(path, "rb") as f:
-                header = f.read(2)
-                return header == b"#!" or header == b"PK"
-        except OSError:
-            return False
 
     @staticmethod
     def get_launch_command(game_name: str, for_steam: bool = False):
