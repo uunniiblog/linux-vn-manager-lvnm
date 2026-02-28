@@ -49,6 +49,8 @@ class GameRunner:
         """Builds the environment and the final command list."""
         self.env = os.environ.copy()
 
+        var = self.scrub_appimage_environment()
+
         if self.is_steam:
             logging.info("Steam launch detected: removing LC_ALL...")
             # remove this since it fucks with locale for jp paths
@@ -382,6 +384,30 @@ class GameRunner:
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
             return False
+    
+    def scrub_appimage_environment(self):
+        """Remove APPIMAGE ENVIRONMENT"""
+        # These variables trick the taskbar into grouping windows together.
+        appimage_vars = [
+            "DESKTOP_STARTUP_ID",   # Icon "theft"
+            "XDG_ACTIVATION_TOKEN", # Wayland's equivalent of startup ID
+            "APPDIR",               # Path to the mounted AppImage
+            "APPIMAGE",             # Path to the AppImage file
+            "ARGV0",                # Original command name
+            "OWD"                   # Original Working Directory
+        ]
+        for var in appimage_vars:
+            self.env.pop(var, None)
+        
+        # RESTORE LIBRARY PATH
+        # AppImages often prepend their internal libs to LD_LIBRARY_PATH.
+        # This can break Wine/Proton or cause them to use the manager's libs.
+        if "OLD_LD_LIBRARY_PATH" in self.env:
+            self.env["LD_LIBRARY_PATH"] = self.env.pop("OLD_LD_LIBRARY_PATH")
+        else:
+            # If no original path exists, clear it to let system/Proton decide
+            self.env.pop("LD_LIBRARY_PATH", None)
+        return var
     
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""

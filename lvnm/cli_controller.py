@@ -2,7 +2,7 @@ import sys
 import time
 import signal
 from datetime import datetime
-from PyQt6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer
 from game_runner import GameRunner
 from game_manager import GameManager
 import logging
