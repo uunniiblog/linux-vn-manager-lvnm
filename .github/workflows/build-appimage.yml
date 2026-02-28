@@ -2,10 +2,7 @@ name: Build lvnm AppImage
 
 on:
   push:
-    branches: [ "main", "master" ]
-    tags: [ "v*" ] # Triggers when you push a tag like v0.1.0
-  pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -41,6 +38,7 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
+            --paths lvnm \
             --name LVNM lvnm/launcher.py
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
@@ -87,14 +85,23 @@ jobs:
           name: LVNM-x86_64.AppImage
           path: LVNM-x86_64.AppImage
 
-      - name: Create Release (Tags Only)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create Release on every push to main
         uses: softprops/action-gh-release@v2
         with:
-          files: LVNM-x86_64.AppImage
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          # Create a tag like 'build-42' automatically
+          tag_name: "b${{ github.run_number }}"
+          name: "LVNM Continuous Build ${{ github.run_number }}"
+          body: |
+            Automated build for commit: ${{ github.sha }}
+            
+            **Checksum (SHA256):**
+            ```
+            $(cat LVNM-x86_64.AppImage.sha256)
+            ```
+          files: |
+            LVNM-x86_64.AppImage
+            LVNM-x86_64.AppImage.sha256
           draft: false
-          prerelease: false
+          prerelease: true # Marks it as a 'Rolling/Beta' build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
