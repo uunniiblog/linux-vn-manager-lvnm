@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: write # Required to create releases
 
@@ -43,12 +43,15 @@ jobs:
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
 
-      - name: Build Bundled umu-run
+      - name: Bundle umu-run (zipapp)
         run: |
-          pip install git+https://github.com/Open-Wine-Components/umu-launcher.git
-          python -m PyInstaller --onefile --collect-all umu --name umu-run $(which umu-run)
-          # Move it to the tools folder
-          cp dist/umu-run LVNM.AppDir/usr/bin/tools/
+          curl -fL -o umu-zipapp.tar \
+            "https://github.com/Open-Wine-Components/umu-launcher/releases/download/1.3.0/umu-launcher-1.3.0-zipapp.tar"
+          tar -xf umu-zipapp.tar
+          ls -la  # print contents so you can see the exact filename
+          # Copy whatever .pyz or script is extracted
+          cp umu-run LVNM.AppDir/usr/bin/tools/umu-run
+          chmod +x LVNM.AppDir/usr/bin/tools/umu-run
 
       - name: Bundle Winetricks
         run: |
