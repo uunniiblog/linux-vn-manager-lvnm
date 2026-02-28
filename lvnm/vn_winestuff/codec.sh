@@ -233,7 +233,7 @@ Install_mf()
         echo "Arch is win64"
         DownloadFileInternal mf mf64.zip 528cea0283db362a35555cd616a621f1cfa2e39be3be65f38487ebf22cf4da11
 
-        unzip -o -q -d "$WORKDIR/temp" "$WORKDIR/mf64.zip" || Quit;
+        unzip -o -q -d "$WORKDIR/temp" "$SRC_DIR/mf64.zip" || Quit;
         cp -vf "$WORKDIR/temp/system32"/* "$WINEPREFIX/drive_c/windows/system32"
 
         RUN64 "c:/windows/system32/reg.exe" import "$WORKDIR/temp/mf.reg"
