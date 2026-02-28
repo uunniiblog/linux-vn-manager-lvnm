@@ -39,6 +39,8 @@ jobs:
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
             --paths lvnm \
+            --exclude-module _tkinter \
+            --collect-all PySide6 \
             --name LVNM lvnm/launcher.py
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
@@ -94,10 +96,6 @@ jobs:
           body: |
             Automated build for commit: ${{ github.sha }}
             
-            **Checksum (SHA256):**
-            ```
-            $(cat LVNM-x86_64.AppImage.sha256)
-            ```
           files: |
             LVNM-x86_64.AppImage
             LVNM-x86_64.AppImage.sha256
