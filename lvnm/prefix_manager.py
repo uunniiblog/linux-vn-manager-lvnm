@@ -142,20 +142,9 @@ class PrefixManager:
         """Installs winetricks components into the prefix."""
         winetricks_bin = SystemUtils.get_tool_path("winetricks")
 
-        # winetricks_bin = shutil.which("winetricks")
-        # if not winetricks_bin:
-        #     logger.error("winetricks not found in PATH.")
-        #     return False
-
-        logger.debug(f"LD_LIBRARY_PATH for winetricks: {self.env.get('LD_LIBRARY_PATH', 'NOT SET')}")
         logger.info(f"Installing winetricks into {self.name}: {winetricks_list}")
         desc = f"Installing winetricks: {winetricks_list}"
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
-
-        # TEST
-        clean_env = SystemUtils.get_clean_env()
-        wine_keys = ("WINEPREFIX", "WINE", "PROTONPATH", "GAMEID", "STORE", "WINEDEBUG")
-        winetricks_env = {**clean_env, **{k: v for k, v in self.env.items() if k in wine_keys}}
 
         logging.debug("Environment Variables:")
         for var in clean_env:
@@ -167,9 +156,9 @@ class PrefixManager:
             self._save_metadata()
 
         if executor:
-            executor.add_task(cmd, winetricks_env, desc, on_finished_callback=finalize)
+            executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
         else:
-            ExecutionManager.run(cmd, winetricks_env, wait=True)
+            ExecutionManager.run(cmd, self.env, wait=True)
             finalize()
 
         return True

@@ -157,8 +157,15 @@ class SettingsTab(QWidget):
         # Fetch data
         sys_data = SystemUtils.get_system_info()
         software = SystemUtils.get_software_support()
-        
-        sysinfo_layout.addRow(QLabel(self.tr("LVNM Version:")), QLabel(sys_data.get('app_version')))
+        runtime = SystemUtils.get_runtime_type()
+        version_label = sys_data.get('app_version')
+
+        if runtime is "appimage":
+            version_label += "  📦 AppImage"
+        else:
+            version_label += "  (native)"
+
+        sysinfo_layout.addRow(QLabel(self.tr("LVNM Version:")), QLabel(version_label))
         sysinfo_layout.addRow(QLabel(self.tr("OS:")), QLabel(sys_data.get('os')))
         sysinfo_layout.addRow(QLabel(self.tr("Kernel:")), QLabel(sys_data.get('kernel')))
         sysinfo_layout.addRow(QLabel(self.tr("Desktop:")), QLabel(f"{sys_data.get('desktop_environment')} - {sys_data.get('session_type')}"))

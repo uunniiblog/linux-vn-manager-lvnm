@@ -54,6 +54,8 @@ class SystemUtils:
     @staticmethod
     def get_system_info() -> dict:
         """Gathers core system, OS, and hardware information."""
+        clean_env = SystemUtils.get_clean_env()
+
         info = {
             "app_version": getattr(config, "VERSION", "Unknown"),
             "os": "Unknown Linux",
@@ -87,7 +89,7 @@ class SystemUtils:
         # Get GPU Model (requires pciutils/lspci)
         if shutil.which("lspci"):
             try:
-                result = subprocess.run(["lspci"], capture_output=True, text=True)
+                result = subprocess.run(["lspci"], capture_output=True, text=True, env=clean_env)
                 gpus = [
                     line.split(":")[-1].strip() 
                     for line in result.stdout.split("\n") 
@@ -103,11 +105,24 @@ class SystemUtils:
     @staticmethod
     def get_software_support() -> dict:
         """Checks for necessary binaries, tools, and libraries."""
+        clean_env = SystemUtils.get_clean_env()
+        appdir = os.environ.get("APPDIR")
+
+        # When running as AppImage, bundled tools are always available (unless build failed)
+        # Fall back to system check when running from source/dev
+        if appdir:
+            tools_dir = Path(appdir) / "usr" / "bin" / "tools"
+            umu_available = (tools_dir / "umu-run").exists()
+            winetricks_available = (tools_dir / "winetricks").exists()
+        else:
+            umu_available = bool(shutil.which("umu-run"))
+            winetricks_available = bool(shutil.which("winetricks"))
+
         support = {
-            "vulkan_support": SystemUtils._check_vulkan(),
+            "vulkan_support": SystemUtils._check_vulkan(clean_env),
             "gamescope": bool(shutil.which("gamescope")),
-            "umu_run": bool(shutil.which("umu-run")),
-            "winetricks": bool(shutil.which("winetricks")),
+            "umu_run": umu_available,
+            "winetricks": winetricks_available,
             "gstreamer_packages": {}
         }
 
@@ -130,46 +145,38 @@ class SystemUtils:
         return support
 
     @staticmethod
-    def _check_vulkan() -> bool:
-        """Checks if Vulkan is supported on the system."""
-        # vulkaninfo is the most reliable quick check if installed
+    def _check_vulkan(env=None) -> bool:
+        if env is None:
+            env = SystemUtils.get_clean_env()
         if shutil.which("vulkaninfo"):
             try:
-                # If vulkaninfo runs without error, Vulkan is working
-                result = subprocess.run(["vulkaninfo"], capture_output=True, env=os.environ)
+                result = subprocess.run(["vulkaninfo"], capture_output=True, env=env)
                 return result.returncode == 0
             except Exception:
                 pass
-        
-        # Fallback: check if the Vulkan loader library exists
         try:
-            result = subprocess.run(["ldconfig", "-p"], capture_output=True, text=True)
+            result = subprocess.run(["ldconfig", "-p"], capture_output=True, text=True, env=env)
             return "libvulkan.so" in result.stdout
         except Exception:
             return False
 
-    @staticmethod
-    def _is_package_installed(pkg_name: str) -> bool:
-        """Dynamically checks package managers for installed packages."""
-        try:
 
-            # Arch Linux (pacman)
+    @staticmethod
+    def _is_package_installed(pkg_name: str, env=None) -> bool:
+        if env is None:
+            env = SystemUtils.get_clean_env()
+        try:
             if shutil.which("pacman"):
-                result = subprocess.run(["pacman", "-Qq", pkg_name], capture_output=True)
+                result = subprocess.run(["pacman", "-Qq", pkg_name], capture_output=True, env=env)
                 return result.returncode == 0
-            
-            # Debian/Ubuntu (dpkg)
             elif shutil.which("dpkg"):
-                result = subprocess.run(["dpkg", "-s", pkg_name], capture_output=True)
+                result = subprocess.run(["dpkg", "-s", pkg_name], capture_output=True, env=env)
                 return result.returncode == 0
-            
-            # Fedora/RHEL (rpm)
             elif shutil.which("rpm"):
-                result = subprocess.run(["rpm", "-q", pkg_name], capture_output=True)
+                result = subprocess.run(["rpm", "-q", pkg_name], capture_output=True, env=env)
                 return result.returncode == 0
         except Exception:
             pass
-            
         return False
 
     @staticmethod
@@ -241,6 +248,17 @@ class SystemUtils:
         #             logger.debug(f"❓ {tool:10} : NOT found in bundled tools folder")
         
         # logger.debug("="*60)
+
+    @staticmethod
+    def get_runtime_type() -> str:
+        """Returns the runtime environment type: 'appimage', 'flatpak', 'dev', etc."""
+        if os.environ.get("APPDIR"):
+            return "appimage"
+        if os.environ.get("FLATPAK_ID"):
+            return "flatpak"
+        if os.environ.get("SNAP"):
+            return "snap"
+        return "dev"
 
     @staticmethod
     def apply_ui_zoom(zoom_factor: float):
