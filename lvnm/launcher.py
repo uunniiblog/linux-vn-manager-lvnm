@@ -3,6 +3,7 @@ import os
 import signal
 import logging
 import setproctitle
+import ssl
 from logging_manager import setup_logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
@@ -16,6 +17,19 @@ from settings_manager import SettingsManager
 def main():
     setproctitle.setproctitle("linux-vn-manager-lvnm")
     settings = SettingsManager()
+
+    if os.environ.get("APPDIR"):
+        # Force system CA bundle instead of PyInstaller's bundled one
+        system_cas = [
+            "/etc/ssl/certs/ca-certificates.crt",  # Debian/Ubuntu/Arch
+            "/etc/pki/tls/certs/ca-bundle.crt",    # Fedora/RHEL
+            "/etc/ssl/ca-bundle.pem",              # openSUSE
+        ]
+        for ca_path in system_cas:
+            if os.path.exists(ca_path):
+                os.environ["SSL_CERT_FILE"] = ca_path
+                os.environ["REQUESTS_CA_BUNDLE"] = ca_path
+                break
 
     # Close with ctrl c in terminal
     signal.signal(signal.SIGINT, signal.SIG_DFL)
