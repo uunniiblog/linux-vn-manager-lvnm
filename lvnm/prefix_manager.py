@@ -371,6 +371,6 @@ class PrefixManager:
     @staticmethod
     def get_prefix_json():
         if not Path(config.PREFIXES_DATA).exists():
-            return None
+            return {}
         with open(config.PREFIXES_DATA, "r") as f:
             return json.load(f)
