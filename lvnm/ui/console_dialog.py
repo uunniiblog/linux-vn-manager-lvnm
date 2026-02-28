@@ -33,6 +33,7 @@ class ConsoleDialog(QDialog):
         self.process.finished.connect(self._on_process_finished)
         self.task_finished.connect(self._on_process_finished)
         self.append_text_signal.connect(self.console.append)
+        self.process.errorOccurred.connect(self._on_process_error)
 
         self.task_queue = []
         self.current_callback = None
@@ -97,6 +98,14 @@ class ConsoleDialog(QDialog):
         if self.current_callback:
             self.current_callback()
         self._run_next()
+
+    def _on_process_error(self, error):
+        """Captures errors when the process fails to start or crashes."""
+        error_msg = self.process.errorString()
+        self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
+        logger.error(f"QProcess Error: {error_msg}")
+        
+        self.close_btn.setEnabled(True)
 
     def handle_stdout(self):
         data = self.process.readAllStandardOutput().data().decode(errors='replace').strip()
