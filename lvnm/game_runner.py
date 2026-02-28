@@ -59,7 +59,7 @@ class GameRunner:
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
 
-        if "wineconsole" or "util-bash" in self.game.name: 
+        if "wineconsole" in self.game.name or "util-bash" in self.game.name:
             self.game_dir = str(Path(self.prefix_info["path"]))
         else:
             self.game_dir = str(Path(self.game.path).parent)

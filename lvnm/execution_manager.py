@@ -50,6 +50,7 @@ class ExecutionManager:
             suppress_codes (list): List of exit codes to treat as success
             cwd: Sets the current directory before the child is executed (useful for some VNs)
             log_callback: Callback to store the log in gamerunner.
+            detached: hopefully this helps
         """
         if suppress_codes is None:
             suppress_codes = []
@@ -58,6 +59,7 @@ class ExecutionManager:
         final_env = ExecutionManager._get_verbosity_env(env)
 
         logger.info(f"Executing: {' '.join(cmd)}")
+        logger.debug(f"running in cwd {cwd}")
 
         # Start Process
         # We merge stderr into stdout for cleaner unified logging
