@@ -1,7 +1,7 @@
 from pathlib import Path
 
-VERSION = 'v0.0.1'
-GIT_URL = ''
+VERSION = 'v0.0.2'
+GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
