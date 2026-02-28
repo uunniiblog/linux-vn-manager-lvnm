@@ -147,9 +147,19 @@ class PrefixManager:
         #     logger.error("winetricks not found in PATH.")
         #     return False
 
+        logger.debug(f"LD_LIBRARY_PATH for winetricks: {self.env.get('LD_LIBRARY_PATH', 'NOT SET')}")
         logger.info(f"Installing winetricks into {self.name}: {winetricks_list}")
         desc = f"Installing winetricks: {winetricks_list}"
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
+
+        # TEST
+        clean_env = SystemUtils.get_clean_env()
+        wine_keys = ("WINEPREFIX", "WINE", "PROTONPATH", "GAMEID", "STORE", "WINEDEBUG")
+        winetricks_env = {**clean_env, **{k: v for k, v in self.env.items() if k in wine_keys}}
+
+        logging.debug("Environment Variables:")
+        for var in clean_env:
+            logging.debug(f"   {var:<18}: {clean_env[var]}")
 
         def finalize():
             new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
