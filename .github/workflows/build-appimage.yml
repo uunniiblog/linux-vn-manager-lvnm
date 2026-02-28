@@ -69,9 +69,11 @@ jobs:
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
             --paths lvnm \
+            --add-data "lvnm/vn_winestuff:lvnm/vn_winestuff" \
             --name LVNM lvnm/launcher.py
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
+          # Avoid library errors
           rm -f LVNM.AppDir/usr/bin/libreadline.so*
           rm -f LVNM.AppDir/usr/bin/libtinfo.so*
 
