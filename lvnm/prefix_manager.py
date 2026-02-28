@@ -64,7 +64,6 @@ class PrefixManager:
             self.env["STORE"] = "none"
             wine_bin = self.runner_path / "files" / "bin" / "wine"
             self.env["WINE"] = str(wine_bin)
-            logger.debug(self.env["WINE"])
             self.runner_command = [SystemUtils.get_tool_path("umu-run")]
         else:
             wine_bin = self.runner_path / "bin" / "wine"

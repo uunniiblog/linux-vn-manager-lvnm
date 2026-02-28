@@ -203,7 +203,12 @@ Install_mf()
 {
     Heading "mf"
 
-    WORKDIR=$SCRIPT_DIR/mf
+    SRC_DIR="$SCRIPT_DIR/mf"
+
+    # Writable directory in /tmp
+    WORKDIR="/tmp/lvnm_mf_setup"
+    mkdir -p "$WORKDIR"
+
     if ! command -v unzip >/dev/null; then echo "unzip is not available, cannot continue."; Quit; fi
 
     OVERRIDE_DLL="colorcnv dxva2 evr mf mferror mfplat mfplay mfreadwrite mp4sdecd msmpeg2adec msmpeg2vdec sqmapi wmadmod wmvdecod"
@@ -212,7 +217,7 @@ Install_mf()
     # install 32-bit components
     DownloadFileInternal mf mf32.zip 7d8e909178f2c56f65e2f9668ef939e644403a844fc75ce7a3f920c8d489bda0
 
-    unzip -o -q -d "$WORKDIR/temp" "$WORKDIR/mf32.zip" || Quit;
+    unzip -o -q -d "$WORKDIR/temp" "$SRC_DIR/mf32.zip" || Quit;
     cp -vf "$WORKDIR/temp/syswow64"/* "$WINEPREFIX/drive_c/windows/$SYSDIR"
 
     Disable_winegstreamer
@@ -225,6 +230,7 @@ Install_mf()
 
     # install 64-bit components
     if [ $ARCH = "win64" ]; then
+        echo "Arch is win64"
         DownloadFileInternal mf mf64.zip 528cea0283db362a35555cd616a621f1cfa2e39be3be65f38487ebf22cf4da11
 
         unzip -o -q -d "$WORKDIR/temp" "$WORKDIR/mf64.zip" || Quit;
@@ -237,7 +243,7 @@ Install_mf()
     fi
 
     # cleanup
-    rm -fr "$WORKDIR/temp"
+    rm -fr "$WORKDIR"
 }
 
 Install_quartz_dx()
