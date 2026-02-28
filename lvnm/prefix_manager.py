@@ -62,6 +62,7 @@ class PrefixManager:
             self.env["PROTONPATH"] = str(self.runner_path)
             self.env["GAMEID"] = "umu-default"
             self.env["STORE"] = "none"
+            self.env["WINE"] = self.runner_path / "files" / "bin" / "wine"
             self.runner_command = [SystemUtils.get_tool_path("umu-run")]
         else:
             wine_bin = self.runner_path / "bin" / "wine"
