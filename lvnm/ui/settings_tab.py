@@ -1,11 +1,15 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QComboBox, 
-                               QLabel, QGroupBox, QFormLayout,
-                               QHBoxLayout, QLineEdit, QPushButton,
-                               QCheckBox, QFileDialog, QScrollArea, QFrame)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QComboBox, 
+    QLabel, QGroupBox, QFormLayout,
+    QHBoxLayout, QLineEdit, QPushButton,
+    QCheckBox, QFileDialog, QScrollArea, QFrame
+)
 from system_utils import SystemUtils
 import config
 import logging
+from settings_manager import SettingsManager
 from logging_manager import setup_logging
+
 logger = logging.getLogger(__name__)
 
 class SettingsTab(QWidget):
@@ -16,7 +20,7 @@ class SettingsTab(QWidget):
         self.theme_manager = theme_manager
 
         # Load existing settings
-        self.user_settings = SystemUtils.load_settings()
+        self.user_settings = SettingsManager()
 
         # Main layout for the entire tab
         outer_layout = QVBoxLayout(self)
@@ -173,6 +177,14 @@ class SettingsTab(QWidget):
             sysinfo_layout.addRow(QLabel(f"  {pkg}:"), QLabel(self.check(installed)))
         
         main_layout.addWidget(sysinfo_group)
+
+        # ==========================================
+        # About
+        about_group = QGroupBox(self.tr("About"))
+        about_layout = QFormLayout(about_group)
+        about_layout.addRow(QLabel(self.tr("LVNM version:")), QLabel(config.VERSION))
+        about_layout.addRow(QLabel(self.tr("Github:")), QLabel(config.GIT_URL))
+        main_layout.addWidget(about_group)
         
         main_layout.addStretch()
 
@@ -211,20 +223,22 @@ class SettingsTab(QWidget):
 
     def save_setting(self, key, value):
         """Updates the local dictionary and flushes it to the JSON file."""
-        self.user_settings[key] = value
-        SystemUtils.save_settings(self.user_settings)
+        self.user_settings.set(key, value)
 
     def save_nested_setting(self, parent_key, child_key, value):
         """Updates a nested dictionary setting and saves to disk."""
-        # Ensure the parent dictionary exists
-        if parent_key not in self.user_settings or not isinstance(self.user_settings[parent_key], dict):
-            self.user_settings[parent_key] = {}
+        # Fetch the existing dictionary (or create a new one if it doesn't exist)
+        parent_dict = self.user_settings.get(parent_key, {})
         
-        # Update the child value
-        self.user_settings[parent_key][child_key] = value
+        # Ensure it's actually a dictionary
+        if not isinstance(parent_dict, dict):
+            parent_dict = {}
         
-        # Flush to JSON
-        SystemUtils.save_settings(self.user_settings)
+        # Update the specific child key
+        parent_dict[child_key] = value
+        
+        # Save the whole dictionary back to the manager
+        self.user_settings.set(parent_key, parent_dict)
 
     def change_zoom(self, index):
         mapping = {

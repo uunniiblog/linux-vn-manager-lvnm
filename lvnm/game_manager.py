@@ -1,13 +1,14 @@
 import config
 import json
 import logging
-logger = logging.getLogger(__name__)
 from datetime import datetime
 from prefix_manager import PrefixManager
 from runner_manager import RunnerManagerInterface
 from pathlib import Path
 from dataclasses import asdict
 from model.game_card import GameCard, GameScope
+
+logger = logging.getLogger(__name__)
 
 class GameManager:
     GAME_FILE = config.GAMES_DATA

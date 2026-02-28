@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 VERSION = 'v0.0.1'
@@ -178,3 +177,4 @@ WINE_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
 PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
 PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
+DXVK_DIR.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, QTimer
 from game_runner import GameRunner
 from game_manager import GameManager
 import logging
+
 logger = logging.getLogger(__name__)
 
 class CliController(QObject):

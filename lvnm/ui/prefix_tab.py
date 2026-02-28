@@ -1,18 +1,21 @@
 import config
 import logging
-logger = logging.getLogger(__name__)
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
-                            QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
-                            QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
-                            QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy, QMenu)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
+    QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
+    QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
+    QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy, QMenu
+)
 from PySide6.QtCore import Qt, QProcess, QSettings
 from datetime import datetime
 from prefix_manager import PrefixManager
 from game_manager import GameManager
 from ui.console_dialog import ConsoleDialog
-from system_utils import SystemUtils
+from settings_manager import SettingsManager
 from runner_manager import RunnerManagerInterface
 from game_runner import GameRunner
+
+logger = logging.getLogger(__name__)
 
 class PrefixTab(QWidget):
     def __init__(self):
@@ -295,7 +298,7 @@ class EditPrefixDialog(QDialog):
         self.manager = prefix_manager
         self.setWindowTitle(self.tr(f"Edit Prefix: {self.manager.name}"))
         self.resize(500, 600)
-        self.user_settings = SystemUtils.load_settings()
+        self.user_settings = SettingsManager()
 
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
@@ -472,7 +475,7 @@ class CreatePrefixDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Create New Prefix"))
         self.resize(500, 600)
-        self.user_settings = SystemUtils.load_settings()
+        self.user_settings = SettingsManager()
 
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)

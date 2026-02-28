@@ -1,8 +1,9 @@
 import config
 import logging
-logger = logging.getLogger(__name__)
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
+
+logger = logging.getLogger(__name__)
 
 class RunnerManagerProtonGE(RunnerManagerInterface):
     PROTON_RUNNER_DIR = config.PROTON_RUNNERS_DIR
@@ -21,7 +22,7 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
             logger.info("No releases found or API error.")
             return []
 
-        logger.info(f"\n--- Available Proton-GE Builds (Page {page}) ---")
+        logger.info(f"--- Available Proton-GE Builds (Page {page}) ---")
         filtered_releases = []
         for release in data:
             tag = release.get("tag_name", "")
@@ -58,7 +59,7 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
     def get_release_info(self, release_data):
         """ Lists assets for the specific Proton-GE release """
         tag = release_data['tag']
-        logger.info(f"\n--- Release Information for {tag} ---")
+        logger.info(f"--- Release Information for {tag} ---")
         
         url = f"{self.API_URL}/tags/{tag}"
         data = RunnerManagerInterface.fetch_json(url)

@@ -1,8 +1,9 @@
 import config
 import logging
-logger = logging.getLogger(__name__)
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
+
+logger = logging.getLogger(__name__)
 
 class RunnerManagerKron4ek(RunnerManagerInterface):
     WINE_RUNNERS_PATH = config.WINE_RUNNERS_DIR
@@ -67,7 +68,7 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """
         tag = release_data['tag']
-        logger.info(f"\n--- Release Information for {tag} ---")
+        logger.info(f"--- Release Information for {tag} ---")
         url = f"{self.API_URL}/tags/{tag}"
         data = self.fetch_json(url)
         if not data: return

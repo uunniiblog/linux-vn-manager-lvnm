@@ -6,9 +6,10 @@ import urllib.error
 import config
 import re
 import logging
-logger = logging.getLogger(__name__)
 from abc import ABC, abstractmethod
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 class RunnerManagerInterface:
     PROTON_DIR = config.PROTON_RUNNERS_DIR
@@ -71,7 +72,7 @@ class RunnerManagerInterface:
     @staticmethod
     def extract_tar(tar_path, dest_dir, tag, compression="gz"):
         """Handles extraction and cleanup for .tar.gz (gz) or .tar.xz (xz)"""
-        logger.info(f"\nExtracting...")
+        logger.info("Extracting...")
         mode = f"r:{compression}"
         try:
             with tarfile.open(tar_path, mode) as tar:

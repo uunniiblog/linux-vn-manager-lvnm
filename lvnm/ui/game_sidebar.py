@@ -18,6 +18,7 @@ from system_utils import SystemUtils
 from ui.prefix_tab import PrefixTab, CreatePrefixDialog
 from ui.console_dialog import ConsoleDialog
 from vndb_manager import VndbManager, VndbWorker
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,7 @@ class GameSidebar(QFrame):
         self.launch_btn.setVisible(False)
 
         # Load Global Settings for Defaults
-        user_settings = SystemUtils.load_settings()
+        user_settings = SettingsManager()
         
         # Clear General UI Fields
         self.launch_btn.setVisible(False)

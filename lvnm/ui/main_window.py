@@ -1,9 +1,10 @@
-from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, 
-                             QListWidget, QStackedWidget, QSplitter,
-                             QApplication)
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QHBoxLayout, 
+    QListWidget, QStackedWidget, QSplitter,
+    QApplication
+)
 from PySide6.QtCore import Qt, QSettings, QByteArray
 import config
-
 from ui.game_tab import GameTab
 from ui.prefix_tab import PrefixTab
 from ui.runner_tab import RunnerTab

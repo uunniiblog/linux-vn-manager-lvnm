@@ -11,10 +11,11 @@ from ui.main_window import MainWindow
 from system_utils import SystemUtils
 from cli_handler import CliHandler
 from cli_controller import CliController
+from settings_manager import SettingsManager
 
 def main():
     setproctitle.setproctitle("linux-vn-manager-lvnm")
-    settings = SystemUtils.load_settings()
+    settings = SettingsManager()
 
     # Close with ctrl c in terminal
     signal.signal(signal.SIGINT, signal.SIG_DFL)

@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
 from PySide6.QtCore import QProcess, QProcessEnvironment, Signal, Slot
 from PySide6.QtGui import QTextCursor
 import logging
+
 logger = logging.getLogger(__name__)
 
 class ConsoleDialog(QDialog):

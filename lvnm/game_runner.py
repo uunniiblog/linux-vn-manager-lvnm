@@ -5,21 +5,22 @@ import config
 import subprocess
 import shutil
 import logging
-logger = logging.getLogger(__name__)
 from pathlib import Path
 from datetime import datetime
 from collections import deque
 from model.game_card import GameCard
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
-settings = SystemUtils.load_settings()
+from settings_manager import SettingsManager
+
+logger = logging.getLogger(__name__)
 
 class GameRunner:
     PREFIXES_DATA = Path(config.PREFIXES_DATA)
     GAME_DATA = Path(config.GAMES_DATA)
-    LOG_LEVEL = settings.get("log_level", "info")
 
     def __init__(self, name: str, card_override: GameCard = None, is_steam=False):
+        self.settings = SettingsManager()
         self.name = name
         self.game: GameCard = card_override
         self.prefix_info: dict = None
@@ -392,7 +393,7 @@ class GameRunner:
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
-        if GameRunner.LOG_LEVEL.lower() == "debug":
+        if self.settings.get("log_level", "info").lower() == "debug":
             logging.debug("" + "="*60)
             logging.debug(f"LAUNCHING: {self.name}")
             logging.debug("="*60)

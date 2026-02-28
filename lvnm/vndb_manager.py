@@ -49,11 +49,11 @@ class VndbManager:
                 logger.info(f"[VNDB] No results found for ID: {vndb_id} / Name: {name}")
                 return []
 
-            logger.info(f"\n[VNDB] Found {len(results)} results. Processing...")
+            logger.info(f"[VNDB] Found {len(results)} results. Processing...")
 
             for vn in results:
                 # Print full raw data for this entry
-                logger.debug(f"\n [VNDB] --- Data for {vn.get('id')} ({vn.get('title')}) ---")
+                logger.debug(f"[VNDB] --- Data for {vn.get('id')} ({vn.get('title')}) ---")
                 logger.debug(f"[VNDB] {vn}")
 
                 # Download cover if URL exists and image doesn't

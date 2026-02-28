@@ -1,13 +1,16 @@
 import logging
-logger = logging.getLogger(__name__)
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QTabWidget, QGroupBox, QListWidget, QPushButton, 
-                             QDialog, QMessageBox, QProgressBar, QApplication)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QTabWidget, QGroupBox, QListWidget, QPushButton, 
+    QDialog, QMessageBox, QProgressBar, QApplication
+)
 from PySide6.QtCore import Qt
 from runner_manager_kron4ek import RunnerManagerKron4ek
 from runner_manager_protonge import RunnerManagerProtonGE
 from runner_manager import RunnerManagerInterface
-from prefix_manager import PrefixManager 
+from prefix_manager import PrefixManager
+
+logger = logging.getLogger(__name__)
 
 class DownloadDialog(QDialog):
     """Popup to list available releases from GitHub"""

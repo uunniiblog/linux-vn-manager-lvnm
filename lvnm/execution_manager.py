@@ -3,16 +3,18 @@ import subprocess
 import threading
 import config
 import logging
+from settings_manager import SettingsManager
+
+settings = SettingsManager()
 logger = logging.getLogger(__name__)
-from system_utils import SystemUtils
-settings = SystemUtils.load_settings()
 
 class ExecutionManager:
+    
     @staticmethod
     def _get_verbosity_env(base_env: dict) -> dict:
         """Augments environment variables based LOG_LEVEL."""
         env = base_env.copy()
-        log_level = settings.get("log_level", "info")
+        log_level = settings.get("log_level", "info").upper()
 
         if log_level == "DEBUG":
             # Show everything
@@ -22,13 +24,12 @@ class ExecutionManager:
         elif log_level == "INFO":
             # Show only errors and major fixmes
             if "WINEDEBUG" not in env:
-                env["WINEDEBUG"] = "-all,err+all"
+                env["WINEDEBUG"] = "-all,err+all,fixme+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             
         elif log_level == "ERROR":
-            # TODO
-            env["WINEDEBUG"] = "-all"
+            env["WINEDEBUG"] = "-all,err+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             env["PRESSURE_VESSEL_VERBOSE"] = "0"

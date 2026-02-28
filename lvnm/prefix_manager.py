@@ -7,13 +7,13 @@ import requests
 import tarfile
 import tempfile
 import logging
-logger = logging.getLogger(__name__)
 from pathlib import Path
 from datetime import datetime
 from pathlib import Path
 from model.prefix import Prefix
 from execution_manager import ExecutionManager
 
+logger = logging.getLogger(__name__)
 
 class PrefixManager:
     CODEC_SH = config.CODEC_SCRIPT

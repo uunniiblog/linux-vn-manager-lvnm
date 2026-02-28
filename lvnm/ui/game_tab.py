@@ -1,9 +1,10 @@
 import config
 import logging
-logger = logging.getLogger(__name__)
-from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
-                             QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
-                             QPushButton, QComboBox, QFileDialog, QDialog)
+from PySide6.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
+    QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
+    QPushButton, QComboBox, QFileDialog, QDialog
+)
 from PySide6.QtCore import Qt, QSettings, QByteArray
 from PySide6.QtGui import QKeySequence, QShortcut
 from game_manager import GameManager
@@ -12,7 +13,9 @@ from prefix_manager import PrefixManager
 from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
 from model.game_card import GameCard
-from system_utils import SystemUtils
+from settings_manager import SettingsManager
+
+logger = logging.getLogger(__name__)
 
 class GameTab(QWidget):
     SETTINGS_FILE = config.UI_SETTINGS
@@ -20,7 +23,8 @@ class GameTab(QWidget):
     def __init__(self):
         super().__init__()
         self.card = None
-        self.zoom = SystemUtils.load_settings().get("ui_zoom", 1.0)
+        self.user_settings = SettingsManager()
+        self.zoom = self.user_settings.get("ui_zoom", 1.0)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -97,7 +101,7 @@ class GameTab(QWidget):
                 self.sidebar.load_game(self.card)
 
         # Reload list if zoom changed
-        new_zoom = SystemUtils.load_settings().get("ui_zoom", 1.0)
+        new_zoom = self.user_settings.get("ui_zoom", 1.0)
         if new_zoom != self.zoom:
             self.zoom = new_zoom
             self.refresh_list()
@@ -272,7 +276,7 @@ class RunInPrefixDialog(QDialog):
             logger.debug("Please select both an executable and a prefix.")
             return
 
-        user_settings = SystemUtils.load_settings()
+        user_settings = SettingsManager()
         global_env_var = user_settings.get("global_env_var", {})
         env_vars = {}
         for wt_id, is_enabled in global_env_var.items():
