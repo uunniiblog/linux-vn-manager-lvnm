@@ -47,9 +47,9 @@ class GameRunner:
 
     def prepare_environment(self):
         """Builds the environment and the final command list."""
-        self.env = os.environ.copy()
+        self.env = SystemUtils.get_clean_env()
 
-        var = self.scrub_appimage_environment()
+        self.scrub_appimage_environment()
 
         if self.is_steam:
             logging.info("Steam launch detected: removing LC_ALL...")

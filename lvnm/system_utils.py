@@ -29,6 +29,33 @@ class SystemUtils:
     ]
 
     @staticmethod
+    def get_clean_env():
+        """
+        Returns an environment dictionary stripped of AppImage/PyInstaller 
+        variables to prevent library conflicts in child processes.
+        """
+        clean_env = os.environ.copy()
+
+        # Restore the original LD_LIBRARY_PATH
+        if "LD_LIBRARY_PATH_ORIG" in clean_env:
+            clean_env["LD_LIBRARY_PATH"] = clean_env.get("LD_LIBRARY_PATH_ORIG")
+            clean_env.pop("LD_LIBRARY_PATH_ORIG", None)
+        else:
+            # If no original exists, just remove it entirely so the system 
+            # uses its default paths (/usr/lib, etc.)
+            clean_env.pop("LD_LIBRARY_PATH", None)
+
+        # Strip Python-specific redirections
+        # This prevents child processes from trying to use the AppImage's Python libs
+        clean_env.pop("PYTHONHOME", None)
+        clean_env.pop("PYTHONPATH", None)
+
+        # Strip PyInstaller markers
+        clean_env.pop("_PYI_ARCHIVE_FILE", None)
+        
+        return clean_env
+
+    @staticmethod
     def get_system_info() -> dict:
         """Gathers core system, OS, and hardware information."""
         info = {
@@ -218,6 +245,7 @@ class SystemUtils:
         #             logger.debug(f"❓ {tool:10} : NOT found in bundled tools folder")
         
         # logger.debug("="*60)
+
     @staticmethod
     def apply_ui_zoom(zoom_factor: float):
         """

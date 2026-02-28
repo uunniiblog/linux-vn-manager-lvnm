@@ -55,6 +55,10 @@ class ExecutionManager:
         if suppress_codes is None:
             suppress_codes = []
 
+        if env.get("LD_LIBRARY_PATH") and "/tmp/.mount_" in env["LD_LIBRARY_PATH"]:
+            logger.debug("Cleaning leaked AppImage path from LD_LIBRARY_PATH")
+            env.pop("LD_LIBRARY_PATH", None)
+
         # Apply automatic verbosity overrides
         final_env = ExecutionManager._get_verbosity_env(env)
 
