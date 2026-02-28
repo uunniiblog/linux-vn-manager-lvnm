@@ -14,11 +14,11 @@ class CliController(QObject):
     
     def handle_args(self, args):
         if args.run:
-            self.headless_run(args.run)
+            self.headless_run(args.run, args.steam)
             return
 
-    def headless_run(self, game):
-        runner = GameRunner(game)
+    def headless_run(self, game, is_steam=False):
+        runner = GameRunner(game, is_steam=is_steam)
         runner.load_data()
         
         if not runner.is_running():
@@ -32,7 +32,7 @@ class CliController(QObject):
             signal.signal(signal.SIGINT, cleanup_and_exit)  # Ctrl+C
             signal.signal(signal.SIGTERM, cleanup_and_exit) # Standard kill / app close
 
-            runner.run(headless=True)
+            runner.run(is_headless=True)
             
             while runner.is_running():
                 time.sleep(1)

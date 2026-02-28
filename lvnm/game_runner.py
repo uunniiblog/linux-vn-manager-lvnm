@@ -19,12 +19,13 @@ class GameRunner:
     GAME_DATA = Path(config.GAMES_DATA)
     LOG_LEVEL = settings.get("log_level", "info")
 
-    def __init__(self, name: str, card_override: GameCard = None):
+    def __init__(self, name: str, card_override: GameCard = None, is_steam=False):
         self.name = name
         self.game: GameCard = card_override
         self.prefix_info: dict = None
         self.env: dict = {}
         self.cmd: list = []
+        self.is_steam = is_steam
         self.logs = deque(maxlen=10000)
         
         # Track running
@@ -32,7 +33,6 @@ class GameRunner:
 
     def load_data(self):
         """Loads game and prefix data into the instance."""
-
         # Only fetch from the json if we didn't provide a card manually
         if not self.game:
             self.game = self._get_game_card(self.name)
@@ -47,6 +47,12 @@ class GameRunner:
     def prepare_environment(self):
         """Builds the environment and the final command list."""
         self.env = os.environ.copy()
+
+        if self.is_steam:
+            logging.info("Steam launch detected: removing LC_ALL...")
+            # remove this since it fucks with locale for jp paths
+            self.env.pop("LC_ALL", None)
+
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
 
@@ -116,7 +122,7 @@ class GameRunner:
             logging.error(f"Run in prefix failed: {e}")
             return False
     
-    def run(self, headless=False):
+    def run(self, is_headless=False):
         """Prepares, logs, and executes the game"""
         self.load_data()
         try:
@@ -128,7 +134,7 @@ class GameRunner:
             return False
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not headless)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless)
 
         logging.debug(f"self.process {self.process}")
         return True

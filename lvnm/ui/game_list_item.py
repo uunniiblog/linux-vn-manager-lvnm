@@ -118,19 +118,19 @@ class GameListItem(QWidget):
             act_run_stop = menu.addAction(self.tr("Run Game"))
 
         act_log = menu.addAction(self.tr("Show Logs"))
-        # act_log.setEnabled(is_running)
-
         act_open = menu.addAction(self.tr("Open Sidebar"))
         act_browse = menu.addAction(self.tr("Browse Files"))
+        menu.addSeparator()
         act_regedit = menu.addAction(self.tr("Open Regedit"))
         act_winecfg = menu.addAction(self.tr("Open Winecfg"))
         act_cmd = menu.addAction(self.tr("Open windows cmd"))
         act_bash = menu.addAction(self.tr("Open Bash Terminal"))
         menu.addSeparator()
+        act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
+        act_steam = menu.addAction(self.tr("Steam Shortcut"))
+        menu.addSeparator()
         act_dup = menu.addAction(self.tr("Duplicate"))
         act_del = menu.addAction(self.tr("Delete"))
-        menu.addSeparator()
-        act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
 
         action = menu.exec(event.globalPos())
 
@@ -169,6 +169,9 @@ class GameListItem(QWidget):
 
         elif action == act_shortcut:
             self.shortcut()
+
+        elif action == act_steam:
+            SystemUtils.add_to_steam(self.game_card)
 
     def show_log(self, name):
         self.log_dialog = LogViewerDialog(name)       

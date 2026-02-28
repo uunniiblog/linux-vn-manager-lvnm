@@ -25,5 +25,12 @@ class CliHandler:
             help="The name of the game to launch in background mode."
         )
 
+        # Steam mode flag
+        self.parser.add_argument(
+            "--steam",
+            action="store_true",
+            help="Apply Steam-specific environment scrubbing (fixes Japanese paths and overlay issues)."
+        )
+
     def parse(self):
         return self.parser.parse_args()

@@ -11,6 +11,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
+from steam_manager import SteamManager
 
 
 class SystemUtils:
@@ -311,4 +312,28 @@ class SystemUtils:
             logging.info(f"Shortcut created at: {shortcut_file}")
         except Exception as e:
             logging.error(f"Failed to create shortcut: {e}")
+
+    @staticmethod
+    def add_to_steam(game_card):
+        app_path = os.path.abspath(sys.argv[0])
+        python_path = sys.executable
+        
+        # We launch the game via your CLI
+        exec_cmd = python_path
+        # Steam uses 'Launch Options' for arguments usually
+        launch_options = f'"{app_path}" -r "{game_card.name}" --steam'
+        
+        icon_path = SystemUtils.get_cover_path(game_card.vndb) or ""
+        game_dir = os.path.dirname(game_card.path)
+
+        success = SteamManager.add_non_steam_game(
+            name=f"LVNM: {game_card.name}",
+            exe=exec_cmd,
+            start_dir=game_dir,
+            icon=icon_path,
+            options=launch_options
+        )
+        
+        if success:
+            logging.info(f"Added {game_card.name} to Steam. Please RESTART Steam.")
         
