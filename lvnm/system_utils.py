@@ -30,29 +30,25 @@ class SystemUtils:
 
     @staticmethod
     def get_clean_env():
-        """
-        Returns an environment dictionary stripped of AppImage/PyInstaller 
-        variables to prevent library conflicts in child processes.
-        """
         clean_env = os.environ.copy()
 
-        # Restore the original LD_LIBRARY_PATH
+        # Restore original LD_LIBRARY_PATH if saved, otherwise strip _MEI and .mount_ AppImage paths
         if "LD_LIBRARY_PATH_ORIG" in clean_env:
-            clean_env["LD_LIBRARY_PATH"] = clean_env.get("LD_LIBRARY_PATH_ORIG")
-            clean_env.pop("LD_LIBRARY_PATH_ORIG", None)
-        else:
-            # If no original exists, just remove it entirely so the system 
-            # uses its default paths (/usr/lib, etc.)
-            clean_env.pop("LD_LIBRARY_PATH", None)
+            clean_env["LD_LIBRARY_PATH"] = clean_env.pop("LD_LIBRARY_PATH_ORIG")
+        elif "LD_LIBRARY_PATH" in clean_env:
+            paths = clean_env["LD_LIBRARY_PATH"].split(":")
+            clean_paths = [p for p in paths if not any(
+                seg in p for seg in ("/tmp/_MEI", "/tmp/.mount_")
+            )]
+            if clean_paths:
+                clean_env["LD_LIBRARY_PATH"] = ":".join(clean_paths)
+            else:
+                clean_env.pop("LD_LIBRARY_PATH", None)
 
-        # Strip Python-specific redirections
-        # This prevents child processes from trying to use the AppImage's Python libs
         clean_env.pop("PYTHONHOME", None)
         clean_env.pop("PYTHONPATH", None)
-
-        # Strip PyInstaller markers
         clean_env.pop("_PYI_ARCHIVE_FILE", None)
-        
+
         return clean_env
 
     @staticmethod

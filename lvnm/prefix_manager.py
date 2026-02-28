@@ -29,7 +29,7 @@ class PrefixManager:
         self.runner_path = None
         self.type = None
         self.codecs = ""
-        self.env = os.environ.copy()
+        self.env = SystemUtils.get_clean_env()
         self.env["WINEPREFIX"] = str(self.prefix_path)
         self.fonts = False
         
