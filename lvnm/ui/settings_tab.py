@@ -183,7 +183,12 @@ class SettingsTab(QWidget):
         about_group = QGroupBox(self.tr("About"))
         about_layout = QFormLayout(about_group)
         about_layout.addRow(QLabel(self.tr("LVNM version:")), QLabel(config.VERSION))
-        about_layout.addRow(QLabel(self.tr("Github:")), QLabel(config.GIT_URL))
+        github_label = QLabel(f'<a href="{config.GIT_URL}">{config.GIT_URL}</a>')
+        github_label.setOpenExternalLinks(True)
+        about_layout.addRow(QLabel(self.tr("Github:")), github_label)
+        wineprefixes_label = QLabel(f'<a href="{config.WINEPREFIX_URL}">{config.WINEPREFIX_URL}</a>')
+        wineprefixes_label.setOpenExternalLinks(True)
+        about_layout.addRow(QLabel(self.tr("Wineprefixes guide:")), wineprefixes_label)
         main_layout.addWidget(about_group)
         
         main_layout.addStretch()

@@ -26,6 +26,7 @@ DXVK_API_URL = "https://api.github.com/repos/doitsujin/dxvk/releases/latest"
 VNDB_API_URL = "https://api.vndb.org/kana"
 VNDB_SITE_URL = "https://vndb.org/{vndbid}"
 EGS_SITE_URL = "https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/kensaku.php?category=game&word_category=name&word={jpname}"
+WINEPREFIX_URL = "https://www.vnwiki.xyz/linux/wineprefixes.html"
 
 # Codec List
 CODEC_LIST = [

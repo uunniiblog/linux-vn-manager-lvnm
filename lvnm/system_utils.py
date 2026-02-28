@@ -276,6 +276,33 @@ class SystemUtils:
                 return t
 
     @staticmethod
+    def get_launch_command(game_name: str, for_steam: bool = False):
+        """
+        Determines the correct executable path and arguments depending on 
+        whether the app is running as an AppImage, a PyInstaller binary, or from source.
+        """
+        appimage_path = os.environ.get("APPIMAGE")
+        
+        if appimage_path:
+            logger.debug("get_launch_command - Running as an AppImage")
+            exe_cmd = f'"{appimage_path}"'
+            args = f'-r "{game_name}"'
+        elif getattr(sys, 'frozen', False):
+            logger.debug("get_launch_command - Running from compiled py")
+            exe_cmd = f'"{sys.executable}"'
+            args = f'-r "{game_name}"'
+        else:
+            logger.debug("get_launch_command - Running from source")
+            exe_cmd = f'"{sys.executable}"'
+            app_path = os.path.abspath(sys.argv[0])
+            args = f'"{app_path}" -r "{game_name}"'
+
+        if for_steam:
+            args += " --steam"
+
+        return exe_cmd, args
+    
+    @staticmethod
     def create_desktop_shortcut(game, cover):
         """Generates a .desktop file on the user's desktop."""
         try:
@@ -284,13 +311,10 @@ class SystemUtils:
             shortcut_file = desktop_path / f"lvnm-{game}.desktop"
             
             # Get the path to your current executable/script
-            app_path = os.path.abspath(sys.argv[0])
-            python_path = sys.executable
+            exe_cmd, args = SystemUtils.get_launch_command(game)
+            exec_cmd = f"{exe_cmd} {args}"
             
-
-            exec_cmd = f"{python_path} {app_path} -r \"{game}\""
-            
-            # Get Icon path (using VNDB cover as icon if available)
+            # Get VNDB Icon if available
             icon_path = SystemUtils.get_cover_path(cover) or "applications-games"
 
             # Create the .desktop content
@@ -308,6 +332,9 @@ class SystemUtils:
             # Write the file
             with open(shortcut_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(content))
+
+            # Make executable
+            os.chmod(shortcut_file, 0o755)
             
             logging.info(f"Shortcut created at: {shortcut_file}")
         except Exception as e:
@@ -315,20 +342,14 @@ class SystemUtils:
 
     @staticmethod
     def add_to_steam(game_card):
-        app_path = os.path.abspath(sys.argv[0])
-        python_path = sys.executable
-        
-        # We launch the game via your CLI
-        exec_cmd = python_path
-        # Steam uses 'Launch Options' for arguments usually
-        launch_options = f'"{app_path}" -r "{game_card.name}" --steam'
+        exe_cmd, launch_options = SystemUtils.get_launch_command(game_card.name, for_steam=True)
         
         icon_path = SystemUtils.get_cover_path(game_card.vndb) or ""
         game_dir = os.path.dirname(game_card.path)
 
         success = SteamManager.add_non_steam_game(
             name=f"LVNM: {game_card.name}",
-            exe=exec_cmd,
+            exe=exe_cmd,
             start_dir=game_dir,
             icon=icon_path,
             options=launch_options

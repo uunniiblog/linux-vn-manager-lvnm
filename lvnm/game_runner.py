@@ -386,10 +386,9 @@ class GameRunner:
             return False
     
     def scrub_appimage_environment(self):
-        """Remove APPIMAGE ENVIRONMENT"""
-        # These variables trick the taskbar into grouping windows together.
+        """Remove APPIMAGE ENVIRONMENT when running a game"""
         appimage_vars = [
-            "DESKTOP_STARTUP_ID",   # Icon "theft"
+            "DESKTOP_STARTUP_ID",   # Icon thieft
             "XDG_ACTIVATION_TOKEN", # Wayland's equivalent of startup ID
             "APPDIR",               # Path to the mounted AppImage
             "APPIMAGE",             # Path to the AppImage file
