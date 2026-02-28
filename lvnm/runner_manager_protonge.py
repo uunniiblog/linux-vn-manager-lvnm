@@ -22,7 +22,6 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
             logger.info("No releases found or API error.")
             return []
 
-        logger.info(f"--- Available Proton-GE Builds (Page {page}) ---")
         filtered_releases = []
         for release in data:
             tag = release.get("tag_name", "")

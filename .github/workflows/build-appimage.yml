@@ -72,6 +72,8 @@ jobs:
             --name LVNM lvnm/launcher.py
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
+          rm -f LVNM.AppDir/usr/bin/libreadline.so*
+          rm -f LVNM.AppDir/usr/bin/libtinfo.so*
 
       - name: Bundle umu-run (Latest Stable Zipapp)
         run: |

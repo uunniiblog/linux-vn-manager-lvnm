@@ -53,9 +53,9 @@ class RunnerManagerInterface:
                         downloaded += len(buffer)
                         f.write(buffer)
                         
-                        if total_size > 0:
-                            percent = downloaded * 100 / total_size
-                            logger.debug(f"\rProgress: [{percent:.1f}%] {downloaded}/{total_size} bytes")
+                        # if total_size > 0:
+                        #     percent = downloaded * 100 / total_size
+                        #     logger.debug(f"\rProgress: [{percent:.1f}%] {downloaded}/{total_size} bytes")
 
                         # Gui
                         if progress_callback and total_size > 0:
