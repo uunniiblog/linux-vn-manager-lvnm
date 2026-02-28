@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from model.prefix import Prefix
 from execution_manager import ExecutionManager
+from system_utils import SystemUtils
 
 logger = logging.getLogger(__name__)
 
@@ -139,10 +140,12 @@ class PrefixManager:
 
     def install_winetricks(self, winetricks_list: str, executor=None):
         """Installs winetricks components into the prefix."""
-        winetricks_bin = shutil.which("winetricks")
-        if not winetricks_bin:
-            logger.error("winetricks not found in PATH.")
-            return False
+        winetricks_bin = SystemUtils.get_tool_path("winetricks")
+
+        # winetricks_bin = shutil.which("winetricks")
+        # if not winetricks_bin:
+        #     logger.error("winetricks not found in PATH.")
+        #     return False
 
         logger.info(f"Installing winetricks into {self.name}: {winetricks_list}")
         desc = f"Installing winetricks: {winetricks_list}"

@@ -159,8 +159,10 @@ class GameRunner:
         self.env["PROTONPATH"] = str(runner_path)
         self.env["GAMEID"] = self.game.umu_gameid
         self.env["STORE"] = self.game.umu_store
+
+        umu_cmd = SystemUtils.get_tool_path("umu-run")
         
-        return ["umu-run", self.game.path]
+        return [umu_cmd, self.game.path]
 
     def _get_game_card(self, name: str):
         if not GameRunner.GAME_DATA.exists():

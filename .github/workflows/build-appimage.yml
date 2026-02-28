@@ -1,0 +1,100 @@
+name: Build lvnm AppImage
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ] # Triggers when you push a tag like v0.1.0
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write # Required to create releases
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+          pip install PySide6 setproctitle requests pyinstaller
+          # Add any other requirements from your requirements.txt if needed
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Create AppDir Structure
+        run: |
+          mkdir -p LVNM.AppDir/usr/bin/tools
+          mkdir -p LVNM.AppDir/usr/share/applications
+          mkdir -p LVNM.AppDir/usr/share/icons/hicolor/256x256/apps
+
+      - name: Build Main LVNM Binary
+        run: |
+          python -m PyInstaller --noconfirm --windowed \
+            --paths . \
+            --name LVNM lvnm/launcher.py
+          # Move it immediately to avoid collision
+          cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
+
+      - name: Build Bundled umu-run
+        run: |
+          pip install git+https://github.com/Open-Wine-Components/umu-launcher.git
+          python -m PyInstaller --onefile --collect-all umu --name umu-run $(which umu-run)
+          # Move it to the tools folder
+          cp dist/umu-run LVNM.AppDir/usr/bin/tools/
+
+      - name: Bundle Winetricks
+        run: |
+          curl -L -o LVNM.AppDir/usr/bin/tools/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
+          chmod +x LVNM.AppDir/usr/bin/tools/*
+
+      - name: Finalize AppDir Metadata
+        run: |
+          # Use your icon
+          if [ -f icon.png ]; then cp icon.png LVNM.AppDir/lvnm.png; fi
+          
+          cat <<EOF > LVNM.AppDir/lvnm.desktop
+          [Desktop Entry]
+          Name=LVNM
+          Exec=LVNM
+          Icon=lvnm
+          Type=Application
+          Categories=Game;Utility;
+          EOF
+
+          cd LVNM.AppDir
+          ln -s usr/bin/LVNM AppRun
+          cd ..
+
+      - name: Generate AppImage
+        run: |
+          curl -LO https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run LVNM.AppDir/ LVNM-x86_64.AppImage
+
+      - name: Upload Artifact (Always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LVNM-x86_64.AppImage
+          path: LVNM-x86_64.AppImage
+
+      - name: Create Release (Tags Only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LVNM-x86_64.AppImage
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

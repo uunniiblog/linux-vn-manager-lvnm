@@ -623,7 +623,7 @@ class GameSidebar(QFrame):
         finished_games = []
 
         for name, runner in self.active_runners.items():
-            logger.debug(f"[check_active_runners {name}")
+            logger.debug(f"check_active_runners {name}")
             if not runner.is_running():
                 finished_games.append(name)
 
