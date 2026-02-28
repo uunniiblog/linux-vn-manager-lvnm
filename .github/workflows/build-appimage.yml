@@ -39,18 +39,16 @@ jobs:
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
             --paths lvnm \
-            --exclude-module _tkinter \
-            --collect-all PySide6 \
             --name LVNM lvnm/launcher.py
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
 
-      - name: Build Bundled umu-run
+      - name: Bundle umu-run (official release)
         run: |
-          pip install git+https://github.com/Open-Wine-Components/umu-launcher.git
-          python -m PyInstaller --onefile --collect-all umu --name umu-run $(which umu-run)
-          # Move it to the tools folder
-          cp dist/umu-run LVNM.AppDir/usr/bin/tools/
+          UMU_VERSION=$(curl -s https://api.github.com/repos/Open-Wine-Components/umu-launcher/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          curl -L -o LVNM.AppDir/usr/bin/tools/umu-run \
+            "https://github.com/Open-Wine-Components/umu-launcher/releases/download/${UMU_VERSION}/umu-run"
+          chmod +x LVNM.AppDir/usr/bin/tools/umu-run
 
       - name: Bundle Winetricks
         run: |
