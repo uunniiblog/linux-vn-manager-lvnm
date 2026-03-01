@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QSize
 from game_manager import GameManager
 from game_runner import GameRunner
 from prefix_manager import PrefixManager
@@ -54,6 +54,7 @@ class GameSidebar(QFrame):
 
         # Cover and Links Row
         self.media_container = QWidget()
+        self.media_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         media_layout = QHBoxLayout(self.media_container)
         media_layout.setContentsMargins(0, 0, 0, 10)
         media_layout.setAlignment(Qt.AlignTop)
@@ -169,7 +170,7 @@ class GameSidebar(QFrame):
         form.addStretch(1)
 
         scroll.setWidget(container)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll, 1)
 
         # Bottom Buttons
         btns = QHBoxLayout()
@@ -201,6 +202,14 @@ class GameSidebar(QFrame):
         self.monitor_timer.timeout.connect(self.check_active_runners)
         self.monitor_timer.setInterval(1000)
         self.monitor_timer.start()
+
+    def resizeEvent(self, event):
+        """
+        Try to keep cover at 1/3
+        """
+        super().resizeEvent(event)
+        cover_cap = max(100, (self.height() // 3) - 80)
+        self.media_container.setMaximumHeight(cover_cap)
 
     def load_game(self, card: GameCard):
         """
@@ -678,26 +687,54 @@ class CoverLabel(QLabel):
         super().__init__(parent)
         self.original_pixmap = None
         self.setAlignment(Qt.AlignCenter)
-        # Give it a much bigger default starting size (2:3 aspect ratio)
-        self.setMinimumSize(240, 360) 
-        self.setMaximumSize(540, 810)
-        # self.setMinimumSize(135, 202) 
-        # self.setMaximumSize(250, 375)
-        # self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # Minimum visible size (portrait 2:3 ratio)
+        self.setMinimumSize(80, 120)
+        # No artificial maximum — let the layout + resizeEvent cap it
+        self.setMaximumSize(16_777_215, 16_777_215)
+
+        # Expanding horizontally so it fills the HBoxLayout column;
+        # Preferred vertically so the layout uses heightForWidth instead of
+        # over-allocating space.
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-        # Maybe do something with this later
         self.setStyleSheet("""
-            background-color: None; 
-            border-radius: 6px; 
+            background-color: transparent;
+            border-radius: 6px;
             border: 0px solid #444;
         """)
+
+    # ── aspect-ratio plumbing ──────────────────────────────────────────────────
+
+    def hasHeightForWidth(self) -> bool:
+        """Tell Qt: my height depends on my width (aspect ratio)."""
+        return (
+            self.original_pixmap is not None
+            and not self.original_pixmap.isNull()
+        )
+
+    def heightForWidth(self, width: int) -> int:
+        """Return the correct portrait height for the given width."""
+        if self.original_pixmap and not self.original_pixmap.isNull():
+            ratio = self.original_pixmap.height() / self.original_pixmap.width()
+            return int(width * ratio)
+        return super().heightForWidth(width)
+
+    def sizeHint(self) -> QSize:
+        w = max(self.minimumWidth(), self.width())
+        if self.original_pixmap and not self.original_pixmap.isNull():
+            return QSize(w, self.heightForWidth(w))
+        return super().sizeHint()
+
+    # ── pixmap management ─────────────────────────────────────────────────────
 
     def set_pixmap_from_path(self, path):
         if path:
             self.original_pixmap = QPixmap(path)
         else:
             self.original_pixmap = None
+        # Recalculate the layout after a new image is loaded
+        self.updateGeometry()
         self.update_scaled()
 
     def resizeEvent(self, event):
@@ -706,11 +743,10 @@ class CoverLabel(QLabel):
 
     def update_scaled(self):
         if self.original_pixmap and not self.original_pixmap.isNull():
-            # Scale dynamically keeping the entire image visible
             scaled = self.original_pixmap.scaled(
                 self.size(),
                 Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
+                Qt.SmoothTransformation,
             )
             super().setPixmap(scaled)
         else:
