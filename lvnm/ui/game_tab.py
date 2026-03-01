@@ -3,7 +3,7 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
     QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
-    QPushButton, QComboBox, QFileDialog, QDialog
+    QPushButton, QComboBox, QFileDialog, QDialog, QApplication
 )
 from PySide6.QtCore import Qt, QSettings, QByteArray
 from PySide6.QtGui import QKeySequence, QShortcut

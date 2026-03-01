@@ -110,7 +110,7 @@ class SettingsTab(QWidget):
         self.log_level_combo.setCurrentIndex(log_map.get(current_log, 1))
         
         self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
-        settings_layout.addRow(QLabel(self.tr("Debug Level:")), self.log_level_combo)
+        settings_layout.addRow(QLabel(self.tr("Log Level:")), self.log_level_combo)
 
         main_layout.addWidget(settings_group)
 

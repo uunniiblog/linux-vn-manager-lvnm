@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
-    QFrame, QMenu, QDialog, QPlainTextEdit, QPushButton
+    QFrame, QMenu, QDialog, QPlainTextEdit, QPushButton, QApplication
 )
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QPainter, QColor
 from PySide6.QtCore import Qt, Signal, QTimer
 from game_manager import GameManager
 from system_utils import SystemUtils
@@ -20,8 +20,12 @@ class GameListItem(QWidget):
 
     def __init__(self, game_card, zoom_factor=1.0, parent=None):
         super().__init__(parent)
+        self.setMouseTracking(True)
         self.zoom = zoom_factor
         self.game_card = game_card
+        self.selected = False
+        self._hovered = False
+        self.hover_bg = "rgba(255, 255, 255, 18)"   # default: dark-mode tint
 
         # Layouts 
         margin = int(5 * zoom_factor)
@@ -29,20 +33,21 @@ class GameListItem(QWidget):
         layout.setContentsMargins(margin, margin, margin, margin)
         layout.setSpacing(int(8 * zoom_factor))
 
-        # Column 1: Cover Placeholder
+        # Column 1: Cover
         self.cover_w = int(90 * zoom_factor)
         self.cover_h = self.cover_w * 3 // 2
         self.cover = QLabel()
         self.cover.setFixedSize(self.cover_w, self.cover_h)
-        self.cover.setAlignment(Qt.AlignCenter) 
-        self.cover.setStyleSheet("background-color: #333; border-radius: 4px; border: 1px solid #444;")
+        self.cover.setAlignment(Qt.AlignCenter)
+        self.cover.setObjectName("gameItemCover")
         layout.addWidget(self.cover)
 
-        # Column 2: Info Labels
+        # Column 2: Info
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(int(20 * zoom_factor)) 
+        info_layout.setSpacing(int(20 * zoom_factor))
 
-        self.name_label = QLabel() # Empty for now
+        self.name_label = QLabel()
+        self.name_label.setObjectName("gameItemName")
         name_font = self.name_label.font()
         name_font.setBold(True)
         name_font.setPointSizeF(11 * zoom_factor)
@@ -51,13 +56,14 @@ class GameListItem(QWidget):
 
         sub_info_layout = QVBoxLayout()
         sub_info_layout.setSpacing(0)
-        
+
         self.prefix_label = QLabel()
-        self.prefix_label.setStyleSheet("color: #888;")
+        self.prefix_label.setObjectName("gameItemPrefix")
+
         self.path_label = QLabel()
-        self.path_label.setStyleSheet("color: #666;")
+        self.path_label.setObjectName("gameItemPath")
         self.path_label.setWordWrap(True)
-        
+
         sub_info_layout.addWidget(self.prefix_label)
         sub_info_layout.addWidget(self.path_label)
         info_layout.addLayout(sub_info_layout)
@@ -66,11 +72,30 @@ class GameListItem(QWidget):
 
         # Column 3: Date
         self.date_label = QLabel()
+        self.date_label.setObjectName("gameItemDate")
         self.date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(self.date_label)
 
         # --- INITIAL DATA FILL ---
         self.update_ui(game_card)
+
+    def enterEvent(self, event):
+        if not self.selected:
+            self._set_hover_state(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._set_hover_state(False)
+        super().leaveEvent(event)
+
+    def _set_hover_state(self, is_hovered: bool):
+        self._hovered = is_hovered
+        # Set a dynamic property that the CSS can see
+        self.setProperty("hovered", is_hovered)
+        
+        # This "re-polishes" the widget to force the CSS to update immediately
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def update_ui(self, game_card):
         """The 'Hot-Swap' method that updates only the data-driven parts."""
