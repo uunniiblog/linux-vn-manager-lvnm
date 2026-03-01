@@ -5,17 +5,13 @@ class ThemeManager:
 
     BASE_STYLE = """
     /* ── Root surfaces ─────────────────────────────────────────── */
-    QMainWindow, QDialog {{
-        background-color: {bg_main};
-        color: {text_main};
-    }}
     QMainWindow, QDialog, QScrollArea, QFrame#sidebar_container {{
         background-color: {bg_main};
         color: {text_main};
     }}
 
+    /* Global widget text color. We removed the global transparent background to fix Dialogs! */
     QWidget {{
-        background-color: transparent;
         color: {text_main};
     }}
     
