@@ -14,6 +14,7 @@ from ui.console_dialog import ConsoleDialog
 from settings_manager import SettingsManager
 from runner_manager import RunnerManagerInterface
 from game_runner import GameRunner
+from system_utils import SystemUtils
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,12 @@ class PrefixTab(QWidget):
             return
         runner = GameRunner("UtilityMode")
         runner.open_terminal(prefix_name)
+
+    def browse_files(self):
+        prefix_name = self.get_selected_prefix()
+        prefix = PrefixManager(prefix_name)
+        logger.debug(prefix.prefix_path)
+        SystemUtils.browse_files(prefix.prefix_path)
     
     def open_context_menu(self, position):
         """Creates and shows the right-click menu for prefixes"""
@@ -259,6 +266,7 @@ class PrefixTab(QWidget):
 
         # Management Actions
         act_edit = menu.addAction(self.tr("Edit Prefix"))
+        act_browse = menu.addAction(self.tr("Browse files"))
         act_del = menu.addAction(self.tr("Delete Prefix"))
         menu.addSeparator()
 
@@ -274,6 +282,8 @@ class PrefixTab(QWidget):
         # Handle Choices
         if action == act_edit:
             self.on_edit()
+        if action == act_browse:
+            self.browse_files()
         elif action == act_del:
             self.on_delete()
         elif action == act_regedit:

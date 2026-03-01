@@ -292,11 +292,14 @@ class SystemUtils:
     @staticmethod
     def browse_files(path: str):
         if not path:
-            logger.error("[Error] Game has no path to browse to.")
+            logger.error("[Error] Path does not exist.")
             return
 
         # Get the directory containing the file
-        folder_path = os.path.dirname(os.path.abspath(path))
+        if os.path.isdir(path):
+            folder_path = os.path.abspath(path)
+        else:
+            folder_path = os.path.dirname(os.path.abspath(path))
 
         if os.path.exists(folder_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
