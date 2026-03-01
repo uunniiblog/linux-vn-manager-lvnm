@@ -129,6 +129,7 @@ class GameListItem(QWidget):
         act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
         act_steam = menu.addAction(self.tr("Steam Shortcut"))
         menu.addSeparator()
+        act_refresh = menu.addAction(self.tr("Refresh List"))
         act_dup = menu.addAction(self.tr("Duplicate"))
         act_del = menu.addAction(self.tr("Delete"))
 
@@ -163,6 +164,9 @@ class GameListItem(QWidget):
             
         elif action == act_dup:
             self.duplicate_game(self.game_card.name)
+
+        elif action == act_refresh:
+            self.requestRefresh.emit(self.game_card)
             
         elif action == act_del:
             self.delete_game(self.game_card.name)
