@@ -132,6 +132,7 @@ class GameSidebar(QFrame):
         self.prefix_warning.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.edit_vndb = QLineEdit()
+        self.edit_vndb.setPlaceholderText("vndb id example: v11")
         self.edit_umu_store = QLineEdit()
         self.edit_umu_id = QLineEdit()
         self.label_umu_store = QLabel(self.tr("UMU Store:"))
