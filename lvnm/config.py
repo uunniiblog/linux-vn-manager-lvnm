@@ -44,7 +44,7 @@ CODEC_LIST = [
 ENV_VARIABLES = [
     {
         "id": "jp_locale",
-        "name": "Japanese Locale (JP)",
+        "name": "Japanese Locale",
         "key": "LANG",
         "value": "ja_JP.UTF-8"
     },

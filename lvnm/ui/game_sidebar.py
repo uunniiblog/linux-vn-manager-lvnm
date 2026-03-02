@@ -275,6 +275,8 @@ class GameSidebar(QFrame):
                 continue
             
             cb = QCheckBox(var.get("name") or var["id"])
+            tooltip_text = f"{var['key']}={var['value']}"
+            cb.setToolTip(tooltip_text)
             # Check if current game has this specific key/value pair
             if active_vars.get(var["key"]) == var["value"]:
                 cb.setChecked(True)
@@ -328,12 +330,13 @@ class GameSidebar(QFrame):
         # Create a temp dict to simulate active env vars for the refresh method
         default_env_vars = {}
         
-        # This part assumes your config.ENV_VARIABLES entries have an ID 
-        # that matches the keys in global_env_var (like 'jp_locale' or 'jp_timezone')
+        # match keys
         for var in config.ENV_VARIABLES:
             var_id = var.get("id")
-            if global_env_var.get(var_id): # If 'jp_locale' is True in settings
+            if global_env_var.get(var_id): # If its true in settings
                 default_env_vars[var["key"]] = var["value"]
+
+        self._create_mode_defaults = default_env_vars
 
         # Clear Env Var checkboxes
         self.refresh_env_vars("wine", default_env_vars)
@@ -501,15 +504,18 @@ class GameSidebar(QFrame):
         self.update_umu_visibility(prefix_type)
         
         if self.current_game:
-            # Keep current selected shit
-            current_ui_vars = {}
-            for var in config.ENV_VARIABLES:
-                cb = self.env_checkboxes.get(var["id"])
-                if cb and cb.isChecked():
-                    current_ui_vars[var["key"]] = var["value"]
-            
-            self.current_game.envvar = current_ui_vars            
-            self.refresh_env_vars(prefix_type, self.current_game.envvar)
+            if getattr(self, "_create_mode_defaults", None) is not None:
+                active_vars = self._create_mode_defaults
+            else:
+                current_ui_vars = {}
+                for var in config.ENV_VARIABLES:
+                    cb = self.env_checkboxes.get(var["id"])
+                    if cb and cb.isChecked():
+                        current_ui_vars[var["key"]] = var["value"]
+                self.current_game.envvar = current_ui_vars
+                active_vars = self.current_game.envvar
+
+            self.refresh_env_vars(prefix_type, active_vars)
 
     def show_saved_feedback(self):
         """ Change Save button to Saved for 1.5 seconds"""
