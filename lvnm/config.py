@@ -36,8 +36,7 @@ CODEC_LIST = [
     {"id": "lavfilters", "name": ""},
     {"id": "quartz_dx", "name": ""},
     {"id": "mciqtz32", "name": ""},
-    {"id": "xaudio29", "name": ""},
-    {"id": "dgvoodoo2", "name": ""}
+    {"id": "xaudio29", "name": ""}
 ]
 
 # Env Variable list

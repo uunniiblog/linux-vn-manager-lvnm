@@ -5,6 +5,7 @@ echo "Helper script to install codecs for VNs on wine (v2025-11-08)"
 echo
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+WORK_DIR=$HOME/.local/share/lvnm/codecs
 
 Quit() { echo; exit; }
 Heading() { echo; echo "[INSTALL] $@"; }
@@ -126,13 +127,13 @@ Hash_SHA256()
 
 DownloadFile()
 { # args: $1=output_subdir $2=output_name $3=url $4=hash
-    DLFILE=$SCRIPT_DIR/$1/$2
+    DLFILE=$WORK_DIR/$1/$2
     DLFILEWIP=${DLFILE}.download
 
     # download file if we don't have it yet
     if [ ! -f "$DLFILE" ]; then
         # download
-        mkdir -p "$SCRIPT_DIR/$1"
+        mkdir -p "$WORK_DIR/$1"
 
         if command -v wget >/dev/null; then
             wget --progress=bar -O "$DLFILEWIP" $3
@@ -203,11 +204,7 @@ Install_mf()
 {
     Heading "mf"
 
-    SRC_DIR="$SCRIPT_DIR/mf"
-
-    # Writable directory in /tmp
-    WORKDIR="/tmp/lvnm_mf_setup"
-    mkdir -p "$WORKDIR"
+    SRC_DIR="$WORK_DIR/mf"
 
     if ! command -v unzip >/dev/null; then echo "unzip is not available, cannot continue."; Quit; fi
 
@@ -217,33 +214,32 @@ Install_mf()
     # install 32-bit components
     DownloadFileInternal mf mf32.zip 7d8e909178f2c56f65e2f9668ef939e644403a844fc75ce7a3f920c8d489bda0
 
-    unzip -o -q -d "$WORKDIR/temp" "$SRC_DIR/mf32.zip" || Quit;
-    cp -vf "$WORKDIR/temp/syswow64"/* "$WINEPREFIX/drive_c/windows/$SYSDIR"
+    unzip -o -q -d "$WORK_DIR/temp" "$SRC_DIR/mf32.zip" || Quit;
+    cp -vf "$WORK_DIR/temp/syswow64"/* "$WINEPREFIX/drive_c/windows/$SYSDIR"
 
     Disable_winegstreamer
     for DLL in $OVERRIDE_DLL; do OverrideDll $DLL native; done
 
-    RUN "c:/windows/$SYSDIR/reg.exe" import "$WORKDIR/temp/mf.reg"
-    RUN "c:/windows/$SYSDIR/reg.exe" import "$WORKDIR/temp/wmf.reg"
+    RUN "c:/windows/$SYSDIR/reg.exe" import "$WORK_DIR/temp/mf.reg"
+    RUN "c:/windows/$SYSDIR/reg.exe" import "$WORK_DIR/temp/wmf.reg"
 
     for DLL in $REGISTER_DLL; do RUN c:/windows/$SYSDIR/regsvr32.exe /s "c:/windows/$SYSDIR/$DLL.dll"; done
 
     # install 64-bit components
     if [ $ARCH = "win64" ]; then
-        echo "Arch is win64"
         DownloadFileInternal mf mf64.zip 528cea0283db362a35555cd616a621f1cfa2e39be3be65f38487ebf22cf4da11
 
-        unzip -o -q -d "$WORKDIR/temp" "$SRC_DIR/mf64.zip" || Quit;
-        cp -vf "$WORKDIR/temp/system32"/* "$WINEPREFIX/drive_c/windows/system32"
+        unzip -o -q -d "$WORK_DIR/temp" "$SRC_DIR/mf64.zip" || Quit;
+        cp -vf "$WORK_DIR/temp/system32"/* "$WINEPREFIX/drive_c/windows/system32"
 
-        RUN64 "c:/windows/system32/reg.exe" import "$WORKDIR/temp/mf.reg"
-        RUN64 "c:/windows/system32/reg.exe" import "$WORKDIR/temp/wmf.reg"
+        RUN64 "c:/windows/system32/reg.exe" import "$WORK_DIR/temp/mf.reg"
+        RUN64 "c:/windows/system32/reg.exe" import "$WORK_DIR/temp/wmf.reg"
 
         for DLL in $REGISTER_DLL; do RUN64 c:/windows/system32/regsvr32.exe /s "c:/windows/system32/$DLL.dll"; done
     fi
 
     # cleanup
-    rm -fr "$WORKDIR"
+    rm -fr "$WORK_DIR"
 }
 
 Install_quartz_dx()
@@ -254,7 +250,7 @@ Install_quartz_dx()
     DownloadFileInternal quartz_dx devenum.dll ab49f2ebb9f99b640c14a4a1d830b35685aa758c7b1f5c62d77fdb6e09081387
     DownloadFileInternal quartz_dx quartz.dll a378764866d8dd280e63dda4e62c5b10626cf46a230768fb24c3c3d5f7263b87
 
-    cp -fv "$SCRIPT_DIR/quartz_dx/"{quartz,devenum,amstream}.dll "$WINEPREFIX/drive_c/windows/$SYSDIR"
+    cp -fv "$WORK_DIR/quartz_dx/"{quartz,devenum,amstream}.dll "$WINEPREFIX/drive_c/windows/$SYSDIR"
 
     Disable_winegstreamer
     OverrideDll amstream native,builtin
@@ -268,14 +264,14 @@ Install_quartz_dx()
     # also install dgVoodoo2 for compatibility
     DownloadFileInternal dgvoodoo2 dgVoodoo2_8_1.zip 15f95a5c163f74105a03479fb2e868c04c432680e0892bf559198a93a7cd1c25
 
-    unzip -o -q -d "$SCRIPT_DIR/dgvoodoo2/temp" "$SCRIPT_DIR/dgvoodoo2/dgVoodoo2_8_1.zip" "MS/x86/DDraw.dll"
-    cp -fv "$SCRIPT_DIR/dgvoodoo2/temp/MS/x86/DDraw.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/ddraw.dll"
-    cp -fv "$SCRIPT_DIR/dgvoodoo2/dgVoodoo.conf" "$WINEPREFIX/drive_c/windows/$SYSDIR"
+    unzip -o -q -d "$WORK_DIR/dgvoodoo2/temp" "$WORK_DIR/dgvoodoo2/dgVoodoo2_8_1.zip" "MS/x86/DDraw.dll"
+    cp -fv "$WORK_DIR/dgvoodoo2/temp/MS/x86/DDraw.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/ddraw.dll"
+    cp -fv "$WORK_DIR/dgvoodoo2/dgVoodoo.conf" "$WINEPREFIX/drive_c/windows/$SYSDIR"
 
     OverrideDll ddraw native
 
     # cleanup
-    rm -fr "$SCRIPT_DIR/dgvoodoo2/temp"
+    rm -fr "$WORK_DIR/dgvoodoo2/temp"
 }
 
 Install_quartz2()
@@ -291,7 +287,7 @@ Install_quartz2()
     OverrideDll devenum native,builtin
     OverrideDll quartz native,builtin
 
-    cp -fv "$SCRIPT_DIR/quartz2/"{quartz2,amstream,devenum}.dll "$WINEPREFIX/drive_c/windows/$SYSDIR"
+    cp -fv "$WORK_DIR/quartz2/"{quartz2,amstream,devenum}.dll "$WINEPREFIX/drive_c/windows/$SYSDIR"
     #RUN c:/windows/$SYSDIR/regsvr32.exe /s amstream.dll
     RUN c:/windows/$SYSDIR/regsvr32.exe /s devenum.dll
     RUN c:/windows/$SYSDIR/regsvr32.exe /s quartz2.dll
@@ -312,8 +308,8 @@ Install_mciqtz32()
     DownloadFileInternal mciqtz32 mciqtz32.dll 43d131bfd6884e2d8d0317aabaf0564e36937347ab43feccfc2b1c9d38c8527b
     DownloadFileInternal mciqtz32 mciavi32.dll 1671e341a26430ae056271dd74e2ddb0646f348870ce23c9c79e9abe98ef7d14
 
-    cp -fv "$SCRIPT_DIR/mciqtz32/mciqtz32.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/mciqtz32.dll"
-    cp -fv "$SCRIPT_DIR/mciqtz32/mciavi32.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/mciavi32.dll"
+    cp -fv "$WORK_DIR/mciqtz32/mciqtz32.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/mciqtz32.dll"
+    cp -fv "$WORK_DIR/mciqtz32/mciavi32.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/mciavi32.dll"
 
     Disable_winegstreamer
     OverrideDll mciqtz32 native
@@ -343,7 +339,7 @@ Install_wmp11()
 
     rm -vf "$WINEPREFIX/drive_c/windows/$SYSDIR"/{qasf,wmasf,wmvcore,wmadmod}.dll
 
-    RUN "$SCRIPT_DIR/wmp11/$wmf" /q
+    RUN "$WORK_DIR/wmp11/$wmf" /q
 
     SetWindowsVer $PREV_OSVER
 }
@@ -354,8 +350,8 @@ Install_xaudio29()
 
     DownloadFileInternal xaudio29 xaudio2_9.dll 667787326dd6cc94f16e332fd271d15aabe1aba2003964986c8ac56de07d5b57
 
-    cp -fv "$SCRIPT_DIR/xaudio29/xaudio2_9.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/xaudio2_9.dll"
-    cp -fv "$SCRIPT_DIR/xaudio29/xaudio2_9.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/xaudio2_8.dll"
+    cp -fv "$WORK_DIR/xaudio29/xaudio2_9.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/xaudio2_9.dll"
+    cp -fv "$WORK_DIR/xaudio29/xaudio2_9.dll" "$WINEPREFIX/drive_c/windows/$SYSDIR/xaudio2_8.dll"
 
     OverrideDll xaudio2_9 native
     OverrideDll xaudio2_8 native
@@ -371,7 +367,7 @@ Install_lavfilters()
 
     Copy_WineVkd3dFiles
 
-    RUN "$SCRIPT_DIR/lavfilters/$FNAME" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    RUN "$WORK_DIR/lavfilters/$FNAME" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
 
     RUN reg add "HKCU\\Software\\LAV\\Audio\\Formats" /f /t REG_DWORD /v wma /d 1
     RUN reg add "HKCU\\Software\\LAV\\Audio\\Formats" /f /t REG_DWORD /v wmapro /d 1

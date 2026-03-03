@@ -401,10 +401,10 @@ class EditPrefixDialog(QDialog):
             
             # Check if already installed
             is_installed = item['id'] in installed_list
-            cb.setChecked(is_installed)
             if is_installed:
                 cb.setEnabled(False)
-            
+                cb.setChecked(True)
+
             storage_dict[item['id']] = cb
             
             # Calculate grid position:

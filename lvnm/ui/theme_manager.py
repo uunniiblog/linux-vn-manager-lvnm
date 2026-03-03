@@ -149,6 +149,9 @@ class ThemeManager:
         background-color: transparent;
         spacing: 6px;
     }}
+    QCheckBox:disabled {{
+        color: {text_disabled};
+    }}
     QCheckBox::indicator {{
         width: 16px;
         height: 16px;
@@ -163,6 +166,10 @@ class ThemeManager:
     QCheckBox::indicator:disabled {{
         background-color: {bg_disabled};
         border-color: {border_color};
+    }}
+    QCheckBox::indicator:checked:disabled {{
+        background-color: {accent};
+        border-color: {accent};
     }}
 
     /* ── Scroll areas ───────────────────────────────────────────── */
