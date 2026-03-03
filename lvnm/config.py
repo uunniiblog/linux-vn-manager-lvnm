@@ -1,13 +1,14 @@
 from pathlib import Path
 
-VERSION = 'v0.0.4'
+VERSION = 'v0.1.0'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
 DATA_DIR = Path.home() / ".local" / "share" / "lvnm" 
 WINE_RUNNERS_DIR = DATA_DIR / "runners" / "wine"
-PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
+# PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
+PROTON_RUNNERS_DIR =  Path.home() / ".local" / "share" / "Steam" / "compatibilitytools.d"
 DXVK_DIR = DATA_DIR / "runners" / "dxvk"
 PREFIXES_DIR = DATA_DIR / "prefixes"
 COVERS_DIR = DATA_DIR / "covers"
