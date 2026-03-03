@@ -131,7 +131,7 @@ jobs:
           if [ "${{ github.ref_type }}" == "tag" ]; then
             # If triggered by a tag (e.g., v1.0.0), set up a stable release
             echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-            echo "RELEASE_NAME=LVNM Stable ${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "RELEASE_NAME=LVNM ${{ github.ref_name }}" >> $GITHUB_ENV
             echo "IS_PRERELEASE=false" >> $GITHUB_ENV
           else
             # If triggered by a branch push, set up the continuous rolling release

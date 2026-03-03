@@ -1,12 +1,16 @@
 import struct
 import os
 import logging
+import zlib
+import shutil
+import binascii
 from pathlib import Path
 
 class SteamManager:
     @staticmethod
     def get_shortcuts_paths():
-        paths = []
+        """ Try to find steam paths """
+        paths = set() 
         base_paths = [
             Path.home() / ".steam/steam/userdata",
             Path.home() / ".local/share/Steam/userdata",
@@ -14,11 +18,12 @@ class SteamManager:
         ]
         for base in base_paths:
             if base.exists():
-                for user_dir in base.iterdir():
+                real_base = base.resolve()
+                for user_dir in real_base.iterdir():
                     if user_dir.is_dir() and user_dir.name.isdigit():
                         vdf_path = user_dir / "config" / "shortcuts.vdf"
-                        paths.append(vdf_path)
-        return paths
+                        paths.add(vdf_path)
+        return list(paths)
 
     @staticmethod
     def _read_string(data, offset):
@@ -76,27 +81,67 @@ class SteamManager:
 
         data = b'\x00shortcuts\x00'
         for i, s in enumerate(shortcuts):
+            appid = SteamManager._generate_appid(s.get("Exe", ""), s.get("AppName", ""))
+
             data += b'\x00' + str(i).encode('utf-8') + b'\x00'
-            # Essential Steam fields
+
+            data += write_int("appid", appid)
             data += write_string("AppName", s.get("AppName", ""))
             data += write_string("Exe", s.get("Exe", ""))
             data += write_string("StartDir", s.get("StartDir", ""))
             data += write_string("icon", s.get("icon", ""))
             data += write_string("LaunchOptions", s.get("LaunchOptions", ""))
-            # Default settings to make it look like a real non-steam game
             data += write_int("AllowDesktopConfig", s.get("AllowDesktopConfig", 1))
             data += write_int("AllowOverlay", s.get("AllowOverlay", 1))
             data += write_int("OpenVR", s.get("OpenVR", 0))
             data += write_int("Devkit", s.get("Devkit", 0))
-            data += b'\x08' # End of this shortcut
-        data += b'\x08\x08' # End of file
+
+            # End of this shortcut
+            data += b'\x08' 
+
+        # End of file
+        data += b'\x08\x08' 
         return data
+
+    @staticmethod
+    def _generate_appid(exe, name):
+        """Generates the unique 32-bit ID Steam uses for grid images."""
+        unique_id = exe + name
+        return binascii.crc32(unique_id.encode('utf-8')) | 0x80000000
+
+    @staticmethod
+    def set_game_cover(vdf_path, exe, name, icon_path):
+        """Copies the icon_path to the Steam grid folder with the correct ID."""
+        if not icon_path or not os.path.exists(icon_path):
+            return
+            
+        # The grid folder is in the same 'config' parent as shortcuts.vdf
+        grid_dir = vdf_path.parent / "grid"
+        grid_dir.mkdir(parents=True, exist_ok=True)
+        
+        vdf_exe = f'"{exe}"'
+        appid = SteamManager._generate_appid(vdf_exe, name)
+
+        ext = os.path.splitext(icon_path)[1] or ".png"
+
+        # Add vertical cover
+        target_vertical = grid_dir / f"{appid}p{ext}"
+        # target_horizontal = grid_dir / f"{appid}{ext}"
+        
+        try:
+            shutil.copy2(icon_path, target_vertical)
+            logging.info(f"Cover art set for {name} (ID: {appid} Path: {target_vertical})")
+        except Exception as e:
+            logging.error(f"Failed to copy cover art: {e}")
 
     @staticmethod
     def add_non_steam_game(name, exe, start_dir, icon, options=""):
         vdf_paths = SteamManager.get_shortcuts_paths()
         if not vdf_paths:
             return False
+
+        vdf_exe = f'"{exe}"'
+        vdf_start_dir = f'"{start_dir}"'
         
         for path in vdf_paths:
             existing_shortcuts = []
@@ -108,9 +153,8 @@ class SteamManager:
             found = False
             for s in existing_shortcuts:
                 if s.get("AppName") == name:
-                    # Update existing entry
-                    s["Exe"] = f'"{exe}"'
-                    s["StartDir"] = f'"{start_dir}"'
+                    s["Exe"] = vdf_exe
+                    s["StartDir"] = vdf_start_dir
                     s["icon"] = icon
                     s["LaunchOptions"] = options
                     found = True
@@ -120,14 +164,15 @@ class SteamManager:
                 # Add new entry
                 existing_shortcuts.append({
                     "AppName": name,
-                    "Exe": f'"{exe}"',
-                    "StartDir": f'"{start_dir}"',
+                    "Exe": vdf_exe,
+                    "StartDir": vdf_start_dir,
                     "icon": icon,
                     "LaunchOptions": options
                 })
             
             # Write merged data back
             binary_data = SteamManager._to_binary_vdf(existing_shortcuts)
+            SteamManager.set_game_cover(path, exe, name, icon)
             try:
                 with open(path, "wb") as f:
                     f.write(binary_data)
