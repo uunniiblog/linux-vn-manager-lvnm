@@ -1,5 +1,6 @@
 import time
 import datetime
+import psutil
 import config
 import logging
 from PySide6.QtCore import QThread, Signal
@@ -195,3 +196,35 @@ class TrackerWorker(QThread):
 
     def stop(self):
         self.running = False
+
+
+class GamescopeWorker(TrackerWorker):
+    def __init__(self, target_pid, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0):
+        # Pass None for window_id to the parent class
+        super().__init__(None, app_name, process_name, desktop_utils, refresh_interval, save_interval, afk_timer)
+        self.target_pid = target_pid
+
+    def is_window_open(self):
+        """
+        Just check if the PID is still alive.
+        """
+        try:
+            if self.target_pid and psutil.pid_exists(int(self.target_pid)):
+                return True
+            
+            # If the original PID died, check if it restarted under a new PID
+            new_pid = SystemUtils.get_pid_by_name(self.process_name)
+            if new_pid:
+                self.target_pid = new_pid
+                return True
+                
+            return False
+        except Exception as e:
+            logger.error(f"Error checking process status: {e}")
+            return False
+
+    def is_game_focused(self):
+        """
+        If the game is open, it is true
+        """
+        return True

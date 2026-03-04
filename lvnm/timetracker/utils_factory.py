@@ -1,6 +1,7 @@
 import os
 import logging
 from timetracker.kde_utils import KdeUtils
+from timetracker.gamescope_utils import GamescopeUtils
 # from timetracker.gnome_utils import GnomeUtils
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ def get_desktop_utils():
         return KdeUtils()
     elif "GAMESCOPE" in de.upper():
         logger.info("Gaming mode test")
+        return GamescopeUtils()
     elif "GNOME" in de.upper():
         logger.info("Using GnomeUtils")
         # return GnomeUtils()

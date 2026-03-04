@@ -2,6 +2,7 @@ import logging
 from PySide6.QtCore import QObject, Signal
 from timetracker.tracker_worker import TrackerWorker
 from timetracker.utils_factory import get_desktop_utils
+from timetracker.gamescope_utils import GamescopeUtils
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,14 @@ class TrackerService(QObject):
         if self.worker and self.worker.isRunning():
             self.stop_tracking()
 
-        self.worker = TrackerWorker(wid, app_name, process_name, self.desktop_utils, refresh_timer, save_interval, afk_timer)
+        if isinstance(self.desktop_utils, GamescopeUtils):
+            logger.info("Gamescope detected: Using  GamescopeWorker")
+            self.worker = GamescopeWorker(
+                wid, app_name, process_name, self.desktop_utils, 
+                refresh_timer, save_interval, afk_timer
+            )
+        else:
+            self.worker = TrackerWorker(wid, app_name, process_name, self.desktop_utils, refresh_timer, save_interval, afk_timer)
 
         if not self.worker.is_window_open():
             logger.error(f"Window '{app_name}' not found. Start the app before tracking.")
