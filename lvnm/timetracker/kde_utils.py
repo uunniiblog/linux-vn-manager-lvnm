@@ -1,10 +1,10 @@
-import dbus
 import time
 import subprocess
 import uuid
 import tempfile
 import os
 import logging
+from PySide6.QtDBus import QDBusInterface, QDBusConnection
 from timetracker.system_utils import SystemUtils
 from timetracker.desktop_utils_interface import DesktopUtilsInterface
 
@@ -12,9 +12,17 @@ logger = logging.getLogger(__name__)
 
 class KdeUtils(DesktopUtilsInterface):
     def __init__(self):
-        self.bus = dbus.SessionBus()
-        self.kwin_scripting = self.bus.get_object("org.kde.KWin", "/Scripting")
-        self.kwin_iface = dbus.Interface(self.kwin_scripting, "org.kde.kwin.Scripting")
+        self.bus = QDBusConnection.sessionBus()
+
+        self.kwin_iface = QDBusInterface(
+            "org.kde.KWin", 
+            "/Scripting", 
+            "org.kde.kwin.Scripting", 
+            self.bus
+        )
+
+        if not self.kwin_iface.isValid():
+            logger.error("Could not connect to KWin DBus interface")
 
         # Local cache to prevent redundant KWin calls
         self._window_cache = {} # Format: {id: {"name": str, "pid": str}}
@@ -55,16 +63,25 @@ class KdeUtils(DesktopUtilsInterface):
         start_time = "-2s"
         temp_path = None
         script_id = -1
+
         try:
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as tf:
                 tf.write(js_code)
                 temp_path = tf.name
 
-            script_id = self.kwin_iface.loadScript(temp_path, script_name, signature='ss')
+            msg = self.kwin_iface.call("loadScript", temp_path, script_name)
+            script_id = msg.arguments()[0]
+
             start_time = time.strftime('%Y-%m-%d %H:%M:%S')
 
-            run_obj = self.bus.get_object("org.kde.KWin", f"/Scripting/Script{script_id}")
-            dbus.Interface(run_obj, "org.kde.kwin.Script").run()
+            script_obj_path = f"/Scripting/Script{script_id}"
+            script_run_iface = QDBusInterface(
+                "org.kde.KWin", 
+                script_obj_path, 
+                "org.kde.kwin.Script", 
+                self.bus
+            )
+            script_run_iface.call("run")
 
             # Short delay
             time.sleep(0.05)
@@ -77,7 +94,7 @@ class KdeUtils(DesktopUtilsInterface):
         finally:
             if temp_path: os.remove(temp_path)
             if script_id != -1:
-                try: self.kwin_iface.unloadScript(script_name)
+                try: self.kwin_iface.call("unloadScript", script_name)
                 except: pass
 
     def get_active_window_id(self):
