@@ -1,5 +1,4 @@
 PySide6
 setproctitle
 requests
-dbus-python
 pyinstaller
