@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QGridLayout
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
 import config
 import logging
@@ -36,6 +37,7 @@ class SettingsTab(QWidget):
         
         main_layout.addWidget(self._build_settings_group())
         main_layout.addWidget(self._build_appearance_group())
+        main_layout.addWidget(self._build_timetracking_group())
         main_layout.addWidget(self._build_sysinfo_group())
         main_layout.addWidget(self._build_about_group())
         main_layout.addStretch()
@@ -201,6 +203,47 @@ class SettingsTab(QWidget):
 
         return appearance_group
 
+    def _build_timetracking_group(self):
+        timetracker_group = QGroupBox(self.tr("Timetracker"))
+        timetracker_layout = QFormLayout(timetracker_group)
+
+        tt_settings = self.user_settings.get("timetracker", {})
+
+        # Warning Message
+        warning_label = QLabel(self.tr("Timetracking only works in KDE 6 Desktop."))
+        warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
+        warning_label.setWordWrap(True)
+        timetracker_layout.addRow(warning_label)
+
+        # Enable Checkbox
+        self.timetracking_enable = QCheckBox(self.tr("Enable"))
+        self.timetracking_enable.setChecked(tt_settings.get("timetracking", False))
+        timetracker_layout.addRow(QLabel(self.tr("Enable timetracking:")), self.timetracking_enable) 
+
+        # AFK Idle Timer
+        afk_layout = QHBoxLayout()
+        self.afk_timer_edit = QLineEdit()
+        self.afk_timer_edit.setValidator(QIntValidator(0, 999))
+        self.afk_timer_edit.setFixedWidth(60)
+        self.afk_timer_edit.setText(str(tt_settings.get("afk_timer", 0)))
+        afk_layout.addWidget(self.afk_timer_edit)
+        afk_layout.addWidget(QLabel(self.tr("minutes (requires swayidle)")))
+        afk_layout.addStretch()
+        timetracker_layout.addRow(QLabel(self.tr("AFK Idle Timer:")), afk_layout)
+
+        # Periodic Save Interval
+        save_interval_layout = QHBoxLayout()
+        self.save_interval_edit = QLineEdit()
+        self.save_interval_edit.setValidator(QIntValidator(1, 999))
+        self.save_interval_edit.setFixedWidth(60)
+        self.save_interval_edit.setText(str(tt_settings.get("log_periodic_save", 0)))
+        save_interval_layout.addWidget(self.save_interval_edit)
+        save_interval_layout.addWidget(QLabel(self.tr("minutes")))
+        save_interval_layout.addStretch()
+        timetracker_layout.addRow(QLabel(self.tr("Periodic Save Interval:")), save_interval_layout)
+
+        return timetracker_group
+
     def _build_sysinfo_group(self):
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
@@ -252,6 +295,9 @@ class SettingsTab(QWidget):
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting("gamescope_enabled", bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
+        self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
+        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "afk_timer", int(t) if t else 0))
+        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "log_periodic_save", int(t) if t else 0))
 
     def _toggle_env_extra(self):
         expanded = self._extra_checkboxes[0].isVisible()

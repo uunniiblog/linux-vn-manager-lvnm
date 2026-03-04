@@ -19,6 +19,7 @@ from ui.prefix_tab import PrefixTab, CreatePrefixDialog
 from ui.console_dialog import ConsoleDialog
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
+from timetracker.tracking_controller import TrackingController
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class GameSidebar(QFrame):
     # Dictionary to track games running
     active_runners = {}
     runners = {}
+    active_trackers = {}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,6 +39,9 @@ class GameSidebar(QFrame):
         self.prefixes = None
         self.is_running = None
         self.runner = None
+
+        self.user_settings = SettingsManager()
+        self.timetracker_settings = self.user_settings.get("timetracker", {})
         
         layout = QVBoxLayout(self)
         
@@ -347,13 +352,11 @@ class GameSidebar(QFrame):
         
         game_name = self.current_game.name
         if game_name in self.active_runners:
-            # Game is running, so we stop it
+            # Game running, stop it
             self.stop_game(game_name)
-            # self.set_ui_start_state()
         else:
             # Game is not running, so we start it
             self.start_game(game_name)
-            # self.set_ui_stop_state()
 
     def stop_game(self, name):
         """
@@ -390,10 +393,18 @@ class GameSidebar(QFrame):
                 self.active_runners[name] = runner
                 self.runners[name] = runner
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
-                return True
         except Exception as e:
             logger.error(f"Failed to start {name}: {e}")
             return False
+
+        # Start tracking
+        if self.timetracker_settings.get("timetracking", False):
+            save_interval = self.timetracker_settings.get("log_periodic_save", 0)
+            afk_timer = self.timetracker_settings.get("afk_timer", 0)
+            tracking = TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
+            tracking.start_auto_tracking()
+            self.active_trackers[name] = tracking
+        return True
 
     def check_game_status(self):
         """Polls the runner to see if the game is still alive."""
@@ -645,7 +656,8 @@ class GameSidebar(QFrame):
 
         for name in finished_games:
             logging.debug(f"[Game {name} exited. Cleaning up...")
-            self.active_runners.pop(name)
+            self.active_runners.pop(name, None)
+            self.stop_tracking(name)
             # Get the actual GameCard for the game that finished
             game_to_update = GameManager.get_game(name) 
             
@@ -683,6 +695,13 @@ class GameSidebar(QFrame):
         self.is_running = False
         self.launch_btn.setText(self.tr("Start Game"))
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
+
+    def stop_tracking(self, name):
+        if self.timetracker_settings.get("timetracking", False):
+            logger.debug(f"Stopping background tracking for {name}")
+            tracker = self.active_trackers.get(name)
+            tracker.stop_tracking()
+            self.active_trackers.pop(name, None)
 
 class CoverLabel(QLabel):
     """

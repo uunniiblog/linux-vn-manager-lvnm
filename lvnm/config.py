@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = 'v0.1.0'
+VERSION = 'v0.1.1'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
@@ -12,6 +12,7 @@ PROTON_RUNNERS_DIR =  Path.home() / ".local" / "share" / "Steam" / "compatibilit
 DXVK_DIR = DATA_DIR / "runners" / "dxvk"
 PREFIXES_DIR = DATA_DIR / "prefixes"
 COVERS_DIR = DATA_DIR / "covers"
+LOG_DIR = DATA_DIR / "tracking"
 
 # Files
 CODEC_SCRIPT = BASE_DIR / "vn_winestuff" / "codec.sh"
@@ -19,6 +20,8 @@ PREFIXES_DATA = DATA_DIR / ".prefixes.json"
 GAMES_DATA = DATA_DIR / ".games.json"
 UI_SETTINGS = DATA_DIR / ".ui.config"
 USER_SETTINGS = DATA_DIR / ".userconf.json"
+LAST_PLAYED_METADATA = LOG_DIR / ".last_played.json"
+AFK_FILE = Path("/tmp/lvnm_afk_detection_file")
 
 # URLS
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
@@ -179,3 +182,4 @@ PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
 PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
 DXVK_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
