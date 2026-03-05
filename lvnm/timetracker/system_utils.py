@@ -115,13 +115,13 @@ class SystemUtils:
             name = SystemUtils.get_process_name(pid)
             
         # Stip paths
+        logger.debug(f"get_app_name_from_pid {name}")
         return ntpath.basename(name)
 
     @staticmethod
     def get_process_name(pid):
         """Returns the executable name from a PID for native applications."""
         try:
-            # Method 1: The most accurate way (resolves symlinks)
             # /proc/{pid}/exe is a symlink to the actual binary
             exe_path = os.readlink(f"/proc/{pid}/exe")
             return os.path.basename(exe_path)
@@ -129,7 +129,7 @@ class SystemUtils:
             pass
 
         try:
-            # Method 2: Fallback to reading the command line (cmdline)
+            # Fallback to reading the command line (cmdline)
             with open(f"/proc/{pid}/cmdline", "r") as f:
                 # cmdline is null-separated, take the first part
                 cmd = f.read().split('\0')[0]
