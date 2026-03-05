@@ -1,6 +1,6 @@
 import time
 import datetime
-import psutil
+import os
 import config
 import logging
 from PySide6.QtCore import QThread, Signal
@@ -209,7 +209,7 @@ class GamescopeWorker(TrackerWorker):
         Just check if the PID is still alive.
         """
         try:
-            if self.target_pid and psutil.pid_exists(int(self.target_pid)):
+            if self.target_pid and os.path.exists(f"/proc/{self.target_pid}"):
                 return True
             
             # If the original PID died, check if it restarted under a new PID
