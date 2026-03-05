@@ -38,7 +38,7 @@ class KdeUtils(DesktopUtilsInterface):
         # JS that returns ID, PID, and Name for all windows at once
         js_code = """
         workspace.windowList().forEach(w => {
-            print('DATA:' + w.internalId + '|' + w.pid + '|' + w.caption);
+            print('DATA:' + w.internalId + '|' + w.pid + '|' + w.resourceClass + '|' + w.caption);
         });
         """
 
@@ -48,11 +48,15 @@ class KdeUtils(DesktopUtilsInterface):
         for line in raw_out.splitlines():
             if "DATA:" in line:
                 try:
-                    parts = line.split("DATA:")[-1].split('|')
-                    if len(parts) >= 3:
-                        wid, pid, name = parts[0], parts[1], parts[2]
-                        new_cache[wid] = {"pid": pid, "name": name}
-                except: continue
+                    # [id, pid, class, caption]
+                    parts = line.split("DATA:")[-1].strip().split('|', 3)
+                    if len(parts) == 4:
+                        wid, pid, w_class, name = parts
+                        new_cache[wid] = {"pid": pid, "class": w_class, "name": name}
+                        logger.debug(f"KWin Cache -> WID: {wid} | PID: {pid} | CLASS: {w_class} | NAME: {name}")
+                except: 
+                    logger.error(f"Failed to parse KWin line: {line} Error: {e}")
+                    continue
 
         self._window_cache = new_cache
         self._last_cache_update = now
@@ -86,11 +90,15 @@ class KdeUtils(DesktopUtilsInterface):
             # Short delay
             time.sleep(0.05)
 
-            return subprocess.check_output([
+            journaltext = subprocess.check_output([
                 "journalctl", "--since", start_time, "--user",
                 "-u", "plasma-kwin_wayland.service",
                 "--output=cat", "-q" # -q for quiet/faster
             ], text=True)
+
+            # logger.debug(f"journaltext {journaltext}")
+
+            return journaltext
         finally:
             if temp_path: os.remove(temp_path)
             if script_id != -1:
@@ -99,6 +107,7 @@ class KdeUtils(DesktopUtilsInterface):
 
     def get_active_window_id(self):
         """ Gets current KWin ID of focused window."""
+        #logger.debug("get_active_window_id")
         js = "print('ACT:' + workspace.activeWindow.internalId);"
         out = self._run_kwin_script(js)
         for line in reversed(out.splitlines()):
@@ -107,16 +116,19 @@ class KdeUtils(DesktopUtilsInterface):
 
     def get_all_window_ids(self):
         """ Gets all windows ids"""
+        #logger.debug("get_all_window_ids")
         self._refresh_cache()
         return list(self._window_cache.keys())
 
     def get_window_name(self, wid):
         """ Gets name of a Window ID"""
+        #logger.debug("get_window_name")
         self._refresh_cache()
         return self._window_cache.get(wid, {}).get("name", "Unknown")
 
     def get_window_pid(self, wid):
         """ Gets pid of a Window ID"""
+        #logger.debug("get_window_pid")
         self._refresh_cache()
         return self._window_cache.get(wid, {}).get("pid", "0")
 
@@ -157,55 +169,36 @@ class KdeUtils(DesktopUtilsInterface):
                 return val if val != "null" else None
         return None
 
-    def find_window_by_pid(self, target_pid):
-        """Returns (window_id, window_title) for a specific PID."""
+    def find_window_by_pid(self, target_pid, target_process_path):
+        """
+        Returns (window_id, window_title) for a specific PID and process path.
+        """
         self._refresh_cache()
         target_pid = str(target_pid)
+        filename = os.path.basename(target_process_path).lower()
         
-        for wid, info in self._window_cache.items():
-            if str(info.get('pid')) == target_pid:
+        # Games opened by wine or proton have one of these three classes given by kwin
+        trusted_classes = ['gamescope', 'steam_app_default', filename]
+        
+        candidates = [
+            (wid, info) for wid, info in self._window_cache.items()
+            if info.get('class', '').lower() in trusted_classes 
+            or info.get('class', '').lower().endswith('.exe')
+        ]
+
+        # Double check in our list in case of multiple games
+        for wid, info in candidates:
+            w_pid = str(info.get('pid'))
+            
+            # First check directly by pid
+            if w_pid == target_pid:
                 return wid, info.get('name')
 
-        # If it doesn't find window by pid search by process. Useful for gamescope
-        target_exe = SystemUtils.get_exe_name_from_cmdline(target_pid)
-        #logger.debug(f'target_exe {target_exe}')
-        return self.find_window_by_process_name(target_exe)
-
-        logger.error("No match found in find_window_by_pid")
-        return None, None
-
-    def find_window_by_process_name(self, target_exe):
-        """
-        TODO: improve this shit
-        Finds the window by looking for the target_pid's presence 
-        in the command lines of window-owning processes.
-        """
-
-        self._refresh_cache()
-    
-        # Filter valid PIDs from cache
-        window_owner_pids = {
-            str(info.get('pid')) for info in self._window_cache.values() 
-            if info.get('pid') and str(info.get('pid')) not in ('0', '')
-        }
-
-        target_exe_lower = target_exe.lower()
-        bridge_pid = None
-
-        # logger.debug(f"Searching across {len(window_owner_pids)} window-owning PIDs: {window_owner_pids}")
-
-        for w_pid in window_owner_pids:
-            # logger.debug(f'w_pid {w_pid}')
+            # Second check for gamescope/wrappers
+            # If gamescope wrapper check by cmdline since gamescope passes the path of the game as argument
             w_cmdline = SystemUtils.get_full_cmdline(w_pid)
-            
-            if target_exe_lower in w_cmdline.lower():
-                bridge_pid = w_pid
-                break 
-        
-        if bridge_pid:
-            for wid, info in self._window_cache.items():
-                if str(info.get('pid')) == bridge_pid:
-                    logger.debug(f"Deep match: Found {target_exe} linked to Window '{info.get('name')}' (PID {bridge_pid})")
-                    return wid, info.get('name')
+            if filename in w_cmdline.lower():
+                logger.debug(f"Validated {filename} inside wrapper {info.get('class')}")
+                return wid, info.get('name')
 
         return None, None

@@ -27,7 +27,7 @@ class GamescopeUtils(DesktopUtilsInterface):
     def get_window_pid(self, pid_str):
         return pid_str
 
-    def find_window_by_pid(self, target_pid):
+    def find_window_by_pid(self, target_pid, target_process_path):
         try:
             process = psutil.Process(int(target_pid))
             if process.is_running():

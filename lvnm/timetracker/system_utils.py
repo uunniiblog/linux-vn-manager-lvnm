@@ -69,13 +69,12 @@ class SystemUtils:
         Extracts the filename and searches the process list.
         Matches the logic needed for Wine/Proton backslashes.
         """
-        filename = os.path.basename(process_name)
+        filename = os.path.basename(process_name).lower()
         my_pid = str(os.getpid()) # Get the PID of the tracker itself
-        logger.debug(f"my_pid {my_pid}")
         
         try:
-            # -f: search full command line
-            output = subprocess.check_output(["pgrep", "-f", filename], text=True)
+            # -f: search full command line -i: ignore case
+            output = subprocess.check_output(["pgrep", "-f", "-i", filename], text=True)
             pids = output.strip().splitlines()
             
             # Filter out our own PID so we don't track ourselves
@@ -84,17 +83,24 @@ class SystemUtils:
             if not valid_pids:
                 return None
 
-            # Priority 1: Look for the process with the Windows-style backslash (The Game)
+            # Look for the process
             for pid in reversed(valid_pids):
                 try:
-                    cmdline = Path(f"/proc/{pid}/cmdline").read_text()
-                    if "\\" in cmdline:
+                    cmdline = SystemUtils.get_full_cmdline(pid)
+                    logger.debug(f"cmdline {cmdline}, filename {filename}")
+                    if rf"\{filename}" in cmdline.lower() or rf"/{filename}" in cmdline.lower():
+                        logger.debug(f"Matched game PID: {pid} using cmdline: {cmdline[:60]}...")
                         return pid
                 except: continue
 
-            # Priority 2: Return the newest process that isn't us
+            # Return the newest process
+            logger.info(f"Fallback to newest PID: {valid_pids[-1]}")
             return valid_pids[-1]
-        except Exception:
+        except subprocess.CalledProcessError:
+            logger.debug("not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error finding PID for {process_name}: {e}")
             return None
 
     @staticmethod
@@ -157,8 +163,19 @@ class SystemUtils:
         """Extracts the filename from /proc/pid/cmdline (handles Windows and Linux paths)."""
         try:
             with open(f"/proc/{pid}/cmdline", "r") as f:
-                full_path = f.read().split('\0')[0]
-                return ntpath.basename(full_path)
+                args = f.read().split('\0')
+                logger.debug(f"PID {pid} arguments: {args}")
+
+                for arg in args:
+                    if arg.lower().endswith('.exe'):
+                        target = ntpath.basename(arg)
+                        logger.debug(f"Extracted exe target: {target}")
+                        return target
+                
+                # maybe useful at some point
+                fallback = ntpath.basename(args[0])
+                logger.debug(f"Extracted native target: {fallback}")
+                return fallback
         except:
             return None
     

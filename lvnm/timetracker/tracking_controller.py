@@ -35,7 +35,7 @@ class TrackingController(QObject):
 
         logger.debug(f"Detected PID: {pid}. Looking for KWin window...")
         
-        wid, title = utils.find_window_by_pid(pid)
+        wid, title = utils.find_window_by_pid(pid, self.target_process)
         logger.debug(f"wid {wid}, title {title}")
         
         if title and wid:

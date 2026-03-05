@@ -68,21 +68,28 @@ class ExecutionManager:
             env=final_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
+            text=False,
+            universal_newlines=False,
+            bufsize=0,
             cwd=cwd,
-            encoding='utf-8',
-            errors='replace',
             start_new_session=detached
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)
         def log_reader(pipe):
             try:
-                for line in pipe:
-                    clean_line = line.strip()
-                    logging.info(clean_line)
+                for line in iter(pipe.readline, b''):
+                    if not line: continue
+                    try:
+                        decoded_line = line.decode('ascii')
+                    except UnicodeDecodeError:
+                        try:
+                            decoded_line = line.decode('cp932')
+                        except UnicodeDecodeError:
+                            decoded_line = line.decode('utf-8', errors='replace')
+
+                    clean_line = decoded_line.strip()
+                    logger.info(clean_line)
                     if log_callback:
                         log_callback(clean_line)
             except Exception as e:
