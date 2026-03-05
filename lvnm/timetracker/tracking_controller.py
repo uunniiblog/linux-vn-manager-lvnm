@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class TrackingController(QObject):
     def __init__(self, main_window, process_path, save_interval=3, afk_timer=0):
         super().__init__()
-        self.window = main_window
+        self.window = main_window # TODO: maybe raise visual error if tracking failed
         self.tracker = TrackerService()
         self.auto_timer = None
         self.target_process = None

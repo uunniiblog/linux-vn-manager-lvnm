@@ -2,6 +2,8 @@ import logging
 import sys
 import config
 import os
+import threading
+import traceback
 from logging.handlers import RotatingFileHandler, MemoryHandler
 
 def setup_logging(level=logging.INFO):
@@ -35,4 +37,25 @@ def setup_logging(level=logging.INFO):
         ]
     )
 
+    # Log exceptions
+    sys.excepthook = handle_exception
+    threading.excepthook = handle_thread_exception
+
     logging.debug(f"Initialized at log level {level}")
+
+# Log exceptions too
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """Logs unhandled exceptions."""
+    if issubclass(exc_type, KeyboardInterrupt):
+        # Allow Ctrl+C to work normally
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logging.critical("Uncaught exception:", exc_info=(exc_type, exc_value, exc_traceback))
+
+def handle_thread_exception(args):
+    """Logs unhandled exceptions in threads."""
+    logging.critical(
+        f"Uncaught thread exception in {args.thread.name}:", 
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+    )
