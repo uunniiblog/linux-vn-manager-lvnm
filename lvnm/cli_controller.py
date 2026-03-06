@@ -31,14 +31,14 @@ class CliController(QObject):
 
             app = QCoreApplication.instance() or QCoreApplication(sys.argv)
 
-            def cleanup_and_exit(signum, frame):
-                runner.stop()
-                self.update_game(game)
+            def kill_handler(signum, frame):
+                logger.info(f"Received Signal {signum}. Forcing shutdown!")
+                self.cleanup_exit(game, runner)
                 sys.exit(0)
 
             logger.info(f"Launching {game} headless mode...")
-            signal.signal(signal.SIGINT, cleanup_and_exit)  # Ctrl+C
-            signal.signal(signal.SIGTERM, cleanup_and_exit) # Standard kill / app close
+            signal.signal(signal.SIGINT, kill_handler)  # Ctrl+C
+            signal.signal(signal.SIGTERM, kill_handler) # Standard kill / app close
 
             runner.run(is_headless=True)
 
@@ -61,18 +61,13 @@ class CliController(QObject):
             
             app.exec()
 
-            # while runner.is_running():
-            #     time.sleep(1)
-            
-            # Just in case something is still running in the background
-            runner.stop()
-            self.tracking.stop_tracking()
-            self.update_game(game)
+            # Stop stuff to properly end
+            self.cleanup_exit(game, runner)
             logger.info(f"{game} exited with code {runner.process.returncode}")
         else:
             logger.info(f"{game} is already running")
+            logging.shutdown()
 
-        logging.shutdown()
         sys.exit(0)
 
     def update_game(self, game):
@@ -80,3 +75,14 @@ class CliController(QObject):
         if game_to_update:
             game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
             GameManager.update_game(game, game_to_update.to_dict())
+
+    def cleanup_exit(self, game, runner):
+        logger.info(f"Closing {game}...")
+        
+        # Stop tracking if active
+        if hasattr(self, 'tracking') and self.tracking:
+            self.tracking.stop_tracking()
+        
+        runner.stop()
+        self.update_game(game)
+        logging.shutdown()
