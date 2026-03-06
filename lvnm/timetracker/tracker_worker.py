@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class TrackerWorker(QThread):
     log_message = Signal(str)
 
-    def __init__(self, window_id, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0):
+    def __init__(self, window_id, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0, gamescope_ses=False):
         super().__init__()
 
         self.app_name = app_name
@@ -27,7 +27,7 @@ class TrackerWorker(QThread):
             self.process_name = SystemUtils.get_app_name_from_pid(active_pid)
             logger.debug(f'self.process_name {self.process_name}')
         
-        if not self.target_window_id:
+        if not self.target_window_id and not gamescope_ses:
             logger.error(f"Could not find Application window ID for: {app_name}")
             return
 
@@ -201,7 +201,7 @@ class TrackerWorker(QThread):
 class GamescopeWorker(TrackerWorker):
     def __init__(self, target_pid, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0):
         # Pass None for window_id to the parent class
-        super().__init__(None, app_name, process_name, desktop_utils, refresh_interval, save_interval, afk_timer)
+        super().__init__(None, app_name, process_name, desktop_utils, refresh_interval, save_interval, afk_timer, gamescope_ses=True)
         self.target_pid = target_pid
 
     def is_window_open(self):

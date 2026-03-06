@@ -20,7 +20,7 @@ def get_desktop_utils():
         logger.info("Using KdeUtils")
         return KdeUtils()
     elif "GAMESCOPE" in de.upper():
-        logger.info("Gaming mode test")
+        logger.info("Using GamescopeUtils")
         return GamescopeUtils()
     elif "GNOME" in de.upper():
         logger.info("Using GnomeUtils")
