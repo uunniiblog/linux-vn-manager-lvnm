@@ -1,6 +1,6 @@
 import logging
 from PySide6.QtCore import QObject, Signal
-from timetracker.tracker_worker import TrackerWorker
+from timetracker.tracker_worker import TrackerWorker, GamescopeWorker
 from timetracker.utils_factory import get_desktop_utils
 from timetracker.gamescope_utils import GamescopeUtils
 
