@@ -338,22 +338,12 @@ class SystemUtils:
             if shutil.which(t):
                 return t
 
-    # @staticmethod
-    # def get_tool_path(tool_name: str) -> str:
-    #     """
-    #     Locates a CLI tool. Checks the AppImage/PyInstaller bundle first,
-    #     then falls back to the system PATH.
-    #     """
-    #     # Check if running inside an AppImage
-    #     appdir = os.environ.get("APPDIR")
-    #     if appdir:
-    #         bundled_path = Path(appdir) / "usr" / "bin" / "tools" / tool_name
-    #         if bundled_path.exists():
-    #             logger.debug(f"using {tool_name} bundled {bundled_path}")
-    #             return str(bundled_path)
-
-    #     logger.debug(f"using {tool_name} from system path")
-    #     return tool_name
+    @staticmethod
+    def get_session_type():
+        """x11 or wayland"""
+        session = os.environ.get("XDG_SESSION_TYPE", "x11").lower()
+        logger.debug(f"session_type {session}")
+        return session
 
     @staticmethod
     def get_tool_path(tool_name: str) -> str:

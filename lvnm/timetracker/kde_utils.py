@@ -30,6 +30,7 @@ class KdeUtils(DesktopUtilsInterface):
         self._last_cache_update = 0
         self._cache_ttl = 1.0 # Cache valid for 1 second
         self.clean_env = MainSysUtils.get_clean_env()
+        self.session_type = MainSysUtils.get_session_type()
 
     def _refresh_cache(self):
         """Fetches all window data from KWin in one single pass."""
@@ -92,10 +93,14 @@ class KdeUtils(DesktopUtilsInterface):
             # Short delay
             time.sleep(0.05)
 
+            if self.session_type == "x11":
+                unit = "plasma-kwin_x11.service"
+            else:
+                unit = "plasma-kwin_wayland.service"
+            
             journaltext = subprocess.check_output([
                 "journalctl", "--since", start_time, "--user",
-                "-u", "plasma-kwin_wayland.service",
-                "--output=cat", "-q" # -q for quiet/faster
+                "-u", unit, "--output=cat", "-q" # -q for quiet/faster
             ], text=True, env=self.clean_env)
 
             # logger.debug(f"journaltext {journaltext}")
