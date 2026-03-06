@@ -5,8 +5,9 @@ import tempfile
 import os
 import logging
 from PySide6.QtDBus import QDBusInterface, QDBusConnection
-from timetracker.system_utils import SystemUtils
+from timetracker.system_utils import SystemUtils as TimeTrackUtils
 from timetracker.desktop_utils_interface import DesktopUtilsInterface
+from system_utils import SystemUtils as MainSysUtils
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class KdeUtils(DesktopUtilsInterface):
         self._window_cache = {} # Format: {id: {"name": str, "pid": str}}
         self._last_cache_update = 0
         self._cache_ttl = 1.0 # Cache valid for 1 second
+        self.clean_env = MainSysUtils.get_clean_env()
 
     def _refresh_cache(self):
         """Fetches all window data from KWin in one single pass."""
@@ -94,7 +96,7 @@ class KdeUtils(DesktopUtilsInterface):
                 "journalctl", "--since", start_time, "--user",
                 "-u", "plasma-kwin_wayland.service",
                 "--output=cat", "-q" # -q for quiet/faster
-            ], text=True)
+            ], text=True, env=self.clean_env)
 
             # logger.debug(f"journaltext {journaltext}")
 
@@ -196,7 +198,7 @@ class KdeUtils(DesktopUtilsInterface):
 
             # Second check for gamescope/wrappers
             # If gamescope wrapper check by cmdline since gamescope passes the path of the game as argument
-            w_cmdline = SystemUtils.get_full_cmdline(w_pid)
+            w_cmdline = TimeTrackUtils.get_full_cmdline(w_pid)
             if filename in w_cmdline.lower():
                 logger.debug(f"Validated {filename} inside wrapper {info.get('class')}")
                 return wid, info.get('name')
