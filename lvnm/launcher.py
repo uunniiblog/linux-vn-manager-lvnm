@@ -62,8 +62,9 @@ def main():
         controller = CliController()
         controller.handle_args(args)
     
+    exit_code = app.exec()
     logging.shutdown()
-    sys.exit(app.exec())
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()
