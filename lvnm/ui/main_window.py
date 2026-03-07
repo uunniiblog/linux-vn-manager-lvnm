@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(GameTab())
         self.content_stack.addWidget(PrefixTab())
         self.content_stack.addWidget(RunnerTab())
-        self.content_stack.addWidget(StatsTab())
+        self.content_stack.addWidget(StatsTab(self.theme_manager))
         self.content_stack.addWidget(SettingsTab(self.theme_manager))
 
         # Add widgets to the splitter

@@ -1,7 +1,10 @@
 from PySide6.QtGui import QGuiApplication, Qt
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Signal
 
-class ThemeManager:
+class ThemeManager(QObject):
+
+    theme_changed = Signal()
 
     BASE_STYLE = """
     /* ── Root surfaces ─────────────────────────────────────────── */
@@ -350,6 +353,7 @@ class ThemeManager:
     }
 
     def __init__(self, settings):
+        super().__init__()
         self.settings = settings
         # Connect to system changes
         QGuiApplication.styleHints().colorSchemeChanged.connect(self.update_theme)
@@ -375,6 +379,8 @@ class ThemeManager:
             if isinstance(widget, MainWindow):
                 widget.update_sidebar_font()
                 break
+
+        self.theme_changed.emit()
 
     def get_theme_mode(self):
         """Returns 'light', 'dark', or 'auto' based on settings."""
