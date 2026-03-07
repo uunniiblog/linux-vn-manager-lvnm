@@ -1,67 +1,80 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, 
-                               QPushButton, QLabel, QTabWidget, QApplication)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
+                               QPushButton, QLabel, QTabWidget)
+from PySide6.QtCharts import (QChart, QChartView, QBarSeries, QBarSet,
+                               QBarCategoryAxis, QValueAxis,
+                               QHorizontalBarSeries)
+from PySide6.QtGui import QIcon, QColor, QPainter, QFont
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.dates as mdates
-import matplotlib.ticker as ticker
-from datetime import datetime
-import logging
-logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+
 from timetracker.log_manager import LogManager
 import config
 
-# Configure Japanese/CJK support
-matplotlib.rcParams['font.sans-serif'] = [
-    'Noto Sans CJK JP', 'WenQuanYi Micro Hei', 'IPAexGothic', 
-    'Droid Sans Fallback', 'DejaVu Sans', 'sans-serif'
-]
-matplotlib.rcParams['axes.unicode_minus'] = False
 
 class StatsTab(QWidget):
     def __init__(self, theme_manager=None):
         super().__init__()
         self.theme_manager = theme_manager
-        self.theme_manager.theme_changed.connect(self.refresh_data)
+        if self.theme_manager:
+            self.theme_manager.theme_changed.connect(self.refresh_data)
         self.log_manager = LogManager(config.LOG_DIR)
-        
+
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.tabs = QTabWidget()
         self.main_layout.addWidget(self.tabs)
-        
+
         self.setup_individual_tab()
         self.setup_global_tab()
         self.refresh_data()
 
     def get_theme_colors(self):
-        """Fetches colors from your ThemeManager or defaults based on lightness."""
-        is_dark = self.theme_manager.is_dark() or False          
-
+        is_dark = self.theme_manager.is_dark() if self.theme_manager else True
         if is_dark:
             return {
-                'bg': "#1e1e1e",
-                'text': "#cccccc",
-                'border': "#3f3f46",
-                'accent': "#3498db",
-                'accent_global': "#e67e22",
-                'highlight': "#f1c40f",
-                'muted': "#888888"
+                'bg': QColor("#1e1e1e"),
+                'text': QColor("#cccccc"),
+                'border': QColor("#3f3f46"),
+                'accent': QColor("#3498db"),
+                'accent_global': QColor("#e67e22"),
+                'highlight': QColor("#f1c40f"),
+                'muted': QColor("#888888"),
+                'grid': QColor("#2d2d2d"),
             }
         else:
             return {
-                'bg': "#ffffff",
-                'text': "#1e1e1e",
-                'border': "#d0d0d0",
-                'accent': "#005a9e",
-                'accent_global': "#d35400",
-                'highlight': "#005a9e",
-                'muted': "#666666"
+                'bg': QColor("#ffffff"),
+                'text': QColor("#1e1e1e"),
+                'border': QColor("#d0d0d0"),
+                'accent': QColor("#005a9e"),
+                'accent_global': QColor("#d35400"),
+                'highlight': QColor("#005a9e"),
+                'muted': QColor("#666666"),
+                'grid': QColor("#eeeeee"),
             }
+
+    def _style_chart(self, chart):
+        """Apply theme colors to a QChart."""
+        colors = self.get_theme_colors()
+        chart.setBackgroundBrush(colors['bg'])
+        chart.setBackgroundRoundness(0)
+        chart.setPlotAreaBackgroundBrush(colors['bg'])
+        chart.setPlotAreaBackgroundVisible(True)
+
+        title_font = QFont()
+        title_font.setPointSize(9)
+        chart.setTitleFont(title_font)
+        chart.setTitleBrush(colors['text'])
+        chart.legend().setVisible(False)
+
+    def _style_axis(self, axis, colors):
+        """Apply theme colors to any QAbstractAxis."""
+        axis.setLabelsBrush(colors['text'])
+        axis.setLinePen(colors['border'])
+        axis.setGridLinePen(colors['grid'])
+        labels_font = QFont()
+        labels_font.setPointSize(8)
+        axis.setLabelsFont(labels_font)
 
     def setup_individual_tab(self):
         tab = QWidget()
@@ -73,36 +86,23 @@ class StatsTab(QWidget):
         self.app_combo.currentIndexChanged.connect(self.update_graph)
         controls.addWidget(self.app_combo, stretch=1)
 
-        refresh_btn = QPushButton()
-        refresh_btn.setIcon(QIcon.fromTheme("view-refresh"))
-        refresh_btn.setFixedSize(30, 30)
-        refresh_btn.setObjectName("refreshBtn")
-        refresh_btn.setStyleSheet("""
-            QPushButton#refreshBtn {
-                background-color: #3c3c3c;
-                border: 1px solid #555555;
-                border-radius: 4px;
-            }
-            QPushButton#refreshBtn:hover {
-                background-color: #505050;
-                border-color: #777777;
-            }
-            QPushButton#refreshBtn:pressed {
-                background-color: #2a2a2a;
-            }
-        """)
-        refresh_btn.clicked.connect(self.refresh_data)
-        controls.addWidget(refresh_btn)
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setIcon(QIcon.fromTheme("view-refresh"))
+        self.refresh_btn.setFixedSize(30, 30)
+        self.refresh_btn.clicked.connect(self.refresh_data)
+        controls.addWidget(self.refresh_btn)
         layout.addLayout(controls)
 
         self.info_label = QLabel("Total Playtime: 0h 0m")
         self.info_label.setStyleSheet("font-size: 13px; font-weight: bold;")
         layout.addWidget(self.info_label)
 
-        self.figure, self.ax = plt.subplots(figsize=(5, 3))
-        self.canvas = FigureCanvas(self.figure)
-        layout.addWidget(self.canvas, stretch=1)
-        
+        self.ind_chart = QChart()
+        self.ind_chart.setMargins(__import__('PySide6.QtCore', fromlist=['QMargins']).QMargins(10, 10, 10, 10))
+        self.ind_chart_view = QChartView(self.ind_chart)
+        self.ind_chart_view.setRenderHint(QPainter.Antialiasing)
+        layout.addWidget(self.ind_chart_view, stretch=1)
+
         self.tabs.addTab(tab, self.tr("Individual App"))
 
     def setup_global_tab(self):
@@ -122,70 +122,100 @@ class StatsTab(QWidget):
         self.summary_info.setStyleSheet("font-size: 13px; font-weight: bold;")
         layout.addWidget(self.summary_info)
 
-        self.global_figure, self.global_ax = plt.subplots(figsize=(6, 4))
-        self.global_canvas = FigureCanvas(self.global_figure)
-        layout.addWidget(self.global_canvas, stretch=1)
+        self.global_chart = QChart()
+        self.global_chart.setMargins(__import__('PySide6.QtCore', fromlist=['QMargins']).QMargins(10, 10, 10, 10))
+        self.global_chart_view = QChartView(self.global_chart)
+        self.global_chart_view.setRenderHint(QPainter.Antialiasing)
+        layout.addWidget(self.global_chart_view, stretch=1)
 
         self.tabs.addTab(tab, self.tr("Global Summary"))
 
     def render_canvas(self, daily_data):
         colors = self.get_theme_colors()
-        
-        self.ax.clear()
-        self.figure.patch.set_facecolor(colors['bg'])
-        self.ax.set_facecolor(colors['bg'])
-        
-        self.ax.tick_params(axis='both', colors=colors['text'], labelsize=8)
-        self.ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f"{x:.1f}h"))
-        
-        for spine in self.ax.spines.values():
-            spine.set_color(colors['border'])
+        chart = self.ind_chart
+        chart.removeAllSeries()
+        for axis in chart.axes():
+            chart.removeAxis(axis)
 
-        self.info_label.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {colors['accent']};")
+        self._style_chart(chart)
+        self.info_label.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {colors['accent'].name()};")
 
-        if daily_data:
-            sorted_dates = sorted(daily_data.keys())
-            plot_hours = [daily_data[d] for d in sorted_dates]
-            self.ax.bar(sorted_dates, plot_hours, color=colors['accent'], width=0.6)
-            
-            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-            self.ax.xaxis.set_major_locator(mdates.DayLocator())
-            self.figure.autofmt_xdate()
-        else:
-            self.ax.text(0.5, 0.5, self.tr("No data available"), color=colors['muted'], 
-                         ha='center', va='center', transform=self.ax.transAxes)
+        if not daily_data:
+            chart.setTitle(self.tr("No data available"))
+            return
 
-        self.canvas.draw()
+        chart.setTitle("")
+        sorted_dates = sorted(daily_data.keys())
+        bar_set = QBarSet("")
+        bar_set.setColor(colors['accent'])
+        bar_set.setBorderColor(colors['accent'])
+
+        for d in sorted_dates:
+            bar_set.append(daily_data[d])
+
+        series = QBarSeries()
+        series.append(bar_set)
+        series.setBarWidth(0.6)
+        chart.addSeries(series)
+
+        # X axis - dates
+        categories = [d.strftime('%b %d') for d in sorted_dates]
+        axis_x = QBarCategoryAxis()
+        axis_x.append(categories)
+        self._style_axis(axis_x, colors)
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
+
+        # Y axis - hours
+        max_h = max(daily_data.values()) if daily_data else 1
+        axis_y = QValueAxis()
+        axis_y.setRange(0, max_h * 1.15)
+        axis_y.setLabelFormat("%.1fh")
+        self._style_axis(axis_y, colors)
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
 
     def render_global_canvas(self, labels, hours):
         colors = self.get_theme_colors()
-        
-        self.global_ax.clear()
-        self.global_figure.patch.set_facecolor(colors['bg'])
-        self.global_ax.set_facecolor(colors['bg'])
+        chart = self.global_chart
+        chart.removeAllSeries()
+        for axis in chart.axes():
+            chart.removeAxis(axis)
 
-        self.summary_info.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {colors['accent_global']};")
-        
-        if labels:
-            bars = self.global_ax.barh(labels, hours, color=colors['accent_global'], height=0.7)
-            
-            for bar in bars:
-                width = bar.get_width()
-                self.global_ax.text(width + 0.05, bar.get_y() + bar.get_height()/2, 
-                                    f' {width:.1f}h', 
-                                    va='center', color=colors['highlight'], fontsize=10, fontweight='bold')
+        self._style_chart(chart)
+        self.summary_info.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {colors['accent_global'].name()};")
 
-            max_h = max(hours) if hours else 1
-            self.global_ax.set_xlim(0, max_h * 1.25)
-            
-            self.global_ax.tick_params(axis='y', colors=colors['text'], labelsize=8)
-            self.global_ax.tick_params(axis='x', colors=colors['muted'], labelsize=8)
-            self.global_figure.subplots_adjust(left=0.4, right=0.95, top=0.95, bottom=0.1)
-        else:
-             self.global_ax.text(0.5, 0.5, self.tr("No data available"), color=colors['muted'], 
-                         ha='center', va='center', transform=self.global_ax.transAxes)
-        
-        self.global_canvas.draw()
+        if not labels:
+            chart.setTitle(self.tr("No data available"))
+            return
+
+        chart.setTitle("")
+        bar_set = QBarSet("")
+        bar_set.setColor(colors['accent_global'])
+        bar_set.setBorderColor(colors['accent_global'])
+        for h in hours:
+            bar_set.append(h)
+
+        series = QHorizontalBarSeries()
+        series.append(bar_set)
+        series.setBarWidth(0.7)
+        chart.addSeries(series)
+
+        # Y axis - app labels
+        axis_y = QBarCategoryAxis()
+        axis_y.append(labels)
+        self._style_axis(axis_y, colors)
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
+
+        # X axis - hours
+        max_h = max(hours) if hours else 1
+        axis_x = QValueAxis()
+        axis_x.setRange(0, max_h * 1.25)
+        axis_x.setLabelFormat("%.1fh")
+        self._style_axis(axis_x, colors)
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
 
     def refresh_data(self):
         self.app_combo.blockSignals(True)
@@ -226,7 +256,7 @@ class StatsTab(QWidget):
         for app, seconds, title in top_data:
             clean_title = title.split(' — ')[0] if ' — ' in title else title
             if len(clean_title) > 30: clean_title = clean_title[:27] + "..."
-            display_labels.append(f"{app.upper()}\n({clean_title})")
+            display_labels.append(f"{app.upper()} ({clean_title})")
 
         hours = [item[1] / 3600 for item in top_data]
         self.render_global_canvas(display_labels, hours)
