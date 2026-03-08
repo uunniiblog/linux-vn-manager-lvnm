@@ -96,6 +96,7 @@ class TrackerWorker(QThread):
             SystemUtils.start_afk_daemon(self.afk_timer)
 
         was_afk = False
+        is_afk = False
 
         last_tick = time.monotonic()
         last_log_update = last_tick
@@ -114,28 +115,28 @@ class TrackerWorker(QThread):
             last_tick = now
             accumulator += delta
 
-            # AFK check
-            is_afk, idle_time = SystemUtils.get_afk_status()
-
-            if is_afk and not was_afk:
-                self.log_message.emit("Status: AFK (Tracking paused)")
-                was_afk = True
-            elif not is_afk and was_afk:
-                self.log_message.emit("Status: Resumed (Back from AFK)")
-                was_afk = False
-
             # Existence Check (Every 4.5 seconds)
-            # if now - last_existence_check >= 4.5:
-            #     is_open = self.is_window_open()
+            if now - last_existence_check >= 4.5:
+                #is_open = self.is_window_open()
                 
-            #     if window_currently_open and not is_open:
-            #         logger.debug(f"'{self.process_name}' closed. Waiting for restart...")
-            #         window_currently_open = False
-            #     elif not window_currently_open and is_open:
-            #         logger.debug(f"'{self.process_name}' detected again with new ID {self.target_window_id}. Resuming tracking.")
-            #         window_currently_open = True
+                # if window_currently_open and not is_open:
+                #     logger.debug(f"'{self.process_name}' closed. Waiting for restart...")
+                #     window_currently_open = False
+                # elif not window_currently_open and is_open:
+                #     logger.debug(f"'{self.process_name}' detected again with new ID {self.target_window_id}. Resuming tracking.")
+                #     window_currently_open = True
 
-            #     last_existence_check = now
+                # AFK check
+                is_afk, idle_time = SystemUtils.get_afk_status()
+
+                if is_afk and not was_afk:
+                    logger.debug("Status: AFK (Tracking paused)")
+                    was_afk = True
+                elif not is_afk and was_afk:
+                    logger.debug("Status: Resumed (Back from AFK)")
+                    was_afk = False
+
+                last_existence_check = now
                 
             # Increment timer every second if focused and not AFK
             if accumulator >= 1.0:
