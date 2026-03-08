@@ -55,7 +55,7 @@ def main():
     # Launch UI
     if not args.run:
         logger = logging.getLogger(__name__)
-        logger.debug(SystemUtils.print_diagnostic_report())
+        SystemUtils.print_diagnostic_report()
         window = MainWindow()
         window.show()
     else:

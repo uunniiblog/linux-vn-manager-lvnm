@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
-                               QPushButton, QLabel, QTabWidget)
+                               QPushButton, QLabel, QTabWidget, QToolTip)
 from PySide6.QtCharts import (QChart, QChartView, QBarSeries, QBarSet,
                                QBarCategoryAxis, QValueAxis,
                                QHorizontalBarSeries)
-from PySide6.QtGui import QIcon, QColor, QPainter, QFont
+from PySide6.QtGui import QIcon, QColor, QPainter, QFont, QCursor
 from PySide6.QtCore import Qt
 
 from timetracker.log_manager import LogManager
@@ -89,6 +89,21 @@ class StatsTab(QWidget):
         self.refresh_btn = QPushButton()
         self.refresh_btn.setIcon(QIcon.fromTheme("view-refresh"))
         self.refresh_btn.setFixedSize(30, 30)
+        self.refresh_btn.setObjectName("refreshBtn")
+        self.refresh_btn.setStyleSheet("""
+            QPushButton#refreshBtn {
+                background-color: #3c3c3c;
+                border: 1px solid #555555;
+                border-radius: 4px;
+            }
+            QPushButton#refreshBtn:hover {
+                background-color: #505050;
+                border-color: #777777;
+            }
+            QPushButton#refreshBtn:pressed {
+                background-color: #2a2a2a;
+            }
+        """)
         self.refresh_btn.clicked.connect(self.refresh_data)
         controls.addWidget(self.refresh_btn)
         layout.addLayout(controls)
@@ -175,7 +190,7 @@ class StatsTab(QWidget):
         chart.addAxis(axis_y, Qt.AlignLeft)
         series.attachAxis(axis_y)
 
-    def render_global_canvas(self, labels, hours):
+    def render_global_canvas(self, labels, hours, full_titles):
         colors = self.get_theme_colors()
         chart = self.global_chart
         chart.removeAllSeries()
@@ -201,6 +216,10 @@ class StatsTab(QWidget):
         series.setBarWidth(0.7)
         chart.addSeries(series)
 
+        # Tooltip
+        self._full_titles = full_titles
+        series.hovered.connect(self.show_tooltip)
+
         # Y axis - app labels
         axis_y = QBarCategoryAxis()
         axis_y.append(labels)
@@ -216,6 +235,14 @@ class StatsTab(QWidget):
         self._style_axis(axis_x, colors)
         chart.addAxis(axis_x, Qt.AlignBottom)
         series.attachAxis(axis_x)
+
+    def show_tooltip(self, status, index):
+        if status:
+            label = self._full_titles[index]
+            # Show tooltip at the current mouse position
+            QToolTip.showText(QCursor.pos(), label, self.global_chart_view)
+        else:
+            QToolTip.hideText()
 
     def refresh_data(self):
         self.app_combo.blockSignals(True)
@@ -253,10 +280,20 @@ class StatsTab(QWidget):
         top_data = data[:15]
         top_data.reverse()
         display_labels = []
+        full_titles = [] # tooltip
+        hours = []
+
         for app, seconds, title in top_data:
             clean_title = title.split(' — ')[0] if ' — ' in title else title
-            if len(clean_title) > 30: clean_title = clean_title[:27] + "..."
-            display_labels.append(f"{app.upper()} ({clean_title})")
+            full_titles.append(f"{app.upper()}\n{clean_title}")
+            
+            # Truncate
+            if len(clean_title) > 25:
+                display_title = clean_title[:22] + "..."
+            else:
+                display_title = clean_title
+            
+            display_labels.append(f"{app.upper()} ({display_title})")
+            hours.append(seconds / 3600)
 
-        hours = [item[1] / 3600 for item in top_data]
-        self.render_global_canvas(display_labels, hours)
+        self.render_global_canvas(display_labels, hours, full_titles)

@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler, MemoryHandler
 
 def setup_logging(level=logging.INFO):
     log_level = getattr(logging, level.upper(), logging.INFO)
-    log_format = "%(asctime)s - [%(levelname)s] - %(message)s"
+    log_format = "%(asctime)s - [%(levelname)s] - %(module)s - %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
     log_path = config.DATA_DIR / "timetracker_test.log"
