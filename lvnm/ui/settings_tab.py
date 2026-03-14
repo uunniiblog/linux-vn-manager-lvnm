@@ -210,7 +210,7 @@ class SettingsTab(QWidget):
         tt_settings = self.user_settings.get("timetracker", {})
 
         # Warning Message
-        warning_label = QLabel(self.tr("Timetracking only works in KDE 6 Desktop."))
+        warning_label = QLabel(self.tr("Timetracking only works in KDE 6 Desktop and Gamescope session."))
         warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
         warning_label.setWordWrap(True)
         timetracker_layout.addRow(warning_label)

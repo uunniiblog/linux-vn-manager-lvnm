@@ -138,7 +138,7 @@ class GameSidebar(QFrame):
         self.prefix_warning.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.edit_vndb = QLineEdit()
-        self.edit_vndb.setPlaceholderText("vndb id example: v11")
+        self.edit_vndb.setPlaceholderText("v11")
         self.edit_umu_store = QLineEdit()
         self.edit_umu_id = QLineEdit()
         self.label_umu_store = QLabel(self.tr("UMU Store:"))
@@ -188,6 +188,8 @@ class GameSidebar(QFrame):
 
         # Save & Cancel (Right side)
         self.save_btn = QPushButton(self.tr("Save"))
+        self.save_btn.setMinimumWidth(100)
+        self.save_btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         self.save_btn.clicked.connect(self.save_data)
 
         self.cancel_btn = QPushButton(self.tr("Cancel"))
@@ -221,6 +223,9 @@ class GameSidebar(QFrame):
         Loaded from GameTab with the data of the game selected
         """
         self.current_game = card
+
+        # Don't preload from global settings in existing game load
+        self._create_mode_defaults = None
 
         self.launch_btn.setVisible(True)
 
@@ -328,17 +333,14 @@ class GameSidebar(QFrame):
         # Default visibility (UMU hidden for new entries until prefix is picked)
         self.update_umu_visibility("wine")
 
-        # --- Apply Global Winetricks/Env Var Defaults ---
-        # We look at the 'global_env_var' dict from settings and find matches in config.ENV_VARIABLES
-        global_env_var = user_settings.get("global_env_var", {})
-        
-        # Create a temp dict to simulate active env vars for the refresh method
+        # Apply Global Winetricks/Env Var Defaults
+        global_env_var = user_settings.get("global_env_var", {})        
         default_env_vars = {}
         
         # match keys
         for var in config.ENV_VARIABLES:
             var_id = var.get("id")
-            if global_env_var.get(var_id): # If its true in settings
+            if global_env_var.get(var_id):
                 default_env_vars[var["key"]] = var["value"]
 
         self._create_mode_defaults = default_env_vars
@@ -355,7 +357,7 @@ class GameSidebar(QFrame):
             # Game running, stop it
             self.stop_game(game_name)
         else:
-            # Game is not running, so we start it
+            # Game is not running, start it
             self.start_game(game_name)
 
     def stop_game(self, name):
@@ -373,18 +375,12 @@ class GameSidebar(QFrame):
                     prefix_count += 1
             runner.stop(prefix_count)
 
-            # dont update last played timer here, let check_active_runners handle it
-            # self.active_runners.pop(name, None)
-            # self.current_game.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-            # update = self.current_game.to_dict()
-            # GameManager.update_game(self.current_game.name, update)
-
     def start_game(self, name):
         """Initializes the runner and starts the process."""
 
         # Avoid launching same game multiple times
         if name in self.active_runners:
-            logger.debug(f"[Debug] {name} is already running. Ignoring launch request.")
+            logger.info(f"{name} is already running. Ignoring launch request.")
             return False
 
         try:
@@ -404,6 +400,7 @@ class GameSidebar(QFrame):
             tracking = TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
             tracking.start_auto_tracking()
             self.active_trackers[name] = tracking
+
         return True
 
     def check_game_status(self):
@@ -419,7 +416,7 @@ class GameSidebar(QFrame):
             self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
 
     def browse_path(self):
-        # Create the dialog instance
+        """File system browser"""
         dialog = QFileDialog(self)
         dialog.setWindowTitle(self.tr("Select Game Executable"))
 
@@ -536,7 +533,7 @@ class GameSidebar(QFrame):
         
         # Change to "Saved!"
         self.save_btn.setText(self.tr("Saved!"))
-        self.save_btn.setStyleSheet("background-color: #4caf50; color: white; font-weight: bold;")
+        self.save_btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         self.save_btn.setEnabled(False) # Prevent double-clicking
         
         # Revert after 1.5 seconds
@@ -681,11 +678,6 @@ class GameSidebar(QFrame):
             # If the game is running but the button doesn't say "Stop Game", fix it
             if is_running and current_text != self.tr("Stop Game"):
                 self.set_ui_stop_state()
-                
-            # dont think this can ever happen
-            # If the game is NOT running but the button doesn't say "Start Game", fix it
-            # elif not is_running and current_text != self.tr("Start Game"):
-            #     self.set_ui_start_state()
             
     def set_ui_stop_state(self):
         self.launch_btn.setText(self.tr("Stop Game"))
@@ -718,9 +710,8 @@ class CoverLabel(QLabel):
         # No artificial maximum — let the layout + resizeEvent cap it
         self.setMaximumSize(16_777_215, 16_777_215)
 
-        # Expanding horizontally so it fills the HBoxLayout column;
-        # Preferred vertically so the layout uses heightForWidth instead of
-        # over-allocating space.
+        # Expanding horizontally so it fills the HBoxLayout column
+        # Preferred vertically so the layout uses heightForWidth instead of over-allocating space.
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.setStyleSheet("""
@@ -729,8 +720,7 @@ class CoverLabel(QLabel):
             border: 0px solid #444;
         """)
 
-    # ── aspect-ratio plumbing ──────────────────────────────────────────────────
-
+    # aspect-ratio plumbing
     def hasHeightForWidth(self) -> bool:
         """Tell Qt: my height depends on my width (aspect ratio)."""
         return (
@@ -751,8 +741,7 @@ class CoverLabel(QLabel):
             return QSize(w, self.heightForWidth(w))
         return super().sizeHint()
 
-    # ── pixmap management ─────────────────────────────────────────────────────
-
+    # pixmap management
     def set_pixmap_from_path(self, path):
         if path:
             self.original_pixmap = QPixmap(path)
