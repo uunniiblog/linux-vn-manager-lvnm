@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class LogManager:
-    def __init__(self, log_dir):
+    def __init__(self, log_dir=config.LOG_DIR):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.header = "Timestamp_Start;Timestamp_End;Duration;ActiveTime;App;Title;Status;Tags\n"
@@ -279,3 +279,9 @@ class LogManager:
         # Return list of tuples: (app_name, total_seconds, latest_title), sorted by total_seconds
         sorted_data = sorted(summary.items(), key=lambda x: x[1], reverse=True)
         return [(app, seconds, titles.get(app, app)) for app, seconds in sorted_data]
+
+    def get_process_name_from_path(self, path):
+        """Extracts 'Game.exe' from '/path/to/Game.exe'"""
+        if not path:
+            return ""
+        return os.path.basename(path)

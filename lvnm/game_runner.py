@@ -27,7 +27,7 @@ class GameRunner:
         self.env: dict = {}
         self.cmd: list = []
         self.is_steam = is_steam
-        self.logs = deque(maxlen=10000)
+        self.logs = deque(maxlen=2000)
         
         # Track running
         self.process = None 

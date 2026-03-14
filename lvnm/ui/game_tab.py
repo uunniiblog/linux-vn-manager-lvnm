@@ -3,10 +3,11 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
     QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
-    QPushButton, QComboBox, QFileDialog, QDialog, QApplication
+    QPushButton, QComboBox, QFileDialog, QDialog, QApplication,
+    QMenu
 )
 from PySide6.QtCore import Qt, QSettings, QByteArray
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QAction, QActionGroup
 from game_manager import GameManager
 from game_runner import GameRunner
 from prefix_manager import PrefixManager
@@ -14,6 +15,7 @@ from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
 from model.game_card import GameCard
 from settings_manager import SettingsManager
+from timetracker.log_manager import LogManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +55,40 @@ class GameTab(QWidget):
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self.search_shortcut.activated.connect(self.search_bar.setFocus)
 
+       # Sort Menu Button 
+        self.btn_sort = QPushButton(self.tr("Sort by"))
+        self.sort_menu = QMenu(self.btn_sort)
+        self.sort_action_group = QActionGroup(self)
+        self.sort_action_group.setExclusive(True)
+
+        sort_options = [
+            (self.tr("Latest Played"), "latest"),
+            (self.tr("Total Playtime"), "playtime"),
+            (self.tr("Prefix"), "prefix"),
+            (self.tr("Name"), "name")
+        ]
+
+        # Load saved sort
+        saved_sort = self.user_settings.get("list_sort_by", "latest")
+        for text, data in sort_options:
+            action = QAction(text, self.btn_sort)
+            action.setCheckable(True)
+            action.setData(data)
+            
+            if data == saved_sort:
+                action.setChecked(True)
+                
+            self.sort_menu.addAction(action)
+            self.sort_action_group.addAction(action)
+
+        # Attach the menu to the button
+        self.btn_sort.setMenu(self.sort_menu)
+        self.sort_action_group.triggered.connect(self.on_sort_changed)
+
         # Add to layout
         top_controls_layout.addWidget(self.btn_run_in_prefix)
         top_controls_layout.addWidget(self.search_bar, stretch=1)
+        top_controls_layout.addWidget(self.btn_sort)
         list_layout.addLayout(top_controls_layout)
 
         # Mid layout: Game list
@@ -106,6 +139,12 @@ class GameTab(QWidget):
             self.zoom = new_zoom
             self.refresh_list()
 
+    def on_sort_changed(self, action):
+        """Saves the sort preference and refreshes the list"""
+        sort_data = action.data()
+        self.user_settings.set("list_sort_by", sort_data)
+        self.refresh_list()
+
     def update_item_metadata(self, game_name):
         """Updates only the widget of a specific game without reloading the whole list."""
         for i in range(self.game_list.count()):
@@ -134,10 +173,29 @@ class GameTab(QWidget):
         query = self.search_bar.text() if hasattr(self, 'search_bar') else None
         games_dict = GameManager.list_games(name_query=query)
         game_cards = list(games_dict.values())
-        game_cards.sort(
-            key=lambda card: card.last_played if card.last_played else "0000-00-00 00:00:00", 
-            reverse=True
-        )
+
+        # Sort
+        sort_pref = self.user_settings.get("list_sort_by", "latest")
+        if sort_pref == "name":
+            # Alphabetical by name
+            game_cards.sort(key=lambda card: card.name.lower())
+        elif sort_pref == "prefix":
+            # Alphabetical by prefix, then by name
+            game_cards.sort(key=lambda card: (card.prefix.lower(), card.name.lower()))
+        elif sort_pref == "playtime":
+            # Sort by total playtime
+            log_mgr = LogManager()
+            playtime_cache = {}            
+            for card in game_cards:
+                exe_name = log_mgr.get_process_name_from_path(card.path) if card.path else ""
+                playtime_cache[card.name] = log_mgr.get_total_app_playtime(exe_name)
+            game_cards.sort(key=lambda card: playtime_cache[card.name], reverse=True)
+        else:
+            # Default: Latest Played
+            game_cards.sort(
+                key=lambda card: card.last_played if card.last_played else "0000-00-00 00:00:00", 
+                reverse=True
+            )
         
         for card in game_cards:
             item = QListWidgetItem(self.game_list)

@@ -46,3 +46,5 @@ class TrackerService(QObject):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.worker.wait()
+            self.worker.deleteLater()
+            self.worker = None

@@ -1,5 +1,6 @@
 import config
 import urllib.parse
+import gc
 import logging
 from datetime import datetime
 from PySide6.QtWidgets import (
@@ -653,8 +654,15 @@ class GameSidebar(QFrame):
 
         for name in finished_games:
             logging.debug(f"[Game {name} exited. Cleaning up...")
-            self.active_runners.pop(name, None)
+            runner = self.active_runners.pop(name, None)
             self.stop_tracking(name)
+            
+            if runner:
+                self.runners[name] = runner.get_full_log()
+                runner.logs.clear()
+                runner = None
+                gc.collect()
+
             # Get the actual GameCard for the game that finished
             game_to_update = GameManager.get_game(name) 
             

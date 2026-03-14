@@ -49,11 +49,13 @@ class MainWindow(QMainWindow):
 
         # RIGHT CONTENT AREA
         self.content_stack = QStackedWidget()
-        self.content_stack.addWidget(GameTab())
-        self.content_stack.addWidget(PrefixTab())
-        self.content_stack.addWidget(RunnerTab())
-        self.content_stack.addWidget(StatsTab(self.theme_manager))
-        self.content_stack.addWidget(SettingsTab(self.theme_manager))
+        for _ in range(5):
+            self.content_stack.addWidget(QWidget())
+        # self.content_stack.addWidget(GameTab())
+        # self.content_stack.addWidget(PrefixTab())
+        # self.content_stack.addWidget(RunnerTab())
+        # self.content_stack.addWidget(StatsTab(self.theme_manager))
+        # self.content_stack.addWidget(SettingsTab(self.theme_manager))
 
         # Add widgets to the splitter
         self.splitter.addWidget(self.sidebar)
@@ -90,16 +92,36 @@ class MainWindow(QMainWindow):
             self.splitter.restoreState(QByteArray(splitter_state))
 
     def on_sidebar_change(self, index):
+
+        # Load widget when selected
+        current_widget = self.content_stack.widget(index)
+
+        if type(current_widget) is QWidget:
+            new_tab = None
+            if index == 0:
+                new_tab = GameTab()
+            elif index == 1:
+                new_tab = PrefixTab()
+            elif index == 2:
+                new_tab = RunnerTab()
+            elif index == 3:
+                new_tab = StatsTab(self.theme_manager)
+            elif index == 4:
+                new_tab = SettingsTab(self.theme_manager)
+
+            if new_tab:
+                # Remove the placeholder and insert the real tab
+                self.content_stack.removeWidget(current_widget)
+                self.content_stack.insertWidget(index, new_tab)
+                current_widget = new_tab
+
+        # Switch to new tab
         self.content_stack.setCurrentIndex(index)
         widget = self.content_stack.widget(index)
 
-        # Here we refresh stuff on sidebar changes
-        if isinstance(widget, RunnerTab):
-            widget.refresh_active_tab()
-        elif isinstance(widget, PrefixTab):
-            widget.refresh_active_tab()
-        elif isinstance(widget, GameTab):
-            widget.refresh_active_tab()
+        # Call refresh_active_tab method in each tab
+        if hasattr(current_widget, 'refresh_active_tab'):
+            current_widget.refresh_active_tab()
 
     def closeEvent(self, event):
         """

@@ -13,9 +13,9 @@ def setup_logging(level=logging.INFO):
 
     log_path = config.DATA_DIR / "timetracker_test.log"
 
-    # 10 MB cap
+    # 1 MB cap
     file_handler = RotatingFileHandler(
-        log_path, maxBytes=10 * 1024 * 1024, backupCount=1
+        log_path, maxBytes=1 * 1024 * 1024, backupCount=1
     )
     file_handler.setFormatter(logging.Formatter(log_format))
 

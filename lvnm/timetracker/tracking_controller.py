@@ -46,3 +46,13 @@ class TrackingController(QObject):
     def stop_tracking(self):
         logger.info(f"Stopping tracking for {self.target_process}")
         self.tracker.stop_tracking()
+        self.tracker = None
+
+        # Stop and kill everything just in case
+        if self.auto_timer:
+            self.auto_timer.stop()
+            self.auto_timer.deleteLater()
+            self.auto_timer = None
+        
+        self.window = None
+        self.deleteLater()

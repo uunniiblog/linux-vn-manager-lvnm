@@ -8,6 +8,7 @@ from game_manager import GameManager
 from system_utils import SystemUtils
 from ui.game_sidebar import GameSidebar
 from game_runner import GameRunner
+from timetracker.log_manager import LogManager
 
 class GameListItem(QWidget):
     """Custom widget for the game list rows"""
@@ -23,6 +24,7 @@ class GameListItem(QWidget):
         self.setMouseTracking(True)
         self.zoom = zoom_factor
         self.game_card = game_card
+        self.log_manager = LogManager() 
         self.selected = False
         self._hovered = False
         self.hover_bg = "rgba(255, 255, 255, 18)"   # default: dark-mode tint
@@ -71,10 +73,22 @@ class GameListItem(QWidget):
         layout.addLayout(info_layout, stretch=1)
 
         # Column 3: Date
+        stats_layout = QVBoxLayout()
+        stats_layout.setSpacing(0)
+        stats_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
         self.date_label = QLabel()
         self.date_label.setObjectName("gameItemDate")
-        self.date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        layout.addWidget(self.date_label)
+        self.date_label.setAlignment(Qt.AlignRight)
+        
+        # Total Playtime
+        self.time_label = QLabel()
+        self.time_label.setObjectName("gameItemTime")
+        self.time_label.setAlignment(Qt.AlignRight)
+
+        stats_layout.addWidget(self.date_label)
+        stats_layout.addWidget(self.time_label)
+        layout.addLayout(stats_layout)
 
         # --- INITIAL DATA FILL ---
         self.update_ui(game_card)
@@ -109,6 +123,21 @@ class GameListItem(QWidget):
         
         last_played = game_card.last_played if game_card.last_played else self.tr("Never")
         self.date_label.setText(last_played)
+
+        # Get total playtime
+        exe_name = self.log_manager.get_process_name_from_path(game_card.path)
+        total_seconds = self.log_manager.get_total_app_playtime(exe_name)
+        if total_seconds > 60:
+            time_str = self._format_total_time(total_seconds)
+            self.time_label.setText(time_str)
+            self.time_label.setVisible(True)
+            # Reset alignment to top/bottom style
+            self.date_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
+            self.time_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        else:
+            self.time_label.setVisible(False)
+            # If no time, center the "Never/Date" label vertically in the column
+            self.date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         # Update Cover
         local_cover = SystemUtils.get_cover_path(game_card.vndb)
@@ -230,6 +259,17 @@ class GameListItem(QWidget):
     def shortcut(self):
         SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.vndb)
 
+    def _format_total_time(self, seconds):
+        """Custom formatter: 10h 50m or 30m"""
+        if seconds <= 0:
+            return None
+        
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        
+        if h > 0:
+            return f"{h}h {m}m"
+        return f"{m}m"
 
 class LogViewerDialog(QDialog):
     def __init__(self, name, parent=None):
@@ -265,22 +305,31 @@ class LogViewerDialog(QDialog):
         self.update_logs()
 
     def update_logs(self):
-        new_runner = GameSidebar.runners.get(self.name)
+        """
+        Update logs in real time. If a new instance starts running append it to current logs.
+        Logs can be an active runner or a string data if the game was closed        
+        """
+        data = GameSidebar.runners.get(self.name)
 
-        # Detect game restarts
-        if new_runner and new_runner != self.runner:
-            self.history_buffer += self.text_area.toPlainText() 
-            self.history_buffer += "\n\n\n--- New Instance Started --- \n\n\n"
+        # Detect transition to a NEW active runner instance
+        is_new_runner = hasattr(data, "get_full_log") and data != self.runner
+        
+        if is_new_runner:
+            # If already showing a log save it before starting
+            if getattr(self, "_last_rendered", ""):
+                self.history_buffer = self._last_rendered + "\n\n--- New Instance Started ---\n\n"
             
-            # Switch to the new runner
-            self.runner = new_runner
+            # Track new runner object
+            self.runner = data
 
-        if not self.runner:
+        # Display log by runner or str
+        if hasattr(data, "get_full_log"):
+            full_display_content = self.history_buffer + data.get_full_log()
+        elif isinstance(data, str):
+            full_display_content = self.history_buffer + data
+        else:
+            # No data found for this game
             return
-            
-        # Get the logs
-        active_logs = self.runner.get_full_log()
-        full_display_content = self.history_buffer + active_logs
         
         # Update
         if getattr(self, "_last_rendered", "") != full_display_content:
