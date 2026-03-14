@@ -11,6 +11,8 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - VNDB api integration to get covers and links
  - Pyside QT 6 interface
 
+ ![lvnm-Screenshot](.github/images/lvnm.jpg)
+
  ##  AppImage
 Releases over here: https://github.com/uunniiblog/linux-vn-manager-lvnm/releases
 
@@ -116,8 +118,7 @@ Tools used and inspiration:
 - Codecs: https://github.com/b-fission/vn_winestuff/
 - swayidle: for idle/afk detection: https://github.com/swaywm/swayidle
 - kdotool: Inspiration to build the timetracking for KDE: https://github.com/jinliu/kdotool
-
-
+- Lutris: Interface and functionality inspiration: https://github.com/lutris/lutris
 
 ## Run local
 - python -m venv venv
