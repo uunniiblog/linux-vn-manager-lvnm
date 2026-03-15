@@ -19,16 +19,19 @@ class ExecutionManager:
         if log_level == "DEBUG":
             # Show everything
             env["UMU_LOG"] = "1"
-            # everything else default should be good ? TODO
+            # errors + everything
+            env["WINEDEBUG"] = "err+all"
+            env["DXVK_LOG_LEVEL"] = "info"
+            env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
         
         elif log_level == "INFO":
             # Show only errors and major fixmes
-            if "WINEDEBUG" not in env:
-                env["WINEDEBUG"] = "-all,err+all,fixme+all"
+            env["WINEDEBUG"] = "-all,err+all,fixme+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             
         elif log_level == "ERROR":
+            # Only errors
             env["WINEDEBUG"] = "-all,err+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
@@ -79,19 +82,16 @@ class ExecutionManager:
         def log_reader(pipe):
             try:
                 for line in iter(pipe.readline, b''):
-                    if not line: continue
+                    if not line:
+                        continue
                     try:
-                        decoded_line = line.decode('ascii')
+                        decoded_line = line.decode('utf-8')
                     except UnicodeDecodeError:
-                        try:
-                            decoded_line = line.decode('cp932')
-                        except UnicodeDecodeError:
-                            decoded_line = line.decode('utf-8', errors='replace')
-
-                    clean_line = decoded_line.strip()
-                    logger.info(clean_line)
+                        # CP932 (Shift-JIS) for some wine cases
+                        decoded_line = line.decode('cp932', errors='replace')
+                    logger.info(decoded_line.strip())
                     if log_callback:
-                        log_callback(clean_line)
+                        log_callback(decoded_line.strip())
             except Exception as e:
                 logger.error(f"Log Thread Error: {e}")
             finally:

@@ -52,10 +52,10 @@ class GameRunner:
         self.scrub_appimage_environment()
 
         if self.is_steam:
-            logging.info("Steam launch detected: removing LC_ALL...")
-            # remove this since it fucks with locale for jp paths
-            self.env.pop("LC_ALL", None)
-
+            logging.info("Steam launch detected: LC_ALL = C.UTF-8...")
+            # Adjust this since it fucks with jp paths
+            self.env["LC_ALL"] = "C.UTF-8"
+            
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
 
@@ -140,8 +140,8 @@ class GameRunner:
 
         self._log_run_command(Path(self.prefix_info["runner"]))
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless)
+        logger.debug(f"Launched PID {self.process.pid} for game {self.game.path}")
 
-        logging.debug(f"self.process {self.process}")
         return True
 
     def _handle_wine(self, runner_path: Path) -> list:

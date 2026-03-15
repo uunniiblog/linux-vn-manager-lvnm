@@ -71,10 +71,11 @@ class SystemUtils:
         """
         filename = os.path.basename(process_name).lower()
         my_pid = str(os.getpid()) # Get the PID of the tracker itself
+        logger.debug(f"get_pid_by_name process: {process_name}")
         
         try:
-            # -f: search full command line -i: ignore case
-            output = subprocess.check_output(["pgrep", "-f", "-i", filename], text=True)
+            # -f: search full command line -i: ignore case, LC_ALL avoid mojibake errors
+            output = subprocess.check_output(["pgrep", "-f", "-i", filename], text=True, env={**os.environ, "LC_ALL": "C.UTF-8"})
             pids = output.strip().splitlines()
             
             # Filter out our own PID so we don't track ourselves
@@ -97,11 +98,22 @@ class SystemUtils:
             logger.info(f"Fallback to newest PID: {valid_pids[-1]}")
             return valid_pids[-1]
         except subprocess.CalledProcessError:
-            logger.debug("not found")
+            logger.error(f"pgrep failed for {filename}.")
             return None
         except Exception as e:
             logger.error(f"Error finding PID for {process_name}: {e}")
             return None
+
+    @staticmethod
+    def get_full_cmdline(pid):
+        """Gets the full command line for a PID. Reads as bytes to handle non-UTF-8 Wine cmdlines."""
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                raw = f.read()
+            # cmdline args are null-separated; decode with surrogateescape so no crash on bad bytes
+            return raw.replace(b'\x00', b' ').decode('utf-8', errors='surrogateescape')
+        except:
+            return ""
 
     @staticmethod
     def get_app_name_from_pid(pid):
@@ -178,15 +190,6 @@ class SystemUtils:
                 return fallback
         except:
             return None
-    
-    @staticmethod
-    def get_full_cmdline(pid):
-        """Gets the full command line for a PID."""
-        try:
-            with open(f"/proc/{pid}/cmdline", "r") as f:
-                return f.read().replace('\0', ' ')
-        except:
-            return ""
 
     @staticmethod
     def is_swayidle_installed():

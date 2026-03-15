@@ -385,10 +385,10 @@ class GameSidebar(QFrame):
             return False
 
         try:
-            runner = GameRunner(name)
-            if runner.run():
-                self.active_runners[name] = runner
-                self.runners[name] = runner
+            self.runner = GameRunner(name)
+            if self.runner.run():
+                self.active_runners[name] = self.runner
+                self.runners[name] = self.runner
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
         except Exception as e:
             logger.error(f"Failed to start {name}: {e}")
