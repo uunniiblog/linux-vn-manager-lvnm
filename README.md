@@ -45,7 +45,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             <li>Regedit: Opens windows registry for the prefix.</li>
             <li>Winecfg: Opens Wine configuration window for the prefix.</li>
             <li>wineboot cmd: Opens windows cmd terminal inside the prefix.</li>
-            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder.</li> 
+            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder. Useful to install extra winetricks or test stuff</li> 
             </ul>
             All utility options are also available from the game tab.
 
@@ -120,7 +120,7 @@ Tools used and inspiration:
 - kdotool: Inspiration to build the timetracking for KDE: https://github.com/jinliu/kdotool
 - Lutris: Interface and functionality inspiration: https://github.com/lutris/lutris
 
-## Run local
+## Run from source directly
 - python -m venv venv
 - source venv/bin/activate
 - pip install -r requirements.txt
