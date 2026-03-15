@@ -106,6 +106,13 @@ I brought the timetracking from another application I made last year, If you wan
 
 With wayland the way of checking focused windows changes based on Desktop implementations, feel free to request PRs here or in the playtimetracker repo for other desktops. An implementation of DesktopUtilsInterface, plus adding the desktop to utils_factory.py is all it should be needed. Can also use external libraries if it makes it easier.
 
+## Planned
+- export/import prefixes and entire game configurations
+- Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs
+- Pause/Start timetracker from the sidebar
+- One game one prefix. Automatically copies the selected prefix making prefixes unique per games.
+
+
 ## Tools and Credits
 Tools used and inspiration:
 
