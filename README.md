@@ -87,6 +87,8 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
     - Timetracker: Enable/disable it
         - AFK Idle timer: timer to stop counting in case you go afk with the game focused. Requires [swayidle](https://github.com/swaywm/swayidle) to be installed.
         - Periodic save interval: Save the session every X minutes in case of power shutdown or app crash.
+    - Texthooking: Enable/disable it
+        - Path: Select the .exe of your texthooker. Right click a running game "Open Texthooker" to run it targeted to the game.
     - System info: List useful system info and gstreamer libraries I have found pretty useful to run videos in VNs with wow64 wine builds.
 
 Config and data stored at: ~/.local/share/lvnm/

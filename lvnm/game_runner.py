@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from collections import deque
-from model.game_card import GameCard
+from model.game_card import GameCard, GameScope
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
 from settings_manager import SettingsManager
@@ -119,6 +119,10 @@ class GameRunner:
             
             # Call same logic as run
             self.prepare_environment()
+
+            if self.is_proton:
+                self.env["PROTON_VERB"] = "runinprefix"
+
             self._log_run_command(Path(self.prefix_info["runner"]))
             self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
             return True
@@ -126,6 +130,106 @@ class GameRunner:
         except Exception as e:
             logging.error(f"Run in prefix failed: {e}")
             return False
+
+    def run_texthooker(self, text_hooker_path: str, prefix_name: str, gamescope: GameScope, target_exe_path: str):
+        """
+        Bypasses JSON loading to run a texthooker
+        """
+        try:
+            # Manually fetch prefix info
+            self.prefix_info = self._get_prefix_info(prefix_name)
+            
+            if not self.prefix_info:
+                raise ValueError(f"Prefix '{prefix_name}' not found.")
+
+            self.game = GameCard(
+                name=f"Texthook-{text_hooker_path}",
+                path=text_hooker_path,
+                prefix=prefix_name,
+                vndb="",
+                gamescope=gamescope or None
+            )
+            
+            self.prepare_environment()
+
+            # Always add jp locale for proper text rendering
+            self.env["LANG"] = "ja_JP.UTF-8"
+
+            exe_filename = os.path.basename(target_exe_path)
+            logger.debug(f"Texthooking to target_exe {exe_filename}")
+
+            if self.is_proton:
+                logger.debug("Launch texthooker through proton")
+                self.env["PROTON_VERB"] = "runinprefix"
+
+                # run through proton directly
+                wine_bin = self.env.get("WINE")
+                self.cmd = [wine_bin, text_hooker_path]
+                self.cmd.append(f"-p{exe_filename}")
+
+                # TODO: Eventually change to umu
+                # target_pid = self.get_windows_pid(exe_filename)
+                # if target_pid:
+                #     self.cmd.append(f"-p{target_pid}")
+                self._log_run_command(Path(self.prefix_info["runner"]))
+                self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
+            else:
+                logger.debug("Launch texthooker through wine")
+                self.cmd.append(f"-p{exe_filename}")
+                self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f"run_texthooker failed: {e}")
+            return False
+
+    def get_windows_pid(self, exe_name: str) -> str:
+        """
+        Queries the wine/proton prefix for the PID. 
+        Uses the direct wine binary to avoid umu-run container overhead.
+        Needed if running texthooker from umu instead of binary
+        """
+        import re
+        try:
+            # Skip umu here
+            wine_bin = self.env.get("WINE")
+
+            lookup_cmd = [wine_bin, "winedbg", "--command", "info process"]
+            
+            logger.debug(f"Querying PIDs with: {' '.join(lookup_cmd)}")
+            
+            result = subprocess.check_output(
+                lookup_cmd, 
+                env=self.env, 
+                stderr=subprocess.STDOUT,
+                timeout=5 
+            )
+            
+            decoded_output = result.decode('utf-8', errors='ignore')
+            logger.debug(decoded_output)
+
+            # winedbg output: 
+            # 00000020 3 'explorer.exe'
+            # 000000f4 5 'AnEpic_unwrapped.exe'
+            # PIDs in winedbg are HEXADECIMAL. need to convert it.
+            
+            for line in decoded_output.splitlines():
+                if exe_name.lower() in line.lower():
+                    # Find the hex PID
+                    match = re.search(r'([0-9a-fA-F]+)', line.strip())
+                    if match:
+                        hex_pid = match.group(1)
+                        decimal_pid = str(int(hex_pid, 16))
+                        logger.debug(f"Found Windows PID (Hex: {hex_pid} -> Dec: {decimal_pid}) for {exe_name}")
+                        return decimal_pid
+                        
+        except subprocess.TimeoutExpired:
+            logger.error("PID lookup timed out")
+        except Exception as e:
+            logger.error(f"Failed to lookup Windows PID: {e}")
+        
+        return None
     
     def run(self, is_headless=False):
         """Prepares, logs, and executes the game"""
@@ -161,6 +265,8 @@ class GameRunner:
         self.env["PROTONPATH"] = str(runner_path)
         self.env["GAMEID"] = self.game.umu_gameid
         self.env["STORE"] = self.game.umu_store
+        wine_bin = runner_path / "files" / "bin" / "wine"
+        self.env["WINE"] = str(wine_bin)
 
         umu_cmd = SystemUtils.get_tool_path("umu-run")
         

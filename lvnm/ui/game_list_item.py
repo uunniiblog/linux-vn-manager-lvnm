@@ -1,3 +1,4 @@
+import logging
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QFrame, QMenu, QDialog, QPlainTextEdit, QPushButton, QApplication
@@ -9,6 +10,9 @@ from system_utils import SystemUtils
 from ui.game_sidebar import GameSidebar
 from game_runner import GameRunner
 from timetracker.log_manager import LogManager
+from settings_manager import SettingsManager
+
+logger = logging.getLogger(__name__)
 
 class GameListItem(QWidget):
     """Custom widget for the game list rows"""
@@ -21,6 +25,7 @@ class GameListItem(QWidget):
 
     def __init__(self, game_card, zoom_factor=1.0, parent=None):
         super().__init__(parent)
+        self.user_settings = SettingsManager()
         self.setMouseTracking(True)
         self.zoom = zoom_factor
         self.game_card = game_card
@@ -164,12 +169,17 @@ class GameListItem(QWidget):
     def contextMenuEvent(self, event):
         """Creates and shows the right-click menu"""
         menu = QMenu(self)
+
+        th_settings = self.user_settings.get("texthooker", {})
         
         is_running = self.game_card.name in GameSidebar.active_runners
         if is_running:
             act_run_stop = menu.addAction(self.tr("Stop Game"))
         else:
             act_run_stop = menu.addAction(self.tr("Run Game"))
+
+        if th_settings.get("enabled", False):
+            act_texthook = menu.addAction(self.tr("Open texthooker"))
 
         act_log = menu.addAction(self.tr("Show Logs"))
         act_open = menu.addAction(self.tr("Open Sidebar"))
@@ -194,6 +204,9 @@ class GameListItem(QWidget):
                 self.requestStop.emit(self.game_card)
             else:
                 self.requestRun.emit(self.game_card)
+
+        elif th_settings.get("enabled", False) and action == act_texthook:
+            self.open_texthooker(th_settings.get("path"))
         
         elif action == act_log:
             self.show_log(self.game_card.name)
@@ -231,8 +244,15 @@ class GameListItem(QWidget):
         elif action == act_steam:
             SystemUtils.add_to_steam(self.game_card)
 
+    def open_texthooker(self, texthooker_path):
+        runner = GameRunner("texthook")
+        if texthooker_path:
+            runner.run_texthooker(texthooker_path, self.game_card.prefix, gamescope=self.game_card.gamescope, target_exe_path=self.game_card.path)
+        else:
+            logger.error("Texthooker path missing")
+
     def show_log(self, name):
-        self.log_dialog = LogViewerDialog(name)       
+        self.log_dialog = LogViewerDialog(name)
         self.log_dialog.show()
         self.log_dialog.raise_()
         self.log_dialog.activateWindow()

@@ -110,20 +110,20 @@ ENV_VARIABLES = [
         "value": "1",
         "req": "proton"
     },
-    # {
-    #     "id": "run_in_prefix",
-    #     "name": "Proton Verb Run in prefix (Two games same prefix)",
-    #     "key": "PROTON_VERB",
-    #     "value": "runinprefix",
-    #     "req": "proton"
-    # },
     {
-        "id": "proton_verb_run",
-        "name": "Proton Verb Run (Two games same prefix)",
+        "id": "run_in_prefix",
+        "name": "Proton Verb Run in prefix (Two games same prefix)",
         "key": "PROTON_VERB",
-        "value": "run",
+        "value": "runinprefix",
         "req": "proton"
     },
+    # {
+    #     "id": "proton_verb_run",
+    #     "name": "Proton Verb Run (Two games same prefix)",
+    #     "key": "PROTON_VERB",
+    #     "value": "run",
+    #     "req": "proton"
+    # },
     {
         "id": "pressure_vessel_shell_after",
         "name": "PRESSURE Vessel after (Run Terminal same memory as game)",

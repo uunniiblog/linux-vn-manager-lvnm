@@ -38,6 +38,7 @@ class SettingsTab(QWidget):
         main_layout.addWidget(self._build_settings_group())
         main_layout.addWidget(self._build_appearance_group())
         main_layout.addWidget(self._build_timetracking_group())
+        main_layout.addWidget(self._build_texthooking_group())
         main_layout.addWidget(self._build_sysinfo_group())
         main_layout.addWidget(self._build_about_group())
         main_layout.addStretch()
@@ -244,6 +245,32 @@ class SettingsTab(QWidget):
 
         return timetracker_group
 
+    def _build_texthooking_group(self):
+        texthooker_group = QGroupBox(self.tr("Texthooker"))
+        texthooker_layout = QFormLayout(texthooker_group)
+
+        # Retrieve current settings
+        th_settings = self.user_settings.get("texthooker", {})
+
+        # Enable Checkbox
+        self.texthooker_enable = QCheckBox(self.tr("Enable"))
+        self.texthooker_enable.setChecked(th_settings.get("enabled", False))
+        texthooker_layout.addRow(QLabel(self.tr("Enable texthooking:")), self.texthooker_enable)
+
+        # Texthooker Path 
+        path_layout = QHBoxLayout()
+        self.texthooker_edit = QLineEdit(th_settings.get("path", ""))
+        self.texthooker_edit.setPlaceholderText(self.tr("Select texthooker executable (e.g., Textractor.exe)..."))
+        
+        self.texthooker_btn = QPushButton(self.tr("Browse..."))
+        
+        path_layout.addWidget(self.texthooker_edit)
+        path_layout.addWidget(self.texthooker_btn)
+        
+        texthooker_layout.addRow(QLabel(self.tr("Texthooker Path:")), path_layout)
+
+        return texthooker_group
+
     def _build_sysinfo_group(self):
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
@@ -298,6 +325,9 @@ class SettingsTab(QWidget):
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "afk_timer", int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "log_periodic_save", int(t) if t else 0))
+        self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
+        self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting("texthooker", "enabled", bool(s)))
+        self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting("texthooker", "path", t))
 
     def _toggle_env_extra(self):
         expanded = self._extra_checkboxes[0].isVisible()
@@ -333,6 +363,16 @@ class SettingsTab(QWidget):
         folder = QFileDialog.getExistingDirectory(self, self.tr("Select Font Folder"), "")
         if folder:
             self.font_edit.setText(folder)
+    
+    def browse_texthooker_path(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            self.tr("Select Texthooker Executable"), 
+            "", 
+            self.tr("Executables (*.exe);;All Files (*)")
+        )
+        if file_path:
+            self.texthooker_edit.setText(file_path)
 
     def save_setting(self, key, value):
         self.user_settings.set(key, value)
