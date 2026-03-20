@@ -9,6 +9,7 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - Game management to test games easily in all diferent prefixes with useful environment variables for VNs.
  - Real time tracking support to have an accurate play count (Only KDE 6 and SteamOS gamescope session).
  - VNDB api integration to get covers and links.
+ - Easy texthooking
  - PySide QT 6 interface.
 
  ![lvnm-Screenshot](.github/images/lvnm.jpg)
@@ -89,6 +90,8 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Periodic save interval: Save the session every X minutes in case of power shutdown or app crash.
     - Texthooking: Enable/disable it
         - Path: Select the .exe of your texthooker. Right click a running game "Open Texthooker" to run it targeted to the game.
+        - Textractor will automatically hook to the game with -pgame.exe, also tested Luna and Agent, both can hook through the program's interface. 
+        - Note that some hook codes behave differently through wine/proton and may crash the game.
     - System info: List useful system info and gstreamer libraries I have found pretty useful to run videos in VNs with wow64 wine builds.
 
 Config and data stored at: ~/.local/share/lvnm/

@@ -9,6 +9,10 @@ settings = SettingsManager()
 logger = logging.getLogger(__name__)
 
 class ExecutionManager:
+
+    FILTERED_PATTERNS = [
+        "err:font:alloc_font_handle out of realized font handles", # Textractor million line spam
+    ]
     
     @staticmethod
     def _get_verbosity_env(base_env: dict) -> dict:
@@ -89,9 +93,16 @@ class ExecutionManager:
                     except UnicodeDecodeError:
                         # CP932 (Shift-JIS) for some wine cases
                         decoded_line = line.decode('cp932', errors='replace')
-                    logger.info(decoded_line.strip())
+
+                    stripped = decoded_line.strip()
+
+                    # Filter wine logs
+                    if any(pattern in stripped for pattern in ExecutionManager.FILTERED_PATTERNS):
+                        continue
+
+                    logger.info(stripped)
                     if log_callback:
-                        log_callback(decoded_line.strip())
+                        log_callback(stripped)
             except Exception as e:
                 logger.error(f"Log Thread Error: {e}")
             finally:

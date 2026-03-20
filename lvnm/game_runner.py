@@ -165,17 +165,22 @@ class GameRunner:
                 # run through proton directly
                 wine_bin = self.env.get("WINE")
                 self.cmd = [wine_bin, text_hooker_path]
-                self.cmd.append(f"-p{exe_filename}")
+                
+                if "textractor" in text_hooker_path.lower():
+                    logger.info("Textractor detected, auto attaching to game")
+                    self.cmd.append(f"-p{exe_filename}")
 
                 # TODO: Eventually change to umu
                 # target_pid = self.get_windows_pid(exe_filename)
                 # if target_pid:
                 #     self.cmd.append(f"-p{target_pid}")
-                self._log_run_command(Path(self.prefix_info["runner"]))
+                # self._log_run_command(Path(self.prefix_info["runner"]))
                 self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
             else:
                 logger.debug("Launch texthooker through wine")
-                self.cmd.append(f"-p{exe_filename}")
+                if "textractor" in text_hooker_path.lower():
+                    logger.info("Textractor detected, auto attaching to game")
+                    self.cmd.append(f"-p{exe_filename}")
                 self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
             
             return True
