@@ -41,6 +41,9 @@ class KdeUtils(DesktopUtilsInterface):
         # JS that returns ID, PID, and Name for all windows at once
         js_code = """
         workspace.windowList().forEach(w => {
+            // Skip hidden windows, tooltips, etc
+            if (w.width < 100 || w.height < 100) return;
+
             print('DATA:' + w.internalId + '|' + w.pid + '|' + w.resourceClass + '|' + w.caption);
         });
         """
