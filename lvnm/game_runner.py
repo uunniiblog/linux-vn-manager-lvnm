@@ -28,6 +28,7 @@ class GameRunner:
         self.cmd: list = []
         self.is_steam = is_steam
         self.logs = deque(maxlen=2000)
+        self.umu_path = None
         
         # Track running
         self.process = None 
@@ -162,9 +163,8 @@ class GameRunner:
                 logger.debug("Launch texthooker through proton")
                 self.env["PROTON_VERB"] = "runinprefix"
 
-                # run through proton directly
-                wine_bin = self.env.get("WINE")
-                self.cmd = [wine_bin, text_hooker_path]
+                # Run through proton instead of umu
+                self.cmd = [self.env["WINE"] if c == self.umu_path else c for c in self.cmd]
                 
                 if "textractor" in text_hooker_path.lower():
                     logger.info("Textractor detected, auto attaching to game")
@@ -174,7 +174,7 @@ class GameRunner:
                 # target_pid = self.get_windows_pid(exe_filename)
                 # if target_pid:
                 #     self.cmd.append(f"-p{target_pid}")
-                # self._log_run_command(Path(self.prefix_info["runner"]))
+                self._log_run_command(Path(self.prefix_info["runner"]))
                 self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir)
             else:
                 logger.debug("Launch texthooker through wine")
@@ -273,9 +273,9 @@ class GameRunner:
         wine_bin = runner_path / "files" / "bin" / "wine"
         self.env["WINE"] = str(wine_bin)
 
-        umu_cmd = SystemUtils.get_tool_path("umu-run")
+        self.umu_path = SystemUtils.get_tool_path("umu-run")
         
-        return [umu_cmd, self.game.path]
+        return [self.umu_path, self.game.path]
 
     def _get_game_card(self, name: str):
         if not GameRunner.GAME_DATA.exists():
