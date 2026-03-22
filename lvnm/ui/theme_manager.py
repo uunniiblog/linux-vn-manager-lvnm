@@ -54,7 +54,7 @@ class ThemeManager(QObject):
     QGroupBox {{
         border: 1px solid {border_color};
         border-radius: 6px;
-        margin-top: 15px;
+        margin-top: 20px;
         padding-top: 15px;
         background-color: {bg_main};
     }}
@@ -63,6 +63,7 @@ class ThemeManager(QObject):
         subcontrol-position: top left;
         padding: 0 5px;
         left: 10px;
+        top: -2px;
         color: {accent};
         font-weight: bold;
         background-color: transparent;
