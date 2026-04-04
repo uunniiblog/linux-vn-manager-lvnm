@@ -121,7 +121,7 @@ class GameSidebar(QFrame):
 
         # Create prefix button
         self.btn_add_prefix = QPushButton("+")
-        self.btn_add_prefix.setFixedSize(32, 32)
+        self.btn_add_prefix.setFixedSize(43, 32)
         self.btn_add_prefix.clicked.connect(self.open_create_prefix_dialog)
 
         # Create a horizontal layout to hold both the combo box and the button
