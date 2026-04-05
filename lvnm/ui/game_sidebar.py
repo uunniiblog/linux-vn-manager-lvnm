@@ -426,7 +426,7 @@ class GameSidebar(QFrame):
             return False
 
         # Start tracking
-        if self.timetracker_settings.get("timetracking", False):
+        if self.timetracker_settings.get("timetracking", False) and self.timetracker_settings.get("autostart", False):
             tracking = self.create_tracking()
             tracking.start_auto_tracking()
             self.active_trackers[name] = tracking

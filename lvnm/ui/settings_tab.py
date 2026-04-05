@@ -243,6 +243,11 @@ class SettingsTab(QWidget):
         save_interval_layout.addStretch()
         timetracker_layout.addRow(QLabel(self.tr("Periodic Save Interval:")), save_interval_layout)
 
+        # Auto Start timetracking
+        self.timetracking_autostart = QCheckBox(self.tr("Automatically Start Time Tracking When Game Launches"))
+        self.timetracking_autostart.setChecked(tt_settings.get("autostart", False))
+        timetracker_layout.addRow(QLabel(self.tr("Auto Start")), self.timetracking_autostart) 
+
         return timetracker_group
 
     def _build_texthooking_group(self):
@@ -325,6 +330,7 @@ class SettingsTab(QWidget):
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "afk_timer", int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "log_periodic_save", int(t) if t else 0))
+        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "autostart", bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting("texthooker", "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting("texthooker", "path", t))
