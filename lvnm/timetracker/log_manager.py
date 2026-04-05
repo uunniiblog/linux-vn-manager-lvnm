@@ -280,8 +280,8 @@ class LogManager:
         sorted_data = sorted(summary.items(), key=lambda x: x[1], reverse=True)
         return [(app, seconds, titles.get(app, app)) for app, seconds in sorted_data]
 
-    def get_process_name_from_path(self, path):
-        """Extracts 'Game.exe' from '/path/to/Game.exe'"""
-        if not path:
+    def get_log_name_from_path(self, path):
+        """Extracts Process Name and byte size from file path"""
+        if not path or not os.path.exists(path):
             return ""
-        return os.path.basename(path)
+        return f"{os.path.basename(path)}_{os.path.getsize(path)}"

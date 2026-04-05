@@ -130,8 +130,8 @@ class GameListItem(QWidget):
         self.date_label.setText(last_played)
 
         # Get total playtime
-        exe_name = self.log_manager.get_process_name_from_path(game_card.path)
-        total_seconds = self.log_manager.get_total_app_playtime(exe_name)
+        log_file = self.log_manager.get_log_name_from_path(game_card.path)
+        total_seconds = self.log_manager.get_total_app_playtime(log_file)
         if total_seconds > 60:
             time_str = self._format_total_time(total_seconds)
             self.time_label.setText(time_str)

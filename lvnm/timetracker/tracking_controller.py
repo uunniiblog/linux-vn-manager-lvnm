@@ -12,8 +12,8 @@ class TrackingController(QObject):
         self.window = main_window # TODO: maybe raise visual error if tracking failed
         self.tracker = TrackerService()
         self.auto_timer = None
-        self.target_process = None
         self.target_process = os.path.basename(process_path)
+        self.log_file_name = f"{os.path.basename(process_path)}_{os.path.getsize(process_path)}"
         self.save_interval = save_interval
         self.afk_timer = afk_timer
 
@@ -41,7 +41,7 @@ class TrackingController(QObject):
         if title and wid:
             self.auto_timer.stop()
             logger.info(f"Success! Found Window: {title}")
-            self.tracker.start_tracking(wid, title, self.target_process, save_interval=self.save_interval, afk_timer=self.afk_timer)
+            self.tracker.start_tracking(wid, title, self.target_process, log_file=self.log_file_name, save_interval=self.save_interval, afk_timer=self.afk_timer)
 
     def stop_tracking(self):
         logger.info(f"Stopping tracking for {self.target_process}")

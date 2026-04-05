@@ -17,10 +17,13 @@ class TrackerService(QObject):
             logger.error(f"TrackerService Critical Startup Error: {e}")
             self.desktop_utils = None
 
-    def start_tracking(self, wid, app_name, process_name, refresh_timer=10, save_interval=3, afk_timer=0):
+    def start_tracking(self, wid, app_name, process_name, log_file=None, refresh_timer=10, save_interval=3, afk_timer=0):
         if not self.desktop_utils:
             logger.error("Desktop utilities not initialized.")
             return
+
+        if not log_file:
+            log_file=process_name
             
         # Stop existing worker if any
         if self.worker and self.worker.isRunning():
@@ -30,10 +33,10 @@ class TrackerService(QObject):
             logger.info("Gamescope detected: Using  GamescopeWorker")
             self.worker = GamescopeWorker(
                 wid, app_name, process_name, self.desktop_utils, 
-                refresh_timer, save_interval, afk_timer
+                log_file, refresh_timer, save_interval, afk_timer
             )
         else:
-            self.worker = TrackerWorker(wid, app_name, process_name, self.desktop_utils, refresh_timer, save_interval, afk_timer)
+            self.worker = TrackerWorker(wid, app_name, process_name, self.desktop_utils, log_file, refresh_timer, save_interval, afk_timer)
 
         if not self.worker.is_window_open():
             logger.error(f"Window '{app_name}' not found. Start the app before tracking.")

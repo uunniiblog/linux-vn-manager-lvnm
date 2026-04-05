@@ -13,13 +13,14 @@ logger = logging.getLogger(__name__)
 class TrackerWorker(QThread):
     log_message = Signal(str)
 
-    def __init__(self, window_id, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0, gamescope_ses=False):
+    def __init__(self, window_id, app_name, process_name, desktop_utils, log_file, refresh_interval=60, save_interval=3, afk_timer=0, gamescope_ses=False):
         super().__init__()
 
         self.app_name = app_name
         self.utils = desktop_utils
         self.target_window_id = window_id
         self.process_name = process_name
+        self.log_file_name = log_file
 
         # Find executable
         if self.target_window_id and not self.process_name:
@@ -87,7 +88,7 @@ class TrackerWorker(QThread):
         """ Main loop logic to calculate active window focus """
         # Load previous total playtime
         # Scan daily logs for this specific app's history
-        self.total_playtime = self.logger.get_total_app_playtime(self.process_name)
+        self.total_playtime = self.logger.get_total_app_playtime(self.log_file_name)
         logger.debug(f"Starting tracking for: {self.app_name} - {self.process_name} - {self.target_window_id}")
         logger.debug(f"Starting playtime: {self.logger.format_duration(self.total_playtime)}")
 
@@ -178,7 +179,7 @@ class TrackerWorker(QThread):
             'end': now,
             'duration': int((now - self.session_start).total_seconds()),
             'active_time': self.session_playtime,
-            'app': self.process_name,
+            'app': self.log_file_name,
             'title': self.app_name,
             'status': "Manual",
             'tags': ""
@@ -200,9 +201,9 @@ class TrackerWorker(QThread):
 
 
 class GamescopeWorker(TrackerWorker):
-    def __init__(self, target_pid, app_name, process_name, desktop_utils, refresh_interval=60, save_interval=3, afk_timer=0):
+    def __init__(self, target_pid, app_name, process_name, desktop_utils, log_file, refresh_interval=60, save_interval=3, afk_timer=0):
         # Pass None for window_id to the parent class
-        super().__init__(None, app_name, process_name, desktop_utils, refresh_interval, save_interval, afk_timer, gamescope_ses=True)
+        super().__init__(None, app_name, process_name, desktop_utils, log_file, refresh_interval, save_interval, afk_timer, gamescope_ses=True)
         self.target_pid = target_pid
 
     def is_window_open(self):

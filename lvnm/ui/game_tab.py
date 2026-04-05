@@ -187,8 +187,8 @@ class GameTab(QWidget):
             log_mgr = LogManager()
             playtime_cache = {}            
             for card in game_cards:
-                exe_name = log_mgr.get_process_name_from_path(card.path) if card.path else ""
-                playtime_cache[card.name] = log_mgr.get_total_app_playtime(exe_name)
+                log_file = log_mgr.get_log_name_from_path(card.path) if card.path else ""
+                playtime_cache[card.name] = log_mgr.get_total_app_playtime(log_file)
             game_cards.sort(key=lambda card: playtime_cache[card.name], reverse=True)
         else:
             # Default: Latest Played
