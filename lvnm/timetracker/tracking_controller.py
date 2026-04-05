@@ -50,13 +50,20 @@ class TrackingController(QObject):
     def stop_tracking(self):
         logger.info(f"Stopping tracking for {self.target_process}")
         self.tracker.stop_tracking()
-        self.tracker = None
+        # self.tracker = None
 
-        # Stop and kill everything just in case
-        if self.auto_timer:
-            self.auto_timer.stop()
-            self.auto_timer.deleteLater()
-            self.auto_timer = None
+        # # Stop and kill everything just in case
+        # if self.auto_timer:
+        #     self.auto_timer.stop()
+        #     self.auto_timer.deleteLater()
+        #     self.auto_timer = None
         
-        self.window = None
-        self.deleteLater()
+        # self.window = None
+        # self.deleteLater()
+
+    def start_manual_tracking(self, wid, title):
+        logger.info(f"Start Manual tracking for {wid}")
+        # self.tracker = TrackerService()
+        self.tracker.start_tracking(wid, title, None, log_file=self.log_file_name, save_interval=self.save_interval, afk_timer=self.afk_timer)
+        if self.tracker.worker:
+            self.tracker.worker.stats_updated.connect(self.stats_received.emit)

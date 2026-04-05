@@ -25,9 +25,12 @@ class TrackerWorker(QThread):
 
         # Find executable
         if self.target_window_id and not self.process_name:
+            logger.debug(f"Start Manually tracking for {window_id}")
             active_pid = self.utils.get_window_pid(self.target_window_id)
+            logger.debug(f"Found PID {active_pid}")
             self.process_name = SystemUtils.get_app_name_from_pid(active_pid)
-            logger.debug(f'self.process_name {self.process_name}')
+            logger.debug(f'Found process_name {self.process_name}')
+            self.app_name = self.process_name
         
         if not self.target_window_id and not gamescope_ses:
             logger.error(f"Could not find Application window ID for: {app_name}")

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
-    QMessageBox
+    QMessageBox, QDialog
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer, QSize
@@ -21,6 +21,7 @@ from ui.console_dialog import ConsoleDialog
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from timetracker.tracking_controller import TrackingController
+from ui.timetracker_dialog import TimetrackerDialog
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,9 @@ class GameSidebar(QFrame):
         tracking_layout.addRow(self.tr("Session Length:"), self.lbl_session_len)
         tracking_layout.addRow(self.tr("Session Playtime:"), self.lbl_session_play)
         tracking_layout.addRow(self.tr("Total Playtime:"), self.lbl_total_play)
+        self.track_btn = QPushButton(self.tr("Manually Select Tracking Window"))
+        self.track_btn.clicked.connect(self.launch_timetracker_dialog)
+        tracking_layout.addRow(self.track_btn)
 
         form.addWidget(self.tracking_group)
         
@@ -423,9 +427,7 @@ class GameSidebar(QFrame):
 
         # Start tracking
         if self.timetracker_settings.get("timetracking", False):
-            save_interval = self.timetracker_settings.get("log_periodic_save", 0)
-            afk_timer = self.timetracker_settings.get("afk_timer", 0)
-            tracking = TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
+            tracking = self.create_tracking()
             tracking.start_auto_tracking()
             self.active_trackers[name] = tracking
             
@@ -434,6 +436,11 @@ class GameSidebar(QFrame):
             self.connect_tracker_signals(tracking)
 
         return True
+
+    def create_tracking(self):
+        save_interval = self.timetracker_settings.get("log_periodic_save", 0)
+        afk_timer = self.timetracker_settings.get("afk_timer", 0)
+        return TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
 
     def check_game_status(self):
         """Polls the runner to see if the game is still alive."""
@@ -673,6 +680,37 @@ class GameSidebar(QFrame):
         else:
             self.media_container.hide()
             self.lbl_cover.set_pixmap_from_path(None)
+
+    def launch_timetracker_dialog(self):
+        """Logic for the timetracker dialog"""
+        controller = self.active_trackers.get(self.current_game.name)
+
+        if not controller or not controller.tracker:
+            logger.warn(f"No active tracker found for the current game {self.current_game.name}")
+            tracking = self.create_tracking()
+            self.active_trackers[self.current_game.name] = tracking
+            controller = tracking
+            
+        dialog = TimetrackerDialog(controller.tracker)
+        result = dialog.exec()
+        if result == QDialog.Accepted:
+            print("accepted")
+            selection = dialog.get_selection()
+            if selection:
+                title, wid = selection
+                logger.info(f"Manually attaching tracker to: {title} (ID: {wid})")
+                
+                # Stop active controller auto-detection timer since we selected it manually
+                controller.stop_tracking()
+                # Launch manual tracking
+                controller.start_manual_tracking(wid, title)
+
+                self.connect_tracker_signals(controller)
+        elif result == 2:
+            # Stop timetracker
+            logger.debug(f"Manually stopped tracking for : {self.current_game.name}")
+            self.stop_tracking(self.current_game.name)
+            
 
     def connect_tracker_signals(self, controller=None):
         """Safely disconnects from old tracker and connects to a new one when changing sidebars."""
