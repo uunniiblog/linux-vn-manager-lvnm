@@ -105,17 +105,20 @@ It only works in KDE 6. Requires KWin and journalctl to be running in the system
 
 Additionally it will also run in Gamescope Gaming mode in SteamOS. In this case it will just count the time the game is open. If you minimize the game to go config controllers or other sections of Steam while game is running it will keep counting.
 
-The tracking data is stored at ~/.local/share/lvnm/tracking/ as csv files with one line per session. If manual intervention is needed you can add/edit/delete lines there manually without issue. The info will be stored as the process name in case the game has a dynamic title window or the name given in the application is changed.
+The tracking data is stored at ~/.local/share/lvnm/tracking/ as csv files with one line per session. If manual intervention is needed you can add/edit/delete lines there manually without issue. The info will be stored as the process name + file size in case the game has a dynamic title window, the name given in the application is changed or there are different games with same exe name like SiglusEngine.exe, etc.
 
 I brought the timetracking from another application I made last year, If you want it as a standalone application it is here: https://github.com/uunniiblog/playtimetracker Although it is a bit outdated compared to the version here.
 
 With wayland the way of checking focused windows changes based on Desktop implementations, feel free to request PRs here or in the playtimetracker repo for other desktops. An implementation of DesktopUtilsInterface, plus adding the desktop to utils_factory.py is all it should be needed. Can also use external libraries if it makes it easier.
+
+If timetracking is enabled when a game is running it will show in the side bar the current tracking stats for the game.
 
 ## Planned
 - export/import prefixes and entire game configurations
 - Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs
 - Pause/Start timetracker from the sidebar
 - One game one prefix. Automatically copies the selected prefix making prefixes unique per games.
+- More suggestions are always welcomed.
 
 
 ## Tools and Credits
