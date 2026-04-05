@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class TrackerWorker(QThread):
     log_message = Signal(str)
+    stats_updated = Signal(dict)
 
     def __init__(self, window_id, app_name, process_name, desktop_utils, log_file, refresh_interval=60, save_interval=3, afk_timer=0, gamescope_ses=False):
         super().__init__()
@@ -147,6 +148,14 @@ class TrackerWorker(QThread):
                     if self.is_game_focused():
                         self.total_playtime += seconds_passed
                         self.session_playtime += seconds_passed
+
+                    # Update Data to signal
+                    now_dt = datetime.datetime.now()
+                    self.stats_updated.emit({
+                        "session_length": self.logger.format_duration(int((now_dt - self.session_start).total_seconds())),
+                        "session_playtime": self.logger.format_duration(self.session_playtime),
+                        "total_playtime": self.logger.format_duration(self.total_playtime)
+                    })
 
                 # Keep the fractional remainder
                 accumulator -= seconds_passed

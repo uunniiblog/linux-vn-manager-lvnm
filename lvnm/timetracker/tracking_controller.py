@@ -1,12 +1,14 @@
 import os
 import logging
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 from timetracker.system_utils import SystemUtils
 from timetracker.tracker_service import TrackerService
 
 logger = logging.getLogger(__name__)
 
 class TrackingController(QObject):
+    stats_received = Signal(dict)
+
     def __init__(self, main_window, process_path, save_interval=3, afk_timer=0):
         super().__init__()
         self.window = main_window # TODO: maybe raise visual error if tracking failed
@@ -42,6 +44,8 @@ class TrackingController(QObject):
             self.auto_timer.stop()
             logger.info(f"Success! Found Window: {title}")
             self.tracker.start_tracking(wid, title, self.target_process, log_file=self.log_file_name, save_interval=self.save_interval, afk_timer=self.afk_timer)
+            if self.tracker.worker:
+                self.tracker.worker.stats_updated.connect(self.stats_received.emit)
 
     def stop_tracking(self):
         logger.info(f"Stopping tracking for {self.target_process}")

@@ -40,6 +40,7 @@ class GameSidebar(QFrame):
         self.prefixes = None
         self.is_running = None
         self.runner = None
+        self.active_controller = None
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get("timetracker", {})
@@ -100,6 +101,26 @@ class GameSidebar(QFrame):
         scroll.setWidgetResizable(True)
         container = QWidget()
         form = QVBoxLayout(container)
+
+        # Timetracker section only shown if game running and timetracker active
+        self.tracking_group = QGroupBox(self.tr("Time Tracking"))
+        self.tracking_group.setVisible(False)
+
+        tracking_layout = QFormLayout(self.tracking_group)
+        tracking_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        tracking_layout.setLabelAlignment(Qt.AlignLeft)
+
+        self.lbl_session_len = QLabel("00:00:00")
+        self.lbl_session_len.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.lbl_session_play = QLabel("00:00:00")
+        self.lbl_session_play.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.lbl_total_play = QLabel("00:00:00")
+        self.lbl_total_play.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tracking_layout.addRow(self.tr("Session Length:"), self.lbl_session_len)
+        tracking_layout.addRow(self.tr("Session Playtime:"), self.lbl_session_play)
+        tracking_layout.addRow(self.tr("Total Playtime:"), self.lbl_total_play)
+
+        form.addWidget(self.tracking_group)
         
         # General Info
         gen_group = QGroupBox(self.tr("Edit Game"))
@@ -274,6 +295,12 @@ class GameSidebar(QFrame):
         # Load Env Vars
         self.refresh_env_vars(prefix_type, card.envvar)
 
+        # Tracker logic
+        running_tracker = self.active_trackers.get(card.name)
+        self.connect_tracker_signals(running_tracker)
+        self.is_running = card.name in self.active_runners
+        self.update_timetracker_visibility()
+
     def refresh_env_vars(self, prefix_type, active_vars):
         # Clear old checkboxes
         for cb in self.env_checkboxes.values():
@@ -401,6 +428,10 @@ class GameSidebar(QFrame):
             tracking = TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
             tracking.start_auto_tracking()
             self.active_trackers[name] = tracking
+            
+            # Update tracking UI periodically
+            tracking.stats_received.connect(self.update_tracking_ui)
+            self.connect_tracker_signals(tracking)
 
         return True
 
@@ -643,6 +674,38 @@ class GameSidebar(QFrame):
             self.media_container.hide()
             self.lbl_cover.set_pixmap_from_path(None)
 
+    def connect_tracker_signals(self, controller=None):
+        """Safely disconnects from old tracker and connects to a new one when changing sidebars."""
+        if self.active_controller:
+            try:
+                self.active_controller.stats_received.disconnect(self.update_tracking_ui)
+            except (TypeError, RuntimeError):
+                pass
+
+        self.active_controller = controller
+
+        if self.active_controller:
+            self.active_controller.stats_received.connect(self.update_tracking_ui)
+        else:
+            # If no controller (game not running), reset the UI
+            self.update_tracking_ui({
+                "session_length": "00:00:00",
+                "session_playtime": "00:00:00",
+                "total_playtime": "00:00:00"
+            })
+
+    def update_tracking_ui(self, stats):
+        """Update the labels with data received from the worker."""
+        self.lbl_session_len.setText(stats["session_length"])
+        self.lbl_session_play.setText(stats["session_playtime"])
+        self.lbl_total_play.setText(stats["total_playtime"])
+
+    def update_timetracker_visibility(self):
+        """Dynamically show/hide the time tracker based on game state and settings."""
+        is_enabled = self.timetracker_settings.get("timetracking", False)
+        should_be_visible = bool(self.is_running and is_enabled)        
+        self.tracking_group.setVisible(should_be_visible)
+
     def check_active_runners(self):
         """Polls ALL active runners. Cleans up those that finished."""
         finished_games = []
@@ -680,11 +743,12 @@ class GameSidebar(QFrame):
                     self.set_ui_start_state()
         
         if self.current_game:
-            is_running = self.current_game.name in self.active_runners
+            self.is_running = self.current_game.name in self.active_runners
             current_text = self.launch_btn.text()
+            self.update_timetracker_visibility()
             
             # If the game is running but the button doesn't say "Stop Game", fix it
-            if is_running and current_text != self.tr("Stop Game"):
+            if self.is_running and current_text != self.tr("Stop Game"):
                 self.set_ui_stop_state()
             
     def set_ui_stop_state(self):
@@ -702,6 +766,14 @@ class GameSidebar(QFrame):
             tracker = self.active_trackers.get(name)
             tracker.stop_tracking()
             self.active_trackers.pop(name, None)
+
+            # Reset tracking UI
+            self.update_tracking_ui(
+            {
+                "session_length": "00:00:00",
+                "session_playtime": "00:00:00",
+                "total_playtime": "00:00:00"
+            })
 
 class CoverLabel(QLabel):
     """
