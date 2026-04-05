@@ -120,7 +120,6 @@ The autostart tracking detects the running by searching the pid of the process e
 ## Planned
 - export/import prefixes and entire game configurations
 - Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs
-- Pause/Start timetracker from the sidebar
 - One game one prefix. Automatically copies the selected prefix making prefixes unique per games.
 - More suggestions are always welcomed.
 
