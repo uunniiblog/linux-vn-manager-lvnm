@@ -88,6 +88,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
     - Timetracker: Enable/disable it
         - AFK Idle timer: timer to stop counting in case you go afk with the game focused. Requires [swayidle](https://github.com/swaywm/swayidle) to be installed.
         - Periodic save interval: Save the session every X minutes in case of power shutdown or app crash.
+        - Autostart: Choose if start autotracking when the game opens or not. If not you can start tracking manually from the sidebar once the game is running.
     - Texthooking: Enable/disable it
         - Path: Select the .exe of your texthooker. Right click a running game "Open Texthooker" to run it targeted to the game.
         - Textractor will automatically hook to the game with -pgame.exe, also tested Luna and Agent, both can hook through the program's interface. 
@@ -111,7 +112,10 @@ I brought the timetracking from another application I made last year, If you wan
 
 With wayland the way of checking focused windows changes based on Desktop implementations, feel free to request PRs here or in the playtimetracker repo for other desktops. An implementation of DesktopUtilsInterface, plus adding the desktop to utils_factory.py is all it should be needed. Can also use external libraries if it makes it easier.
 
-If timetracking is enabled when a game is running it will show in the side bar the current tracking stats for the game.
+If timetracking is enabled when a game is running it will show in the side bar the current tracking stats for the game. 
+There will be a button to open a dialog where you can manually select an opened window to start tracking, or to stop current active tracking. This is useful in case you don't want to autostart the timetracker with the game, or the autostart logic can't detect the game correctly, in case it is a game with a launcher for example.
+
+The autostart tracking detects the running by searching the pid of the process executed first. Manual tracking directly selects the window ID that the compositor gives so it is more direct and should work better. Both will store in the same csv file name so saved playing times will be shared between both autostart and manual.
 
 ## Planned
 - export/import prefixes and entire game configurations
