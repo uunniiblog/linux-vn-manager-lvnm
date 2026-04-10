@@ -90,12 +90,6 @@ ENV_VARIABLES = [
         "key": "PULSE_LATENCY_MSEC",
         "value": "120"
     },
-    # {
-    #     "id": "Disable DXVK",
-    #     "key": "WINEDLLOVERRIDES",
-    #     "value": "d3d11,d3d10,d3d9,dxgi=b",
-    #     "req": "wine"
-    # },
     {
         "id": "disable_umu_update",
         "name": "Disable UMU runtime update",
@@ -117,13 +111,6 @@ ENV_VARIABLES = [
         "value": "runinprefix",
         "req": "proton"
     },
-    # {
-    #     "id": "proton_verb_run",
-    #     "name": "Proton Verb Run (Two games same prefix)",
-    #     "key": "PROTON_VERB",
-    #     "value": "run",
-    #     "req": "proton"
-    # },
     {
         "id": "pressure_vessel_shell_after",
         "name": "PRESSURE Vessel after (Run Terminal same memory as game)",
@@ -149,6 +136,12 @@ ENV_VARIABLES = [
         "key": "PROTON_LOG",
         "value": "1",
         "req": "proton"
+    },
+    {
+        "id": "sdl_video_x11",
+        "name": "SDL_VIDEODRIVER X11",
+        "key": "SDL_VIDEODRIVER",
+        "value": "x11",
     },
 
 ]

@@ -102,9 +102,11 @@ Can be enabled in settings.
 
 Timetracking will only track "real" playing time, it will only count the time when the game is focused so it should be somewhat accurate to your real playing time if you don't spend a lot of time in menus. 
 
-It only works in KDE 6. Requires KWin and journalctl to be running in the system (Tested in SteamOS desktop mode and EndeavourOS with wayland).
+Current working desktops:
+- KDE 6: Fully working for both X11 and Wayland through KWIN queries.
+- Gamescope session: In this case it will just count the time the game is open. If you minimize the game to go config controllers or other sections of Steam while game is running it will keep counting.
 
-Additionally it will also run in Gamescope Gaming mode in SteamOS. In this case it will just count the time the game is open. If you minimize the game to go config controllers or other sections of Steam while game is running it will keep counting.
+As a fallback it uses x11_utils (python-xlib) which should work in any x11 desktop and through xwayland. That means any game not purposefully running through the wayland driver should still work. If you run the game with gamescope you will need to use --backend sdl and SDL_VIDEODRIVER=x11 environment variable for gamescope to run as x11 to be able to timetrack it.
 
 The tracking data is stored at ~/.local/share/lvnm/tracking/ as csv files with one line per session. If manual intervention is needed you can add/edit/delete lines there manually without issue. The info will be stored as the process name + file size in case the game has a dynamic title window, the name given in the application is changed or there are different games with same exe name like SiglusEngine.exe, etc.
 

@@ -18,27 +18,38 @@ class TrackingController(QObject):
         self.log_file_name = f"{os.path.basename(process_path)}_{os.path.getsize(process_path)}"
         self.save_interval = save_interval
         self.afk_timer = afk_timer
+        self.launch_attemps = 0
 
     def start_auto_tracking(self):
         logger.info(f"Auto-tracking enabled for: {self.target_process}")
         logger.debug("Looking for PID...")
+        self.launch_attemps = 0
 
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._attempt_auto_launch)
         self.auto_timer.start(2000)
 
     def _attempt_auto_launch(self):
+        if self.launch_attemps > 20:
+            logger.error(f"Could not find {self.target_process} after 20 attempts. Timetracker DISABLED")
+            self.auto_timer.stop()
+            return
+
+        self.launch_attemps += 1
+        logger.debug(f"_attempt_auto_launch {self.launch_attemps}/20...")
+        
         utils = self.tracker.desktop_utils
         pid = SystemUtils.get_pid_by_name(self.target_process)
         
         if not pid:
-            logger.error("PID not found")
+            logger.warning(f"PID not found. Attempt {self.launch_attemps}/20...")
             return 
 
-        logger.debug(f"Detected PID: {pid}. Looking for KWin window...")
+        logger.debug(f"Detected PID: {pid}. Looking for Window ID...")
         
         wid, title = utils.find_window_by_pid(pid, self.target_process)
         logger.debug(f"wid {wid}, title {title}")
+
         
         if title and wid:
             self.auto_timer.stop()

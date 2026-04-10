@@ -1,6 +1,7 @@
 import os
 import logging
 from timetracker.kde_utils import KdeUtils
+from timetracker.x11_utils import X11Utils
 from timetracker.gamescope_utils import GamescopeUtils
 # from timetracker.gnome_utils import GnomeUtils
 
@@ -22,13 +23,7 @@ def get_desktop_utils():
     elif "GAMESCOPE" in de.upper():
         logger.info("Using GamescopeUtils")
         return GamescopeUtils()
-    elif "GNOME" in de.upper():
-        logger.info("Using GnomeUtils")
-        # return GnomeUtils()
-
-    # Give error if no supported DE
-    raise RuntimeError(
-        f"Unsupported Desktop Environment: '{de}'. "
-        "This application currently only supports KDE via KWin Scripting API."
-    )
+    else:
+        logger.info("Using X11Utils")
+        return X11Utils()
         
