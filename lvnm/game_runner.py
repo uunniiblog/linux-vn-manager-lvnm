@@ -50,7 +50,11 @@ class GameRunner:
         """Builds the environment and the final command list."""
         self.env = SystemUtils.get_clean_env()
 
+        # Clean app image env variables
         self.scrub_appimage_environment()
+
+        # Point to appimage gstreamer libraries
+        self.inject_appimage_gstreamer()
 
         if self.is_steam:
             logging.info("Steam launch detected: LC_ALL = C.UTF-8...")
@@ -517,6 +521,27 @@ class GameRunner:
             # If no original path exists, clear it to let system/Proton decide
             self.env.pop("LD_LIBRARY_PATH", None)
         return var
+
+    def inject_appimage_gstreamer(self):
+        appdir = os.environ.get("APPDIR")
+        if appdir:
+            gst_lib_dir = Path(appdir) / "usr" / "lib" / "x86_64-linux-gnu"
+            gst_plugin_dir = gst_lib_dir / "gstreamer-1.0"
+            gst_scanner = gst_lib_dir / "gstreamer1.0" / "gstreamer-1.0" / "gst-plugin-scanner"
+        
+            if gst_lib_dir.exists():
+                logger.debug("Injecting bundled AppImage GStreamer libraries into environment.")
+                # Prepend the bundled lib directory to LD_LIBRARY_PATH so winegstreamer finds it
+                current_ld = self.env.get("LD_LIBRARY_PATH", "")
+                self.env["LD_LIBRARY_PATH"] = f"{gst_lib_dir}:{current_ld}".strip(":")
+        
+                # Point GStreamer directly to our bundled plugins and scanner
+                self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = str(gst_plugin_dir)
+                self.env["GST_PLUGIN_SCANNER"] = str(gst_scanner)
+        
+                # Force GStreamer to build its registry inside the wineprefix 
+                # instead of the user's home folder to prevent permission/cache issues.
+                self.env["GST_REGISTRY"] = str(Path(self.prefix_info["path"]) / "gstreamer.registry")
     
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""
