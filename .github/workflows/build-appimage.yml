@@ -41,6 +41,7 @@ jobs:
         run: |
           mkdir -p gst-downloads && cd gst-downloads
           GST_DIR=$(pwd)
+          echo "GST_DIR is: $GST_DIR" 
 
           sudo apt-get update
 
