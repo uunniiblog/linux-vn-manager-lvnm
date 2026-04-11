@@ -75,6 +75,21 @@ jobs:
             libpcre3
           
           for deb in *.deb; do dpkg -x "$deb" . ; done
+
+          cd usr/lib/x86_64-linux-gnu
+
+          for versioned in libpcre.so.3.* libpcreposix.so.3.* libglib-2.0.so.0.* libgobject-2.0.so.0.*; do
+              [ -f "$versioned" ] || continue
+              # Extract the soname (e.g. libpcre.so.3.13.3 → libpcre.so.3)
+              soname=$(echo "$versioned" | grep -oP '^lib[^.]+\.so\.\d+')
+              if [ -n "$soname" ] && [ ! -e "$soname" ]; then
+                  ln -sf "$versioned" "$soname"
+                  echo "Created symlink: $soname -> $versioned"
+              fi
+          done
+          pwd
+          cd ../../../..
+          pwd
           
           # Try to find what the GStreamer plugins are strictly missing
           echo "Finding missing dependencies for GStreamer plugins..."
