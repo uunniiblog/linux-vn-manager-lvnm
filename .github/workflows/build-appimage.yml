@@ -118,6 +118,11 @@ jobs:
           rm -f libGL.so* libEGL.so* libGLX.so* libGLdispatch.so* libgbm.so*
           rm -f libX11.so* libX11-xcb.so* libxcb.so* libdrm.so*
           rm -f libasound.so* libjack.so* libpulse.so*
+
+          # Remove 32 bit
+          find LVNM.AppDir/usr/lib/i386-linux-gnu -type f -delete 2>/dev/null || true
+          find LVNM.AppDir/usr/lib32 -type f -delete 2>/dev/null || true
+          find LVNM.AppDir/usr/lib -name "*.so*" | xargs file 2>/dev/null | grep "ELF 32-bit" | cut -d: -f1 | xargs rm -f 2>/dev/null || true
           
           echo "Final library count: $(ls | wc -l)"
           echo "GStreamer bundling complete."
@@ -175,7 +180,7 @@ jobs:
         run: |
           curl -fLo appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool          
-          ./appimagetool --appimage-extract-and-run LVNM.AppDir/ LVNM-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run LVNM.AppDir/ LVNM-x86_64.AppImage
 
       - name: Upload Artifact (Always)
         uses: actions/upload-artifact@v4
