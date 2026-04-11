@@ -525,26 +525,50 @@ class GameRunner:
     def inject_appimage_gstreamer(self):
         appdir = os.environ.get("APPDIR")
         if appdir:
-            gst_lib_dir = Path(appdir) / "usr" / "lib" / "x86_64-linux-gnu"
-            gst_plugin_dir = gst_lib_dir / "gstreamer-1.0"
-            gst_scanner = gst_lib_dir / "gstreamer1.0" / "gstreamer-1.0" / "gst-plugin-scanner"
+            base_lib = os.path.join(appdir, "usr", "lib", "x86_64-linux-gnu")
+            logger.debug(f"gst_lib_dir: {base_lib}")
+            gst_plugin_path = os.path.join(base_lib, "gstreamer-1.0")
+            logger.debug(f"gst_plugin_dir: {gst_plugin_path}")
+            gst_scanner = os.path.join(base_lib, "gstreamer1.0", "gstreamer-1.0", "gst-plugin-scanner")
+            logger.debug(f"gst_scanner: {gst_scanner}")
         
             if gst_lib_dir.exists():
+
+                # --- DEBUG LOGGING START ---
+                try:
+                    all_files = os.listdir(base_lib)
+                    # Filter for things we care about to keep logs readable
+                    gst_related = [f for f in all_files if "gst" in f or "libicu" in f or "libav" in f]
+                    
+                    logger.debug(f"--- AppImage Library Audit ---")
+                    logger.debug(f"Total files in base_lib: {len(all_files)}")
+                    logger.debug(f"GStreamer/Codec related files found: {gst_related}")
+                    
+                    # Specifically check for the 'smoking gun' file
+                    if "libgstgl-1.0.so.0" in all_files:
+                        logger.debug("CHECK: libgstgl-1.0.so.0 is PRESENT in bundle.")
+                    else:
+                        logger.warning("CHECK: libgstgl-1.0.so.0 is MISSING from bundle!")
+                except Exception as e:
+                    logger.error(f"Failed to audit AppImage libs: {e}")
+                # --- DEBUG LOGGING END ---
+
                 logger.debug("Injecting bundled AppImage GStreamer libraries into environment.")
+
                 # Prepend the bundled lib directory to LD_LIBRARY_PATH so winegstreamer finds it
                 current_ld = self.env.get("LD_LIBRARY_PATH", "")
-                self.env["LD_LIBRARY_PATH"] = f"{gst_lib_dir}:{current_ld}".strip(":")
-        
-                # Point GStreamer directly to our bundled plugins and scanner
-                self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = str(gst_plugin_dir)
-                self.env["GST_PLUGIN_SCANNER"] = str(gst_scanner)
-        
-                # Force GStreamer to build its registry inside the wineprefix 
-                # instead of the user's home folder to prevent permission/cache issues.
-                self.env["GST_REGISTRY"] = str(Path(self.prefix_info["path"]) / "gstreamer.registry")
-
-                # Force fresh scan
-                self.env["GST_REGISTRY_REUSE_PLUGIN_SCANNER"] = "no"
+                self.env["LD_LIBRARY_PATH"] = f"{base_lib}:{gst_plugin_path}:{current_ld}".strip(":")
+                
+                # Tell GStreamer exactly where its plugins are
+                self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = gst_plugin_path
+                self.env["GST_PLUGIN_SCANNER"] = gst_scanner
+                
+                # Disable the shared registry to avoid "Blacklist" contamination from the host
+                self.env["GST_REGISTRY"] = os.path.join(self.prefix_info["path"], "gst_registry.bin")
+                # Force rescan
+                self.env["GST_REGISTRY_FORK"] = "no"
+                
+                logger.debug(f"GStreamer environment sealed to AppImage: {base_lib}")
     
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""

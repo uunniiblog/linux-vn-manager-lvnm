@@ -47,30 +47,22 @@ jobs:
 
           # Core
           apt-get download \
-            libgstreamer1.0-0 \
-            libgstreamer-plugins-base1.0-0 \
-            libgstreamer-plugins-good1.0-0 \
-            libgstreamer-plugins-bad1.0-0 \
-            liborc-0.4-0
+            libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+            libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav gstreamer1.0-tools liborc-0.4-0
 
-          # Plugins
-          apt-get download \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good \
-            gstreamer1.0-plugins-bad \
-            gstreamer1.0-plugins-ugly \
-            gstreamer1.0-libav \
-            gstreamer1.0-tools
-
-          # Dependencies
-          apt-get download \
-            liba52-0.7.4 libxml2 libflac8 libvorbis0a libvorbisenc2 \
-            libavcodec58 libavformat58 libavutil56 libswresample3 \
-            libvpx7 libx264-163 libx265-199 libmp3lame0 libmpg123-0 \
-            libopencore-amrnb0 libopencore-amrwb0 libvo-aacenc0 \
-            libopenh264-6 libpocketsphinx3 libvisual-0.4-0 libmjpegutils-2.1-0 \
-            libopenexr25 libopenni2-0 libsoundtouch1 libsrt1.4-gnutls \
-            libwebrtc-audio-processing1 libzxingcore1
+          # Extract them first to see what they need
+          for deb in *.deb; do dpkg -x "$deb" . ; done
+          
+          # IDENTIFY ALL MISSING DEPS (The "Magic" part)
+          # This finds every .so in the plugins, checks what it's linked to, 
+          # and tells apt to download those packages too.
+          MISSING_PKGS=$(find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | xargs ldd | grep "not found" | awk '{print $1}' | sort -u)
+          
+          # Also manually add the heavy hitters that often fail to be detected
+          apt-get download libicu70 libbluray2 libdc1394-22 libflite1 libtheora0 libilmbase25 libopenexr25 libmpeg2-4 libmjpegutils-2.1-0
           
           # Extract all downloaded .deb files directly into the AppDir
           for deb in *.deb; do
