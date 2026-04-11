@@ -58,25 +58,41 @@ jobs:
             libicu70 libbluray2 libdc1394-25 libflite1 libtheora0 \
             libopenexr25 libmpeg2-4 libmjpegutils-2.1-0 libvpx7 \
             libx264-163 libx265-199 libmp3lame0 libmpg123-0 libkate1
+
+          apt-get download \
+            libncurses6 \
+            libdav1d5 \
+            libxml2 \
+            libpocketsphinx3 \
+            libilmbase25 \
+            libtiff5 \
+            libgupnp-igd-1.0-4 \
+            libavcodec-extra58
           
           for deb in *.deb; do dpkg -x "$deb" . ; done
           
           # Try to find what the GStreamer plugins are strictly missing
           echo "Finding missing dependencies for GStreamer plugins..."
-          MISSING_FILES=$(find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | xargs ldd | grep "not found" | awk '{print $1}' | sort -u)
-          
+          MISSING_FILES=$(
+            find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | \
+            xargs -I{} env LD_LIBRARY_PATH=usr/lib/x86_64-linux-gnu ldd {} 2>/dev/null | \
+            grep "not found" | \
+            awk '{print $1}' | \
+            sort -u
+          )
+
           if [ -n "$MISSING_FILES" ]; then
             echo "Missing files: $MISSING_FILES"
             for file in $MISSING_FILES; do
-              PKG=$(apt-file search "$file" | head -n 1 | cut -d: -f1)
+              PKG=$(apt-file search "$file" | grep "x86_64-linux-gnu\|amd64" | head -n 1 | cut -d: -f1)
               if [ -n "$PKG" ]; then
                 echo "Downloading $PKG to satisfy $file..."
                 apt-get download "$PKG" || true
               fi
             done
+            # Second extraction pass for anything newly downloaded
             for deb in *.deb; do dpkg -x "$deb" . ; done
           fi
-
           # Move to AppDir
           cp -r usr ../LVNM.AppDir/
           cd ..

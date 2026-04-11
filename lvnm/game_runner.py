@@ -574,12 +574,14 @@ class GameRunner:
                 
                 # Tell GStreamer exactly where its plugins are
                 self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = gst_plugin_path
+                self.env["GST_PLUGIN_PATH"] = gst_plugin_path 
                 self.env["GST_PLUGIN_SCANNER"] = gst_scanner
                 
                 # Disable the shared registry to avoid "Blacklist" contamination from the host
                 self.env["GST_REGISTRY"] = os.path.join(self.prefix_info["path"], "gst_registry.bin")
                 # Force rescan
                 self.env["GST_REGISTRY_FORK"] = "no"
+                self.env["GST_REGISTRY_UPDATE"] = "yes"
                 
                 logger.debug(f"GStreamer environment sealed to AppImage: {base_lib}")
     
