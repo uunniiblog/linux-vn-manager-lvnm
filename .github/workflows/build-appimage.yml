@@ -44,7 +44,7 @@ jobs:
           
           sudo apt-get update
           sudo apt-get install -y apt-file
-          sudo apt-file update
+          sudo apt-file upda
 
           # Download GStreamer
           apt-get download \
@@ -71,7 +71,8 @@ jobs:
             libncurses6 \
             libsphinxbase3 \
             libjbig0 \
-            libgupnp-1.2-1
+            libgupnp-1.2-1 \
+            libpcre3
           
           for deb in *.deb; do dpkg -x "$deb" . ; done
           
@@ -111,7 +112,7 @@ jobs:
           cd LVNM.AppDir/usr/lib/x86_64-linux-gnu
           
           # Remove things that break Python and core OS functions
-          rm -f libzstd.so* libffi.so* liblzma.so* libresolv.so* libcrypt.so*
+          rm -f libzstd.so* libresolv.so* libcrypt.so*
           rm -f libexpat.so* libssl.so* libcrypto.so* libsqlite3.so*
           
           # Remove core drivers to prevent conflicts
