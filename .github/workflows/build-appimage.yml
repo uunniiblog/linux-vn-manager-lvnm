@@ -67,18 +67,27 @@ jobs:
             libilmbase25 \
             libtiff5 \
             libgupnp-igd-1.0-4 \
-            libavcodec-extra58
+            libavcodec-extra58 \
+            libncurses6 \
+            libsphinxbase3 \
+            libjbig0 \
+            libgupnp-1.2-1
           
           for deb in *.deb; do dpkg -x "$deb" . ; done
           
           # Try to find what the GStreamer plugins are strictly missing
           echo "Finding missing dependencies for GStreamer plugins..."
+          BUNDLED_LIBS=$(find usr/lib/x86_64-linux-gnu -name "*.so*" -printf "%f\n" | sort -u)
           MISSING_FILES=$(
-            find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | \
-            xargs -I{} env LD_LIBRARY_PATH=usr/lib/x86_64-linux-gnu ldd {} 2>/dev/null | \
-            grep "not found" | \
-            awk '{print $1}' | \
-            sort -u
+            find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | while read plugin; do
+              readelf -d "$plugin" 2>/dev/null | grep NEEDED | grep -oP '\[\K[^\]]+' 
+            done | sort -u | while read needed; do
+              # Check if it exists in our bundle (match by prefix since versions vary)
+              base="${needed%.so*}"
+              if ! echo "$BUNDLED_LIBS" | grep -q "^${base}"; then
+                echo "$needed"
+              fi
+            done
           )
 
           if [ -n "$MISSING_FILES" ]; then
@@ -110,6 +119,7 @@ jobs:
           rm -f libX11.so* libX11-xcb.so* libxcb.so* libdrm.so*
           rm -f libasound.so* libjack.so* libpulse.so*
           
+          echo "Final library count: $(ls | wc -l)"
           echo "GStreamer bundling complete."
 
       - name: Build Main LVNM Binary
