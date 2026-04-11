@@ -42,43 +42,59 @@ jobs:
           mkdir -p gst-downloads
           cd gst-downloads
           
-          # Download GStreamer plugins PLUS deep media codec dependencies
           sudo apt-get update
+          sudo apt-get install -y apt-file
+          sudo apt-file update
 
-          BASE_PKGS="libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools liborc-0.4-0"
+          # Download GStreamer
+          apt-get download \
+            libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+            libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav gstreamer1.0-tools liborc-0.4-0
 
-          echo "Resolving full dependency tree..."
-          ALL_PKGS=$(apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances $BASE_PKGS | grep "^\w" | sort -u)
+          apt-get download \
+            libicu70 libbluray2 libdc1394-25 libflite1 libtheora0 \
+            libopenexr25 libmpeg2-4 libmjpegutils-2.1-0 libvpx7 \
+            libx264-163 libx265-199 libmp3lame0 libmpg123-0 libkate1
           
-          echo "Downloading packages..."
-          for pkg in $ALL_PKGS; do
-            apt-get download "$pkg" 2>/dev/null || true
-          done
+          for deb in *.deb; do dpkg -x "$deb" . ; done
+          
+          # Try to find what the GStreamer plugins are strictly missing
+          echo "Finding missing dependencies for GStreamer plugins..."
+          MISSING_FILES=$(find usr/lib/x86_64-linux-gnu/gstreamer-1.0 -name "*.so" | xargs ldd | grep "not found" | awk '{print $1}' | sort -u)
+          
+          if [ -n "$MISSING_FILES" ]; then
+            echo "Missing files: $MISSING_FILES"
+            for file in $MISSING_FILES; do
+              PKG=$(apt-file search "$file" | head -n 1 | cut -d: -f1)
+              if [ -n "$PKG" ]; then
+                echo "Downloading $PKG to satisfy $file..."
+                apt-get download "$PKG" || true
+              fi
+            done
+            for deb in *.deb; do dpkg -x "$deb" . ; done
+          fi
 
-          echo "Extracting libraries..."
-          for deb in *.deb; do
-            dpkg -x "$deb" ../LVNM.AppDir/
-          done
+          # Move to AppDir
+          cp -r usr ../LVNM.AppDir/
           cd ..
-
-          echo "Applying AppImage Excludelist to prevent distro conflicts..."
-          wget -q https://raw.githubusercontent.com/AppImageCommunity/pkg2appimage/master/excludelist
-          find LVNM.AppDir/usr/lib -name "*.so*" | while read -r libpath; do
-            libname=$(basename "$libpath")
-            # Strip version numbers to check against the excludelist (e.g., libc.so.6 -> libc.so)
-            baselibname=$(echo "$libname" | sed 's/\.so.*/.so/')
-            
-            # Delete if found
-            if grep -q -x "$baselibname" excludelist || grep -q -x "$libname" excludelist; then
-              echo "Removing blacklisted system library: $libname"
-              rm -f "$libpath"
-            fi
-          done
-
-          rm -f LVNM.AppDir/usr/lib/*/libstdc++.so*
-          rm -f LVNM.AppDir/usr/lib/*/libgcc_s.so*
-          rm -f LVNM.AppDir/usr/lib/*/libc.so*
-          rm -f LVNM.AppDir/usr/lib/*/libglib-2.0.so*
+          
+          # Clean 
+          echo "Cleaning up dangerous system libraries..."
+          cd LVNM.AppDir/usr/lib/x86_64-linux-gnu
+          
+          # Remove things that break Python and core OS functions
+          rm -f libzstd.so* libffi.so* liblzma.so* libresolv.so* libcrypt.so*
+          rm -f libexpat.so* libssl.so* libcrypto.so* libsqlite3.so*
+          
+          # Remove core drivers to prevent conflicts
+          rm -f libGL.so* libEGL.so* libGLX.so* libGLdispatch.so* libgbm.so*
+          rm -f libX11.so* libX11-xcb.so* libxcb.so* libdrm.so*
+          rm -f libasound.so* libjack.so* libpulse.so*
+          
+          echo "GStreamer bundling complete."
 
       - name: Build Main LVNM Binary
         run: |
