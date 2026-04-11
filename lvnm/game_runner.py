@@ -532,8 +532,7 @@ class GameRunner:
             gst_scanner = os.path.join(base_lib, "gstreamer1.0", "gstreamer-1.0", "gst-plugin-scanner")
             logger.debug(f"gst_scanner: {gst_scanner}")
         
-            if gst_lib_dir.exists():
-
+            if base_lib.exists():
                 # --- DEBUG LOGGING START ---
                 try:
                     all_files = os.listdir(base_lib)
