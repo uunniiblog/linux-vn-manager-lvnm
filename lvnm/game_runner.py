@@ -576,7 +576,11 @@ class GameRunner:
                 self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = gst_plugin_path
                 self.env["GST_PLUGIN_PATH"] = gst_plugin_path 
                 self.env["GST_PLUGIN_SCANNER"] = gst_scanner
-            
+                self.env["GST_REGISTRY_FORK"] = "no"
+                gst_registry_path = os.path.join(self.prefix_info["path"], "gstreamer.registry")
+                if os.path.exists(gst_registry_path):
+                    os.remove(gst_registry_path)
+                self.env["GST_REGISTRY"] = gst_registry_path
 
                 self.env["GST_DEBUG"] = "3"
                 self.env["GST_DEBUG_NO_COLOR"] = "1"

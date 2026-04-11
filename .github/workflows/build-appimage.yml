@@ -112,6 +112,8 @@ jobs:
           cd LVNM.AppDir/usr/lib/x86_64-linux-gnu
           
           # Remove things that break Python and core OS functions
+          rm -f libc.so* libm.so* libdl.so* libpthread.so* librt.so* libutil.so* libresolv.so*
+          rm -f libgcc_s.so* libstdc++.so*
           rm -f libzstd.so* libresolv.so* libcrypt.so*
           rm -f libexpat.so* libssl.so* libcrypto.so* libsqlite3.so*
           
