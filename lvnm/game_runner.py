@@ -532,7 +532,7 @@ class GameRunner:
             gst_scanner = os.path.join(base_lib, "gstreamer1.0", "gstreamer-1.0", "gst-plugin-scanner")
             logger.debug(f"gst_scanner: {gst_scanner}")
         
-            if base_lib.exists():
+            if os.path.exists(base_lib):
                 # --- DEBUG LOGGING START ---
                 try:
                     all_files = os.listdir(base_lib)
@@ -548,6 +548,20 @@ class GameRunner:
                         logger.debug("CHECK: libgstgl-1.0.so.0 is PRESENT in bundle.")
                     else:
                         logger.warning("CHECK: libgstgl-1.0.so.0 is MISSING from bundle!")
+
+                    scanner_exists = os.path.isfile(gst_scanner)
+                    logger.debug(f"CHECK: gst-plugin-scanner found at target path? {scanner_exists}")
+                    if not scanner_exists:
+                        logger.warning(f"SCANNER NOT FOUND at: {gst_scanner}")
+                        parent_dir = os.path.join(base_lib, "gstreamer1.0")
+                        if os.path.exists(parent_dir):
+                            try:
+                                sub_contents = os.listdir(parent_dir)
+                                logger.debug(f"Contents of {parent_dir}: {sub_contents}")
+                            except Exception as e:
+                                logger.error(f"Could not list parent_dir: {e}")
+                        else:
+                            logger.error(f"Parent directory {parent_dir} does not exist")
                 except Exception as e:
                     logger.error(f"Failed to audit AppImage libs: {e}")
                 # --- DEBUG LOGGING END ---
