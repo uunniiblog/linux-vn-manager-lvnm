@@ -542,6 +542,9 @@ class GameRunner:
                 # Force GStreamer to build its registry inside the wineprefix 
                 # instead of the user's home folder to prevent permission/cache issues.
                 self.env["GST_REGISTRY"] = str(Path(self.prefix_info["path"]) / "gstreamer.registry")
+
+                # Force fresh scan
+                self.env["GST_REGISTRY_REUSE_PLUGIN_SCANNER"] = "no"
     
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""
