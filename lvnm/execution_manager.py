@@ -24,7 +24,7 @@ class ExecutionManager:
             # Show everything
             env["UMU_LOG"] = "1"
             # errors + everything
-            env["WINEDEBUG"] = "err+all,+winegstreamer,+quartz"
+            env["WINEDEBUG"] = "err+all"
             env["DXVK_LOG_LEVEL"] = "info"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
         

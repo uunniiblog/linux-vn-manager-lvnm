@@ -37,88 +37,6 @@ jobs:
           mkdir -p LVNM.AppDir/usr/share/applications
           mkdir -p LVNM.AppDir/usr/share/icons/hicolor/256x256/apps
 
-      - name: Bundle GStreamer Libraries and Deep Codecs
-        run: |
-          mkdir -p gst-downloads && cd gst-downloads
-          GST_DIR=$(pwd)
-          echo "GST_DIR is: $GST_DIR" 
-
-          sudo apt-get update
-
-          apt-get download \
-            libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
-            libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0 \
-            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-            gstreamer1.0-libav gstreamer1.0-tools liborc-0.4-0 \
-            libicu70 libbluray2 libdc1394-25 libflite1 libtheora0 \
-            libopenexr25 libmpeg2-4 libmjpegutils-2.1-0 libvpx7 \
-            libx264-163 libx265-199 libmp3lame0 libmpg123-0 libkate1 \
-            libncurses6 libdav1d5 libxml2 libpocketsphinx3 libilmbase25 \
-            libtiff5 libgupnp-igd-1.0-4 libavcodec-extra58 libsphinxbase3 \
-            libjbig0 libgupnp-1.2-1 libpcre3
-
-          for deb in *.deb; do dpkg -x "$deb" . ; done
-
-          # Fix missing symlinks that dpkg -x doesn't create (no postinst)
-          LIBDIR="$GST_DIR/usr/lib/x86_64-linux-gnu"
-          for versioned in "$LIBDIR"/libpcre.so.3.* "$LIBDIR"/libpcreposix.so.3.*; do
-            [ -f "$versioned" ] || continue
-            soname=$(basename "$versioned" | grep -oP '^lib[^.]+\.so\.\d+')
-            if [ -n "$soname" ] && [ ! -e "$LIBDIR/$soname" ]; then
-              ln -sf "$(basename "$versioned")" "$LIBDIR/$soname"
-              echo "Created symlink: $soname -> $(basename "$versioned")"
-            fi
-          done
-
-          # readelf-based missing dep detection
-          echo "Finding missing dependencies..."
-          BUNDLED_LIBS=$(find "$LIBDIR" -name "*.so*" -printf "%f\n" | sort -u)
-          MISSING_FILES=$(
-            find "$LIBDIR/gstreamer-1.0" -name "*.so" | while read plugin; do
-              readelf -d "$plugin" 2>/dev/null | grep NEEDED | grep -oP '\[\K[^\]]+'
-            done | sort -u | while read needed; do
-              base="${needed%.so*}"
-              if ! echo "$BUNDLED_LIBS" | grep -q "^${base}"; then
-                echo "$needed"
-              fi
-            done
-          )
-          if [ -n "$MISSING_FILES" ]; then
-            echo "Still missing: $MISSING_FILES"
-            for file in $MISSING_FILES; do
-              PKG=$(apt-cache search "${file%%.*}" 2>/dev/null | grep "lib" | head -n 1 | cut -d' ' -f1)
-              if [ -n "$PKG" ]; then
-                apt-get download "$PKG" || true
-              fi
-            done
-            for deb in *.deb; do dpkg -x "$deb" . ; done
-          fi
-
-          # Verify scanner deps
-          echo "Scanner dep check:"
-          LD_LIBRARY_PATH="$LIBDIR" ldd "$LIBDIR/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner" | grep "not found" && echo "WARNING: missing deps" || echo "Scanner OK"
-
-          cp -r "$GST_DIR/usr" ../LVNM.AppDir/
-          cd ..
-
-          echo "Cleaning dangerous system libraries..."
-          APPLIB="LVNM.AppDir/usr/lib/x86_64-linux-gnu"
-          rm -f "$APPLIB"/libc.so* "$APPLIB"/libm.so* "$APPLIB"/libdl.so* \
-                "$APPLIB"/libpthread.so* "$APPLIB"/librt.so* "$APPLIB"/libresolv.so* \
-                "$APPLIB"/libgcc_s.so* "$APPLIB"/libstdc++.so* \
-                "$APPLIB"/libzstd.so* "$APPLIB"/libcrypt.so* \
-                "$APPLIB"/libexpat.so* "$APPLIB"/libssl.so* "$APPLIB"/libcrypto.so* "$APPLIB"/libsqlite3.so* \
-                "$APPLIB"/libGL.so* "$APPLIB"/libEGL.so* "$APPLIB"/libGLX.so* "$APPLIB"/libGLdispatch.so* "$APPLIB"/libgbm.so* \
-                "$APPLIB"/libX11.so* "$APPLIB"/libX11-xcb.so* "$APPLIB"/libxcb.so* "$APPLIB"/libdrm.so* \
-                "$APPLIB"/libasound.so* "$APPLIB"/libjack.so* "$APPLIB"/libpulse.so*
-
-          find LVNM.AppDir/usr/lib/i386-linux-gnu -type f -delete 2>/dev/null || true
-          find LVNM.AppDir/usr/lib32 -type f -delete 2>/dev/null || true
-          find LVNM.AppDir/usr/lib -name "*.so*" | xargs file 2>/dev/null | grep "ELF 32-bit" | cut -d: -f1 | xargs rm -f 2>/dev/null || true
-
-          echo "Done. Library count: $(ls $APPLIB | wc -l)"
-
       - name: Build Main LVNM Binary
         run: |
           python -m PyInstaller --noconfirm --windowed \
@@ -172,7 +90,7 @@ jobs:
         run: |
           curl -fLo appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool          
-          ARCH=x86_64 ./appimagetool --appimage-extract-and-run LVNM.AppDir/ LVNM-x86_64.AppImage
+          ./appimagetool --appimage-extract-and-run LVNM.AppDir/ LVNM-x86_64.AppImage
 
       - name: Upload Artifact (Always)
         uses: actions/upload-artifact@v4

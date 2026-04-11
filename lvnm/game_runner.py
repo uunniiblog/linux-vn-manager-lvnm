@@ -53,9 +53,6 @@ class GameRunner:
         # Clean app image env variables
         self.scrub_appimage_environment()
 
-        # Point to appimage gstreamer libraries
-        self.inject_appimage_gstreamer()
-
         if self.is_steam:
             logging.info("Steam launch detected: LC_ALL = C.UTF-8...")
             # Adjust this since it fucks with jp paths
@@ -523,6 +520,7 @@ class GameRunner:
         return var
 
     def inject_appimage_gstreamer(self):
+        """Unused method to try load gstreamer from appimage"""
         appdir = os.environ.get("APPDIR")
         if appdir:
             base_lib = os.path.join(appdir, "usr", "lib", "x86_64-linux-gnu")

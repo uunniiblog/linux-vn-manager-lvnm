@@ -414,26 +414,26 @@ class GameSidebar(QFrame):
         if name in self.active_runners:
             logger.info(f"{name} is already running. Ignoring launch request.")
             return False
-
+        
         try:
             self.runner = GameRunner(name)
             if self.runner.run():
                 self.active_runners[name] = self.runner
                 self.runners[name] = self.runner
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
+
+                # Start tracking
+                if self.timetracker_settings.get("timetracking", False) and self.timetracker_settings.get("autostart", False):
+                    tracking = self.create_tracking()
+                    tracking.start_auto_tracking()
+                    self.active_trackers[name] = tracking
+                    
+                    # Update tracking UI periodically
+                    tracking.stats_received.connect(self.update_tracking_ui)
+                    self.connect_tracker_signals(tracking)
         except Exception as e:
             logger.error(f"Failed to start {name}: {e}")
             return False
-
-        # Start tracking
-        if self.timetracker_settings.get("timetracking", False) and self.timetracker_settings.get("autostart", False):
-            tracking = self.create_tracking()
-            tracking.start_auto_tracking()
-            self.active_trackers[name] = tracking
-            
-            # Update tracking UI periodically
-            tracking.stats_received.connect(self.update_tracking_ui)
-            self.connect_tracker_signals(tracking)
 
         return True
 
