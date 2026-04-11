@@ -37,32 +37,34 @@ jobs:
           mkdir -p LVNM.AppDir/usr/share/applications
           mkdir -p LVNM.AppDir/usr/share/icons/hicolor/256x256/apps
 
-      # - name: Build Main LVNM Binary
-      #   run: |
-      #     # Added --exclude-module readline
-      #     python -m PyInstaller --noconfirm --windowed \
-      #       --exclude-module readline \
-      #       --paths . \
-      #       --paths lvnm \
-      #       --name LVNM lvnm/launcher.py
+      - name: Bundle GStreamer Libraries and Deep Codecs
+        run: |
+          mkdir -p gst-downloads
+          cd gst-downloads
           
-      #     cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
+          # Download GStreamer plugins PLUS deep media codec dependencies
+          sudo apt-get update
+          apt-get download \
+            libgstreamer1.0-0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav \
+            gstreamer1.0-tools \
+            libgstreamer-plugins-base1.0-0 \
+            libgstreamer-plugins-bad1.0-0 \
+            libavcodec58 libavformat58 libavutil56 libavfilter7 \
+            libswscale5 libswresample3 \
+            libx264-163 libx265-199 libvpx7 \
+            libmpg123-0 libfaad2 libmpeg2-4 \
+            libtheora0 libvorbis0a libvorbisenc2 libogg0 libopus0
           
-      #     # Fix to use with compiled umu
-      #     rm -f LVNM.AppDir/usr/bin/libreadline.so*
-      #     rm -f LVNM.AppDir/usr/bin/libtinfo.so*
-
-      # - name: Build Bundled umu-run
-      #   run: |
-      #     pip install git+https://github.com/Open-Wine-Components/umu-launcher.git
-          
-      #     # Added --exclude-module readline to prevent the onefile from bundling it
-      #     python -m PyInstaller --onefile \
-      #       --exclude-module readline \
-      #       --collect-all umu \
-      #       --name umu-run $(which umu-run)
-            
-      #     cp dist/umu-run LVNM.AppDir/usr/bin/tools/
+          # Extract all downloaded .deb files directly into the AppDir
+          for deb in *.deb; do
+            dpkg -x "$deb" ../LVNM.AppDir/
+          done
+          cd ..
 
       - name: Build Main LVNM Binary
         run: |
