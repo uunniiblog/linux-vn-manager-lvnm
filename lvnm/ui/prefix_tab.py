@@ -458,7 +458,7 @@ class EditPrefixDialog(QDialog):
         }
 
         if self.font_checkbox.isChecked():
-            data["fonts"] = self.user_settings.get("font_folder", "")
+            data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
 
         return data
 
@@ -514,7 +514,7 @@ class CreatePrefixDialog(QDialog):
 
         # --- Font checkbox ---
         self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
-        self.font_checkbox.setChecked(bool(self.user_settings.get("font_folder", "")))
+        self.font_checkbox.setChecked(bool(self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")))
         self.layout.addWidget(self.font_checkbox)
 
         # --- Codecs Section ---
@@ -597,7 +597,7 @@ class CreatePrefixDialog(QDialog):
         }
 
         if self.font_checkbox.isChecked():
-            data["fonts"] = self.user_settings.get("font_folder", "")
+            data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
 
         return data
 

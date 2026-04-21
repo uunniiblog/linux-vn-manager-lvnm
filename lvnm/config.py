@@ -112,13 +112,6 @@ ENV_VARIABLES = [
         "req": "proton"
     },
     {
-        "id": "pressure_vessel_shell_after",
-        "name": "PRESSURE Vessel after (Run Terminal same memory as game)",
-        "key": "PRESSURE_VESSEL_SHELL",
-        "value": "after",
-        "req": "proton"
-    },
-    {
         "id": "mangohud",
         "name": "Mangohud",
         "key": "MANGOHUD",
@@ -155,9 +148,6 @@ WINETRICKS_LIST = [
     {"id": "devenum", "name": "devenum"},
     {"id": "quartz", "name": "quartz"},
     {"id": "xact", "name": "xact"},
-    # wmp10 and 9 only work in 32 bit
-    # {"id": "wmp10", "name": "Windows Media Player 10"},
-    # {"id": "wmp9", "name": "Windows Media Player 9"},
     {"id": "d3dx9", "name": "DirectX 9"},
     {"id": "wsh57", "name": "Windows scripting host (SRPG Studio)"},
 ]
@@ -165,6 +155,16 @@ WINETRICKS_LIST = [
 # User config variable names
 USER_CONF_ENV_VARIABLE_LIST = "env_variables_list"
 USER_CONF_GLOBAL_VARIABLES = "global_env_var"
+USER_CONF_FONT_FOLDER = "font_folder"
+USER_CONF_GAMESCOPE_ENABLED = "gamescope_enabled"
+USER_CONF_GAMESCOPE_PARAMS = "gamescope_params"
+USER_CONF_SAVE_DATA_FOLDER = "save_folder"
+USER_CONF_ONE_GAME_PREFIX = "one_game_one_prefix"
+USER_CONF_LOG_LEVEL = "log_level"
+USER_CONF_UI_ZOOM = "ui_zoom"
+USER_CONF_TIMETRACKER = "timetracker"
+USER_CONF_TEXTHOOKER = "texthooker"
+USER_CONF_SORT_BY_LIST = "list_sort_by"
 
 # User config
 GAMESCOPE_INSTALLED = False
@@ -175,7 +175,7 @@ WINETRICKS_INSTALLED = False
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 WINE_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
-PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
+# PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True) # Don't create in case steam not installed
 PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
 DXVK_DIR.mkdir(parents=True, exist_ok=True)

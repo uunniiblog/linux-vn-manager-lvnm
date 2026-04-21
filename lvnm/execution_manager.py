@@ -18,7 +18,7 @@ class ExecutionManager:
     def _get_verbosity_env(base_env: dict) -> dict:
         """Augments environment variables based LOG_LEVEL."""
         env = base_env.copy()
-        log_level = settings.get("log_level", "info").upper()
+        log_level = settings.get(config.USER_CONF_LOG_LEVEL, "info").upper()
 
         if log_level == "DEBUG":
             # Show everything

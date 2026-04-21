@@ -170,7 +170,7 @@ class GameListItem(QWidget):
         """Creates and shows the right-click menu"""
         menu = QMenu(self)
 
-        th_settings = self.user_settings.get("texthooker", {})
+        th_settings = self.user_settings.get(config.USER_CONF_TEXTHOOKER, {})
         
         is_running = self.game_card.name in GameSidebar.active_runners
         if is_running:

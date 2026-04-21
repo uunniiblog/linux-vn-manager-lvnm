@@ -44,7 +44,7 @@ class GameSidebar(QFrame):
         self.active_controller = None
 
         self.user_settings = SettingsManager()
-        self.timetracker_settings = self.user_settings.get("timetracker", {})
+        self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
         
         layout = QVBoxLayout(self)
         
@@ -352,8 +352,8 @@ class GameSidebar(QFrame):
         self.edit_umu_id.clear()
         
         # Apply Gamescope Defaults from Settings or leave empty
-        gs_default_enabled = user_settings.get("gamescope_enabled", False)
-        gs_default_params = user_settings.get("gamescope_params", "")
+        gs_default_enabled = user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
+        gs_default_params = user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, "")
         
         self.gs_enabled.setChecked(gs_default_enabled)
         self.gs_params.setText(gs_default_params)

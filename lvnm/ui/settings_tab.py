@@ -59,7 +59,7 @@ class SettingsTab(QWidget):
         
         # Font Folder
         font_layout = QHBoxLayout()
-        self.font_edit = QLineEdit(self.user_settings.get("font_folder", ""))
+        self.font_edit = QLineEdit(self.user_settings.get(config.USER_CONF_FONT_FOLDER, ""))
         self.font_edit.setPlaceholderText(self.tr("Select folder to symlink fonts..."))
         self.font_btn = QPushButton(self.tr("Browse..."))
         font_layout.addWidget(self.font_edit)
@@ -69,8 +69,8 @@ class SettingsTab(QWidget):
         # Gamescope
         gs_layout = QHBoxLayout()
         self.gs_checkbox = QCheckBox(self.tr("Enable"))
-        self.gs_checkbox.setChecked(self.user_settings.get("gamescope_enabled", False))
-        self.gs_params = QLineEdit(self.user_settings.get("gamescope_params", ""))
+        self.gs_checkbox.setChecked(self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False))
+        self.gs_params = QLineEdit(self.user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, ""))
         self.gs_params.setPlaceholderText(self.tr("Parameters (e.g., -W 1920 -H 1080)"))
         if not config.GAMESCOPE_INSTALLED:
             self.gs_checkbox.setDisabled(True)
@@ -82,7 +82,7 @@ class SettingsTab(QWidget):
         # Save Data Management
         save_layout = QHBoxLayout()
         self.save_checkbox = QCheckBox(self.tr("Enable"))
-        self.save_edit = QLineEdit(self.user_settings.get("save_folder", ""))
+        self.save_edit = QLineEdit(self.user_settings.get(config.USER_CONF_SAVE_DATA_FOLDER, ""))
         self.save_edit.setPlaceholderText(self.tr("Main folder for save files..."))
         self.save_btn = QPushButton(self.tr("Browse..."))
         save_layout.addWidget(self.save_checkbox)
@@ -95,7 +95,7 @@ class SettingsTab(QWidget):
         
         # One Game One Prefix
         self.ogop_checkbox = QCheckBox(self.tr("Enable"))
-        self.ogop_checkbox.setChecked(self.user_settings.get("one_game_one_prefix", False))
+        self.ogop_checkbox.setChecked(self.user_settings.get(config.USER_CONF_ONE_GAME_PREFIX, False))
         self.ogop_checkbox.setEnabled(False)
         settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
         
@@ -109,7 +109,7 @@ class SettingsTab(QWidget):
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "ERROR"])
         self.log_level_combo.setFixedWidth(200)
-        current_log = self.user_settings.get("log_level", "INFO").upper()
+        current_log = self.user_settings.get(config.USER_CONF_LOG_LEVEL, "INFO").upper()
         log_map = {"DEBUG": 0, "INFO": 1, "ERROR": 2}
         self.log_level_combo.setCurrentIndex(log_map.get(current_log, 1))
         self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
@@ -258,7 +258,7 @@ class SettingsTab(QWidget):
         self.zoom_combo = QComboBox()
         self.zoom_combo.addItems(["70%", "80%", "90%", "100%", "110%", "125%", "135%", "150%", "175%"])
         self.zoom_combo.setFixedWidth(200)
-        current_zoom = self.user_settings.get("ui_zoom", 1.0)
+        current_zoom = self.user_settings.get(config.USER_CONF_UI_ZOOM, 1.0)
         zoom_map = {0.7: 0, 0.8: 1, 0.9: 2, 1.0: 3, 1.1: 4, 1.25: 5, 1.35: 6, 1.5: 7, 1.75: 8}
         self.zoom_combo.setCurrentIndex(zoom_map.get(current_zoom, 2))
         self.zoom_combo.currentIndexChanged.connect(self.change_zoom)
@@ -270,7 +270,7 @@ class SettingsTab(QWidget):
         timetracker_group = QGroupBox(self.tr("Timetracker"))
         timetracker_layout = QFormLayout(timetracker_group)
 
-        tt_settings = self.user_settings.get("timetracker", {})
+        tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
 
         # Warning Message
         warning_label = QLabel(self.tr("Timetracking only works in KDE 6 Desktop and Gamescope session."))
@@ -317,7 +317,7 @@ class SettingsTab(QWidget):
         texthooker_layout = QFormLayout(texthooker_group)
 
         # Retrieve current settings
-        th_settings = self.user_settings.get("texthooker", {})
+        th_settings = self.user_settings.get(config.USER_CONF_TEXTHOOKER, {})
 
         # Enable Checkbox
         self.texthooker_enable = QCheckBox(self.tr("Enable"))
@@ -385,8 +385,8 @@ class SettingsTab(QWidget):
 
     def _connect_signals(self):
         self.font_btn.clicked.connect(self.browse_font_folder)
-        self.font_edit.textChanged.connect(lambda t: self.save_setting("font_folder", t))
-        self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting("gamescope_enabled", bool(s)))
+        self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
+        self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
@@ -394,8 +394,8 @@ class SettingsTab(QWidget):
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "log_periodic_save", int(t) if t else 0))
         self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "autostart", bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
-        self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting("texthooker", "enabled", bool(s)))
-        self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting("texthooker", "path", t))
+        self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
+        self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
 
     def _toggle_env_extra(self, force_hide=False):
         """Toggles the visibility of checkboxes beyond the first row."""
@@ -421,14 +421,14 @@ class SettingsTab(QWidget):
     def change_zoom(self, index):
         mapping = {0: 0.7, 1: 0.8, 2: 0.9, 3: 1.0, 4: 1.1, 5: 1.25, 6: 1.35, 7: 1.5, 8: 1.75}
         new_zoom = mapping[index]
-        self.save_setting("ui_zoom", new_zoom)        
+        self.save_setting(config.USER_CONF_UI_ZOOM, new_zoom)        
         SystemUtils.apply_ui_zoom(new_zoom)
         self.theme_manager.update_theme()
 
     def change_log_level(self, index):
         mapping = {0: "DEBUG", 1: "INFO", 2: "ERROR"}
         new_level = mapping[index]
-        self.save_setting("log_level", new_level)        
+        self.save_setting(config.USER_CONF_LOG_LEVEL, new_level)        
         config.LOG_LEVEL = new_level
         setup_logging(new_level)
 

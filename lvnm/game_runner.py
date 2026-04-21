@@ -595,7 +595,7 @@ class GameRunner:
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
-        if self.settings.get("log_level", "info").lower() == "debug":
+        if self.settings.get(config.USER_CONF_LOG_LEVEL, "info").lower() == "debug":
             logging.debug("" + "="*60)
             logging.debug(f"LAUNCHING: {self.name}")
             logging.debug("="*60)

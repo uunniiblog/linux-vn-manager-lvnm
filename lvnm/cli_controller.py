@@ -1,6 +1,7 @@
 import sys
 import time
 import signal
+import config
 from datetime import datetime
 from PySide6.QtCore import QObject, QCoreApplication, QTimer
 from game_runner import GameRunner
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class CliController(QObject):
     def __init__(self):
         self.user_settings = SettingsManager()
-        self.timetracker_settings = self.user_settings.get("timetracker", {})
+        self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
         self.tracking = None
         super().__init__()
     

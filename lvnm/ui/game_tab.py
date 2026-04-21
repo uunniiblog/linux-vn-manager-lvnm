@@ -26,7 +26,7 @@ class GameTab(QWidget):
         super().__init__()
         self.card = None
         self.user_settings = SettingsManager()
-        self.zoom = self.user_settings.get("ui_zoom", 1.0)
+        self.zoom = self.user_settings.get(config.USER_CONF_UI_ZOOM, 1.0)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -69,7 +69,7 @@ class GameTab(QWidget):
         ]
 
         # Load saved sort
-        saved_sort = self.user_settings.get("list_sort_by", "latest")
+        saved_sort = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
         for text, data in sort_options:
             action = QAction(text, self.btn_sort)
             action.setCheckable(True)
@@ -134,7 +134,7 @@ class GameTab(QWidget):
                 self.sidebar.load_game(self.card)
 
         # Reload list if zoom changed
-        new_zoom = self.user_settings.get("ui_zoom", 1.0)
+        new_zoom = self.user_settings.get(config.USER_CONF_UI_ZOOM, 1.0)
         if new_zoom != self.zoom:
             self.zoom = new_zoom
             self.refresh_list()
@@ -142,7 +142,7 @@ class GameTab(QWidget):
     def on_sort_changed(self, action):
         """Saves the sort preference and refreshes the list"""
         sort_data = action.data()
-        self.user_settings.set("list_sort_by", sort_data)
+        self.user_settings.set(config.USER_CONF_SORT_BY_LIST, sort_data)
         self.refresh_list()
 
     def update_item_metadata(self, game_name):
@@ -175,7 +175,7 @@ class GameTab(QWidget):
         game_cards = list(games_dict.values())
 
         # Sort
-        sort_pref = self.user_settings.get("list_sort_by", "latest")
+        sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
         if sort_pref == "name":
             # Alphabetical by name
             game_cards.sort(key=lambda card: card.name.lower())
