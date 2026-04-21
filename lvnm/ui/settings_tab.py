@@ -5,12 +5,14 @@ from PySide6.QtWidgets import (
     QCheckBox, QFileDialog, QScrollArea, QFrame,
     QGridLayout
 )
+from ui.env_var_manager_dialog import EnvVarManagerDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
 import config
 import logging
 from settings_manager import SettingsManager
+from game_manager import GameManager
 from logging_manager import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -115,49 +117,109 @@ class SettingsTab(QWidget):
 
         return settings_group
 
+    def get_env_variables_list(self):
+        """Fetches the custom list or falls back to default config."""
+        vars_list = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, None)
+        if vars_list is None:
+            vars_list = config.ENV_VARIABLES
+            self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, vars_list)
+        return vars_list
+    
     def _build_env_var_widget(self):
         """Builds the collapsible env var checkbox grid."""
-        global_env_var = self.user_settings.get("global_env_var", {})
+        self.env_var_container = QWidget()
+        self.env_var_main_layout = QVBoxLayout(self.env_var_container)
+        self.env_var_main_layout.setContentsMargins(0, 0, 0, 0)
+        self.env_var_main_layout.setSpacing(4)
 
-        env_var_container = QWidget()
-        env_var_main_layout = QVBoxLayout(env_var_container)
-        env_var_main_layout.setContentsMargins(0, 0, 0, 0)
-        env_var_main_layout.setSpacing(4)
+        # Widget to hold the dynamic grid
+        self.env_grid_widget = QWidget()
+        self.env_var_main_layout.addWidget(self.env_grid_widget)
 
-        # Single unified grid so both columns align across all rows
-        grid = QGridLayout()
+        # Control Buttons Layer
+        btn_layout = QHBoxLayout()
+        self.env_expand_btn = QPushButton(self.tr("Show more..."))
+        self.env_expand_btn.setFlat(True)
+        self.env_expand_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
+        self.env_expand_btn.setCursor(Qt.PointingHandCursor)
+        self.env_expand_btn.clicked.connect(self._toggle_env_extra)
+        
+        self.manage_env_btn = QPushButton(self.tr("Manage Variables"))
+        self.manage_env_btn.setFlat(True)
+        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_env_btn.clicked.connect(self._open_env_manager)
+
+        btn_layout.addWidget(self.env_expand_btn)
+        btn_layout.addWidget(self.manage_env_btn)
+        btn_layout.addStretch()
+        
+        self.env_var_main_layout.addLayout(btn_layout)
+
+        # Populate the grid initially
+        self._refresh_env_grid()
+
+        return self.env_var_container
+
+    def _open_env_manager(self):
+        """Opens the dialog to add/remove/edit environment variables."""
+
+        is_expanded = (
+            hasattr(self, '_extra_checkboxes') and
+            bool(self._extra_checkboxes) and
+            self._extra_checkboxes[0].isVisible()
+        )
+
+        current_vars = self.get_env_variables_list()
+        dialog = EnvVarManagerDialog(current_vars, self)
+        if dialog.exec():
+            new_vars = dialog.get_vars()
+            self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, new_vars)
+
+            # Clean ghost variables
+            current_keys = [var["key"] for var in new_vars]
+            GameManager.cleanup_env_vars(current_keys)
+
+            # Refresh
+            self._refresh_env_grid()
+            if is_expanded:
+                self._toggle_env_extra()
+
+    def _refresh_env_grid(self):
+        """Rebuilds the checkbox grid dynamically based on settings."""
+        # Clear existing layout safely
+        if self.env_grid_widget.layout():
+            QWidget().setLayout(self.env_grid_widget.layout()) 
+
+        grid = QGridLayout(self.env_grid_widget)
         grid.setHorizontalSpacing(30)
         grid.setVerticalSpacing(6)
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 0)
 
+        global_env_var = self.user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+        self.global_env_checkboxes = {}
         self._extra_checkboxes = []
+        vars_list = self.get_env_variables_list()
 
-        for i, var in enumerate(config.ENV_VARIABLES):
+        for i, var in enumerate(vars_list):
             var_id = var["id"]
             cb = QCheckBox(self.tr(var.get("name") or var_id))
             cb.setToolTip(f"{var['key']}={var['value']}")
             cb.setChecked(global_env_var.get(var_id, False))
             cb.stateChanged.connect(
-                lambda s, vid=var_id: self.save_nested_setting("global_env_var", vid, bool(s))
+                lambda s, vid=var_id: self.save_nested_setting(config.USER_CONF_GLOBAL_VARIABLES, vid, bool(s))
             )
             self.global_env_checkboxes[var_id] = cb
             grid.addWidget(cb, i // 2, i % 2)
+            
+            # Hide items beyond the first row (2 items)
             if i >= 2:
                 cb.setVisible(False)
                 self._extra_checkboxes.append(cb)
 
-        env_var_main_layout.addLayout(grid)
-
-        if self._extra_checkboxes:
-            self.env_expand_btn = QPushButton(self.tr("▶ Show more..."))
-            self.env_expand_btn.setFlat(True)
-            self.env_expand_btn.setStyleSheet("text-align: left; color: palette(link); padding: 2px 0px;")
-            self.env_expand_btn.setCursor(Qt.PointingHandCursor)
-            self.env_expand_btn.clicked.connect(self._toggle_env_extra)
-            env_var_main_layout.addWidget(self.env_expand_btn)
-
-        return env_var_container
+        # Reset button visibility state
+        self._toggle_env_extra(force_hide=True)
 
     def _add_env_rows(self, vars_list, target_layout, global_env_var):
         """Populates a layout with env var checkboxes, two per row."""
@@ -173,7 +235,7 @@ class SettingsTab(QWidget):
             cb.setToolTip(f"{var['key']}={var['value']}")
             cb.setChecked(global_env_var.get(var_id, False))
             cb.stateChanged.connect(
-                lambda s, vid=var_id: self.save_nested_setting("global_env_var", vid, bool(s))
+                lambda s, vid=var_id: self.save_nested_setting(config.USER_CONF_GLOBAL_VARIABLES, vid, bool(s))
             )
             self.global_env_checkboxes[var_id] = cb
             grid.addWidget(cb, i // 2, i % 2)  # row, col
@@ -335,12 +397,20 @@ class SettingsTab(QWidget):
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting("texthooker", "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting("texthooker", "path", t))
 
-    def _toggle_env_extra(self):
-        expanded = self._extra_checkboxes[0].isVisible()
+    def _toggle_env_extra(self, force_hide=False):
+        """Toggles the visibility of checkboxes beyond the first row."""
+        if not hasattr(self, '_extra_checkboxes') or not self._extra_checkboxes:
+            self.env_expand_btn.setVisible(False)
+            return
+
+        self.env_expand_btn.setVisible(True)
+        expanded = True if force_hide else self._extra_checkboxes[0].isVisible()
+
         for cb in self._extra_checkboxes:
             cb.setVisible(not expanded)
+            
         self.env_expand_btn.setText(
-            self.tr("▼ Show less") if not expanded else self.tr("▶ Show more...")
+            self.tr("Show less") if not expanded else self.tr("Show more...")
         )
 
     def change_theme(self, index):

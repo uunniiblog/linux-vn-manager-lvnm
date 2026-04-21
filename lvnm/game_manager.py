@@ -204,3 +204,30 @@ class GameManager:
         
         logging.info(f"Successfully duplicated '{name}' as '{new_name}'")
         return True
+
+    @staticmethod
+    def cleanup_env_vars(current_env_vars: list[str]):
+        """
+        Removes any environment variables from all games that are not in the env vars list.
+        """
+        games_data = GameManager._load_data()
+        updated_any = False
+
+        for game_name, details in games_data.items():
+            env_dict = details.get("envvar", {})
+            if not env_dict:
+                continue
+
+            keys_to_remove = [k for k in env_dict.keys() if k not in current_env_vars]
+
+            if keys_to_remove:
+                for k in keys_to_remove:
+                    logging.info(f"Removing ghost variable '{k}' from game '{game_name}'")
+                    del env_dict[k]
+                
+                details["update_date"] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+                updated_any = True
+
+        if updated_any:
+            GameManager._save_data(games_data)
+            logging.info("Global environment variable cleanup complete.")

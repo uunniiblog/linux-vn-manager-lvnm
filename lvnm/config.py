@@ -162,6 +162,10 @@ WINETRICKS_LIST = [
     {"id": "wsh57", "name": "Windows scripting host (SRPG Studio)"},
 ]
 
+# User config variable names
+USER_CONF_ENV_VARIABLE_LIST = "env_variables_list"
+USER_CONF_GLOBAL_VARIABLES = "global_env_var"
+
 # User config
 GAMESCOPE_INSTALLED = False
 VULKAN_INSTALLED = False

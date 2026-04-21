@@ -306,12 +306,17 @@ class GameSidebar(QFrame):
         self.update_timetracker_visibility()
 
     def refresh_env_vars(self, prefix_type, active_vars):
+        """Populates the UI checkboxes using the dynamic list from settings."""
+
         # Clear old checkboxes
         for cb in self.env_checkboxes.values():
             cb.deleteLater()
         self.env_checkboxes.clear()
 
-        for var in config.ENV_VARIABLES:
+        # Get list from user settings or config fallback to default
+        env_vars_list = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
+
+        for var in env_vars_list:
             req = var.get("req")
             if req and req != prefix_type:
                 continue
@@ -365,12 +370,13 @@ class GameSidebar(QFrame):
         # Default visibility (UMU hidden for new entries until prefix is picked)
         self.update_umu_visibility("wine")
 
-        # Apply Global Winetricks/Env Var Defaults
-        global_env_var = user_settings.get("global_env_var", {})        
+        # Environment variables logic
+        global_env_var = user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+        env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         default_env_vars = {}
         
         # match keys
-        for var in config.ENV_VARIABLES:
+        for var in env_vars_definitions:
             var_id = var.get("id")
             if global_env_var.get(var_id):
                 default_env_vars[var["key"]] = var["value"]
@@ -493,8 +499,9 @@ class GameSidebar(QFrame):
         self.current_game.umu_gameid = self.edit_umu_id.text()
         
         # Env Vars
+        env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         new_env = {}
-        for var in config.ENV_VARIABLES:
+        for var in env_vars_definitions:
             cb = self.env_checkboxes.get(var["id"])
             if cb and cb.isChecked():
                 new_env[var["key"]] = var["value"]
@@ -549,13 +556,15 @@ class GameSidebar(QFrame):
         
         prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
         self.update_umu_visibility(prefix_type)
+
+        env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         
         if self.current_game:
             if getattr(self, "_create_mode_defaults", None) is not None:
                 active_vars = self._create_mode_defaults
             else:
                 current_ui_vars = {}
-                for var in config.ENV_VARIABLES:
+                for var in env_vars_definitions:
                     cb = self.env_checkboxes.get(var["id"])
                     if cb and cb.isChecked():
                         current_ui_vars[var["key"]] = var["value"]

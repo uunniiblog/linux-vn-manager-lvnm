@@ -302,7 +302,7 @@ class RunInPrefixDialog(QDialog):
         
         self.btn_run = QPushButton(self.tr("Run"))
         self.btn_run.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-        self.btn_run.clicked.connect(self.run_executable)
+        self.btn_run.clicked.connect(self.run_in_prefix)
         
         btn_layout.addStretch()
         btn_layout.addWidget(self.btn_cancel)
@@ -324,9 +324,8 @@ class RunInPrefixDialog(QDialog):
             if selected_files:
                 self.edit_path.setText(selected_files[0])
 
-    def run_executable(self):
+    def run_in_prefix(self):
         """ Run executable in prefix bypassing game card creation """
-        # TODO: a way to cancel and add jp locale
         exe_path = self.edit_path.text().strip()
         prefix_name = self.combo_prefix.currentText()
 
@@ -335,14 +334,15 @@ class RunInPrefixDialog(QDialog):
             return
 
         user_settings = SettingsManager()
-        global_env_var = user_settings.get("global_env_var", {})
+        global_env_var = user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+        env_vars_definitions = user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         env_vars = {}
-        for wt_id, is_enabled in global_env_var.items():
-            if is_enabled:
-                for var in config.ENV_VARIABLES:
-                    if var.get("id") == wt_id:
-                        env_vars[var["key"]] = var["value"]
-                        break
+
+        for var in env_vars_definitions:
+            var_id = var.get("id")
+            if global_env_var.get(var_id):
+                env_vars[var["key"]] = str(var["value"])
+
         logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
         if env_vars:
             logger.debug(f"Applying Global Env Vars: {env_vars}")
