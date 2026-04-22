@@ -103,19 +103,6 @@ class ThemeManager(QObject):
         background-color: {bg_disabled};
         color: {text_disabled};
     }}
-    QComboBox::drop-down {{
-        border: none;
-        width: 20px;
-    }}
-    QComboBox::down-arrow {{
-        image: none;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 6px solid {text_main};
-        width: 0;
-        height: 0;
-        margin-right: 4px;
-    }}
     QComboBox QAbstractItemView {{
         background-color: {bg_popup};
         color: {text_main};
