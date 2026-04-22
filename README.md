@@ -76,6 +76,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
                 <li>Last played date and playtime count.</li>
             </ul>
         - Steam/desktop shortcut: Right click an entry to add. The application will be run headless without GUI in this mode. Timetracking will still work in the background if enabled.
+        - Label: Can right click a game to create labels (Playing, Finished, etc) to group games in sections. Sections can be expaned or collapsed to hide all the games in one section. Can right click over the header of a section to delete it.
 4. Statistics tab: If timetracking has been enabled when you run a game it will count your playtime. This tab shows some simple graphs by app or global based on your playtime.
 5. Settings tab
     - Functional Settings:
