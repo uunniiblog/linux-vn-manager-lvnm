@@ -45,8 +45,8 @@ class CliController(QObject):
 
             # Start tracking
             if self.timetracker_settings.get("timetracking", False):
-                save_interval = self.timetracker_settings.get("log_periodic_save", 0)
-                afk_timer = self.timetracker_settings.get("afk_timer", 0)
+                save_interval = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)
+                afk_timer = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)
                 logger.debug(f"calling tracking controller with process {runner.game.path}")
                 self.tracking = TrackingController(self, runner.game.path, save_interval=save_interval, afk_timer=afk_timer)
                 self.tracking.start_auto_tracking()

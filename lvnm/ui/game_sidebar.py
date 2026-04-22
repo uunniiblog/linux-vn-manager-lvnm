@@ -1,8 +1,6 @@
 import config
 import urllib.parse
-import gc
 import logging
-from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
@@ -11,28 +9,21 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer, QSize
+from ui.prefix_tab import PrefixTab
+from ui.timetracker_dialog import TimetrackerDialog
 from game_manager import GameManager
-from game_runner import GameRunner
 from prefix_manager import PrefixManager
 from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
-from ui.prefix_tab import PrefixTab, CreatePrefixDialog
-from ui.console_dialog import ConsoleDialog
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
-from timetracker.tracking_controller import TrackingController
-from ui.timetracker_dialog import TimetrackerDialog
+from game_process_manager import GameProcessManager
 
 logger = logging.getLogger(__name__)
 
 class GameSidebar(QFrame):
     VNDB_SITE_URL = config.VNDB_SITE_URL
     EGS_SITE_URL = config.EGS_SITE_URL
-    
-    # Dictionary to track games running
-    active_runners = {}
-    runners = {}
-    active_trackers = {}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -45,6 +36,12 @@ class GameSidebar(QFrame):
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+
+        # Connect to Game Process Manager
+        self.process_manager = GameProcessManager.get_instance()
+        self.process_manager.game_started.connect(self.on_game_started_signal)
+        self.process_manager.game_stopped.connect(self.on_game_stopped_signal)
+        self.process_manager.tracking_updated.connect(self.on_tracking_updated_signal)
         
         layout = QVBoxLayout(self)
         
@@ -230,12 +227,6 @@ class GameSidebar(QFrame):
 
         layout.addLayout(btns)
 
-        # Setup a timer to monitor the game process
-        self.monitor_timer = QTimer(self)
-        self.monitor_timer.timeout.connect(self.check_active_runners)
-        self.monitor_timer.setInterval(1000)
-        self.monitor_timer.start()
-
     def resizeEvent(self, event):
         """
         Try to keep cover at 1/3
@@ -243,6 +234,32 @@ class GameSidebar(QFrame):
         super().resizeEvent(event)
         cover_cap = max(100, (self.height() // 3) - 80)
         self.media_container.setMaximumHeight(cover_cap)
+
+    # SIGNAL HANDLERS
+    def on_game_started_signal(self, name):
+        if self.current_game and self.current_game.name == name:
+            self.set_ui_stop_state()
+
+    def on_game_stopped_signal(self, name):
+        """ Triggered by Backend when ANY game finishes """
+        # Notify GameTab list item to refresh last played text
+        if hasattr(self, 'on_metadata_updated'):
+            self.on_metadata_updated(name)
+        
+        # If we are currently looking at the game that finished, reset UI
+        if self.current_game and self.current_game.name == name:
+            game_to_update = GameManager.get_game(name)
+            if game_to_update:
+                self.current_game.last_played = game_to_update.last_played
+            self.set_ui_start_state()
+            self.reset_tracking_labels()
+
+    def on_tracking_updated_signal(self, name, stats):
+        """ Updates UI text only if we are viewing the actively tracked game """
+        if self.current_game and self.current_game.name == name:
+            self.lbl_session_len.setText(stats.get("session_length", "00:00:00"))
+            self.lbl_session_play.setText(stats.get("session_playtime", "00:00:00"))
+            self.lbl_total_play.setText(stats.get("total_playtime", "00:00:00"))
 
     def load_game(self, card: GameCard):
         """
@@ -256,7 +273,7 @@ class GameSidebar(QFrame):
         self.launch_btn.setVisible(True)
 
         # Check the registry to set the button state correctly
-        if self.current_game.name in self.active_runners:
+        if self.process_manager.is_game_running(card.name):
             self.set_ui_stop_state()
         else:
             self.set_ui_start_state()
@@ -298,12 +315,6 @@ class GameSidebar(QFrame):
 
         # Load Env Vars
         self.refresh_env_vars(prefix_type, card.envvar)
-
-        # Tracker logic
-        running_tracker = self.active_trackers.get(card.name)
-        self.connect_tracker_signals(running_tracker)
-        self.is_running = card.name in self.active_runners
-        self.update_timetracker_visibility()
 
     def refresh_env_vars(self, prefix_type, active_vars):
         """Populates the UI checkboxes using the dynamic list from settings."""
@@ -391,7 +402,7 @@ class GameSidebar(QFrame):
             return
         
         game_name = self.current_game.name
-        if game_name in self.active_runners:
+        if self.process_manager.is_game_running(game_name):
             # Game running, stop it
             self.stop_game(game_name)
         else:
@@ -399,66 +410,12 @@ class GameSidebar(QFrame):
             self.start_game(game_name)
 
     def stop_game(self, name):
-        """
-        Calls the runner's stop logic.
-        Sends number of games running in same prefix
-        """
-        runner = self.active_runners.get(name)
-        if runner:
-            target_prefix_path = runner.prefix_info["path"]
-            prefix_count = 0
-            for active_runner in self.active_runners.values():
-                active_path = active_runner.prefix_info.get("path")
-                if active_path == target_prefix_path:
-                    prefix_count += 1
-            runner.stop(prefix_count)
+        """Call process manager to stop game."""
+        self.process_manager.stop_game(name)
 
     def start_game(self, name):
-        """Initializes the runner and starts the process."""
-
-        # Avoid launching same game multiple times
-        if name in self.active_runners:
-            logger.info(f"{name} is already running. Ignoring launch request.")
-            return False
-        
-        try:
-            self.runner = GameRunner(name)
-            if self.runner.run():
-                self.active_runners[name] = self.runner
-                self.runners[name] = self.runner
-                logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
-
-                # Start tracking
-                if self.timetracker_settings.get("timetracking", False) and self.timetracker_settings.get("autostart", False):
-                    tracking = self.create_tracking()
-                    tracking.start_auto_tracking()
-                    self.active_trackers[name] = tracking
-                    
-                    # Update tracking UI periodically
-                    tracking.stats_received.connect(self.update_tracking_ui)
-                    self.connect_tracker_signals(tracking)
-        except Exception as e:
-            logger.error(f"Failed to start {name}: {e}")
-            return False
-
-        return True
-
-    def create_tracking(self):
-        save_interval = self.timetracker_settings.get("log_periodic_save", 0)
-        afk_timer = self.timetracker_settings.get("afk_timer", 0)
-        return TrackingController(self, self.current_game.path, save_interval=save_interval, afk_timer=afk_timer)
-
-    def check_game_status(self):
-        """Polls the runner to see if the game is still alive."""
-        if self.runner and not self.runner.is_running():
-            logger.debug("Game exited naturally. Cleaning up UI...")
-            self.monitor_timer.stop()
-            self.runner = None
-            
-            # Reset the button UI state manually
-            self.is_running = False
-            self.launch_btn.setText(self.tr("Start Game"))
-            self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
+        """Call process manager to initialize the runner and starts the process."""
+        self.process_manager.start_game(name, self.timetracker_settings)
 
     def browse_path(self):
         """File system browser"""
@@ -692,34 +649,27 @@ class GameSidebar(QFrame):
 
     def launch_timetracker_dialog(self):
         """Logic for the timetracker dialog"""
-        controller = self.active_trackers.get(self.current_game.name)
+        name = self.current_game.name
+        tracker = self.process_manager.get_tracker(name)
+        
+        # Create a tracker when there isn't one for the game
+        if not tracker or not tracker.tracker:
+            logger.warning(f"No active tracker found for {name}. Creating one.")
+            tracker = self.process_manager.start_timetracker(name, self.current_game.path, self.timetracker_settings)
 
-        if not controller or not controller.tracker:
-            logger.warn(f"No active tracker found for the current game {self.current_game.name}")
-            tracking = self.create_tracking()
-            self.active_trackers[self.current_game.name] = tracking
-            controller = tracking
-            
-        dialog = TimetrackerDialog(controller.tracker)
+        dialog = TimetrackerDialog(tracker.tracker)
         result = dialog.exec()
+        
         if result == QDialog.Accepted:
-            print("accepted")
+            # Start tracking logic
             selection = dialog.get_selection()
             if selection:
                 title, wid = selection
-                logger.info(f"Manually attaching tracker to: {title} (ID: {wid})")
-                
-                # Stop active controller auto-detection timer since we selected it manually
-                controller.stop_tracking()
-                # Launch manual tracking
-                controller.start_manual_tracking(wid, title)
-
-                self.connect_tracker_signals(controller)
+                self.process_manager.start_manual_tracking(name, wid, title)
         elif result == 2:
-            # Stop timetracker
-            logger.debug(f"Manually stopped tracking for : {self.current_game.name}")
-            self.stop_tracking(self.current_game.name)
-            
+            # Stop tracking logic
+            self.process_manager.stop_tracking(name)
+            self.reset_tracking_labels()           
 
     def connect_tracker_signals(self, controller=None):
         """Safely disconnects from old tracker and connects to a new one when changing sidebars."""
@@ -735,11 +685,7 @@ class GameSidebar(QFrame):
             self.active_controller.stats_received.connect(self.update_tracking_ui)
         else:
             # If no controller (game not running), reset the UI
-            self.update_tracking_ui({
-                "session_length": "00:00:00",
-                "session_playtime": "00:00:00",
-                "total_playtime": "00:00:00"
-            })
+            self.reset_tracking_labels()
 
     def update_tracking_ui(self, stats):
         """Update the labels with data received from the worker."""
@@ -752,75 +698,23 @@ class GameSidebar(QFrame):
         is_enabled = self.timetracker_settings.get("timetracking", False)
         should_be_visible = bool(self.is_running and is_enabled)        
         self.tracking_group.setVisible(should_be_visible)
-
-    def check_active_runners(self):
-        """Polls ALL active runners. Cleans up those that finished."""
-        finished_games = []
-
-        for name, runner in self.active_runners.items():
-            # logger.debug(f"check_active_runners {name}")
-            if not runner.is_running():
-                finished_games.append(name)
-
-        for name in finished_games:
-            logging.debug(f"[Game {name} exited. Cleaning up...")
-            runner = self.active_runners.pop(name, None)
-            self.stop_tracking(name)
-            
-            if runner:
-                self.runners[name] = runner.get_full_log()
-                runner.logs.clear()
-                runner = None
-                gc.collect()
-
-            # Get the actual GameCard for the game that finished
-            game_to_update = GameManager.get_game(name) 
-            
-            if game_to_update:
-                game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
-                GameManager.update_game(name, game_to_update.to_dict())
-                # Update last played column
-                # self.on_saved()
-                if hasattr(self, 'on_metadata_updated'):
-                    self.on_metadata_updated(name)
-                
-                # If the sidebar is currently showing THIS game, sync the UI object
-                if self.current_game and self.current_game.name == name:
-                    self.current_game.last_played = game_to_update.last_played
-                    self.set_ui_start_state()
-        
-        if self.current_game:
-            self.is_running = self.current_game.name in self.active_runners
-            current_text = self.launch_btn.text()
-            self.update_timetracker_visibility()
-            
-            # If the game is running but the button doesn't say "Stop Game", fix it
-            if self.is_running and current_text != self.tr("Stop Game"):
-                self.set_ui_stop_state()
             
     def set_ui_stop_state(self):
+        self.is_running = True
         self.launch_btn.setText(self.tr("Stop Game"))
         self.launch_btn.setStyleSheet("background-color: #c62828; color: white; height: 40px; font-weight: bold;")
+        self.update_timetracker_visibility()
 
     def set_ui_start_state(self):
         self.is_running = False
         self.launch_btn.setText(self.tr("Start Game"))
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
+        self.update_timetracker_visibility()
 
-    def stop_tracking(self, name):
-        if self.timetracker_settings.get("timetracking", False):
-            logger.debug(f"Stopping background tracking for {name}")
-            tracker = self.active_trackers.get(name)
-            tracker.stop_tracking()
-            self.active_trackers.pop(name, None)
-
-            # Reset tracking UI
-            self.update_tracking_ui(
-            {
-                "session_length": "00:00:00",
-                "session_playtime": "00:00:00",
-                "total_playtime": "00:00:00"
-            })
+    def reset_tracking_labels(self):
+        self.lbl_session_len.setText("00:00:00")
+        self.lbl_session_play.setText("00:00:00")
+        self.lbl_total_play.setText("00:00:00")
 
 class CoverLabel(QLabel):
     """

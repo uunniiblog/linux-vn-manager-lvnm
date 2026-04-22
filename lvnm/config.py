@@ -165,6 +165,9 @@ USER_CONF_UI_ZOOM = "ui_zoom"
 USER_CONF_TIMETRACKER = "timetracker"
 USER_CONF_TEXTHOOKER = "texthooker"
 USER_CONF_SORT_BY_LIST = "list_sort_by"
+USER_CONF_TIMETRACKER_PERIODIC_SAVE = "log_periodic_save"
+USER_CONF_TIMETRACKER_AFK_TIMER = "afk_timer"
+USER_CONF_TIMETRACKER_AUTOSTART = "autostart"
 
 # User config
 GAMESCOPE_INSTALLED = False

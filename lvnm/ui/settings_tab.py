@@ -288,7 +288,7 @@ class SettingsTab(QWidget):
         self.afk_timer_edit = QLineEdit()
         self.afk_timer_edit.setValidator(QIntValidator(0, 999))
         self.afk_timer_edit.setFixedWidth(60)
-        self.afk_timer_edit.setText(str(tt_settings.get("afk_timer", 0)))
+        self.afk_timer_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)))
         afk_layout.addWidget(self.afk_timer_edit)
         afk_layout.addWidget(QLabel(self.tr("minutes (requires swayidle)")))
         afk_layout.addStretch()
@@ -299,7 +299,7 @@ class SettingsTab(QWidget):
         self.save_interval_edit = QLineEdit()
         self.save_interval_edit.setValidator(QIntValidator(1, 999))
         self.save_interval_edit.setFixedWidth(60)
-        self.save_interval_edit.setText(str(tt_settings.get("log_periodic_save", 0)))
+        self.save_interval_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)))
         save_interval_layout.addWidget(self.save_interval_edit)
         save_interval_layout.addWidget(QLabel(self.tr("minutes")))
         save_interval_layout.addStretch()
@@ -307,7 +307,7 @@ class SettingsTab(QWidget):
 
         # Auto Start timetracking
         self.timetracking_autostart = QCheckBox(self.tr("Automatically Start Time Tracking When Game Launches"))
-        self.timetracking_autostart.setChecked(tt_settings.get("autostart", False))
+        self.timetracking_autostart.setChecked(tt_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False))
         timetracker_layout.addRow(QLabel(self.tr("Auto Start")), self.timetracking_autostart) 
 
         return timetracker_group
@@ -390,9 +390,9 @@ class SettingsTab(QWidget):
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
-        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "afk_timer", int(t) if t else 0))
-        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", "log_periodic_save", int(t) if t else 0))
-        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "autostart", bool(s)))
+        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
+        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
+        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
