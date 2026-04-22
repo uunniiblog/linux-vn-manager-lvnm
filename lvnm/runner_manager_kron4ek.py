@@ -63,7 +63,8 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
         dest_path = self.WINE_RUNNERS_PATH / target_name
         
         if self.download_file(target_asset["browser_download_url"], dest_path, progress_callback=progress_callback):
-            self.extract_tar(dest_path, self.WINE_RUNNERS_PATH, tag, compression="xz")
+            return dest_path
+        return None
 
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """

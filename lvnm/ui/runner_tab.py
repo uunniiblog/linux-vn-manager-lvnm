@@ -9,6 +9,7 @@ from runner_manager_kron4ek import RunnerManagerKron4ek
 from runner_manager_protonge import RunnerManagerProtonGE
 from runner_manager import RunnerManagerInterface
 from prefix_manager import PrefixManager
+from ui.console_dialog import ConsoleDialog
 
 logger = logging.getLogger(__name__)
 
@@ -139,18 +140,10 @@ class RunnerSubTab(QWidget):
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.del_btn)
         layout.addLayout(btn_layout)
-
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.progress_bar)
         
         # Signals
         self.add_btn.clicked.connect(self.on_add)
         self.del_btn.clicked.connect(self.on_delete)
-        
         
         self.refresh_list()
 
@@ -165,24 +158,83 @@ class RunnerSubTab(QWidget):
         if dialog.exec():
             rel_data, arch = dialog.get_selection()
             if rel_data:
-                # Setup bar
-                self.progress_bar.setValue(0)
-                self.progress_bar.setVisible(True)
-                self.add_btn.setEnabled(False) # Disable buttons so user doesn't click twice
-                self.del_btn.setEnabled(False)
+                console = ConsoleDialog(self)
+                console.setWindowTitle(self.tr(f"Installing {self.runner_type.capitalize()}: {rel_data['tag']}"))
 
-                # Start download (pass our update function as the callback)
-                if self.runner_type == "wine":
-                    self.manager.get_runner_download(rel_data, arch, progress_callback=self.update_progress)
-                else:
-                    self.manager.get_runner_download(rel_data, progress_callback=self.update_progress)
+                shared_data = {"downloaded_path": None}
+                # Create Download Task
+                download_task = lambda logger: self._task_download(logger, rel_data, arch, shared_data)
+                # Create Extract Task
+                extract_task = lambda logger: self._task_extract(logger, rel_data, shared_data)
 
-                # Cleanup
-                self.progress_bar.setVisible(False)
-                self.add_btn.setEnabled(True)
-                self.del_btn.setEnabled(True)
-                self.refresh_list()
+                # Add the task to the queue
+                console.add_task(download_task, {}, f"Downloading Version {rel_data['tag']}")
+                console.add_task(extract_task, {}, "Extracting runner")
+                
+                # Connect refresh to finish and start queue
+                console.finished_all.connect(self.refresh_list)
+                console.start_queue()
+                console.exec()
 
+    def _task_download(self, console_logger, rel_data, arch, shared_data):
+        """Handles the download runner logic."""
+        last_percent = -1
+
+        def internal_progress(percent):
+            nonlocal last_percent
+            if percent % 5 == 0 and percent != last_percent:
+                console_logger(f"[Progress] {percent}% complete...")
+                last_percent = percent
+
+        try:
+            console_logger(f"Initiating download for version {rel_data['tag']}...")
+            
+            if self.runner_type == "wine":
+                result_path = self.manager.get_runner_download(
+                    rel_data, 
+                    arch, 
+                    progress_callback=internal_progress
+                )
+            else:
+                result_path = self.manager.get_runner_download(
+                    rel_data, 
+                    progress_callback=internal_progress
+                )
+            
+            if result_path:
+                shared_data["downloaded_path"] = result_path
+            else:
+                raise Exception("Download failed or returned no path.")
+            
+            console_logger(f"Download finished.")
+        except Exception as e:
+            console_logger(f"\nFATAL ERROR {str(e)}")
+            logger.error(f"Installation error: {e}", exc_info=True)
+            raise e
+
+    def _task_extract(self, console_logger, rel_data, shared_data):
+        path = shared_data.get("downloaded_path")
+        if not path or not path.exists():
+            raise Exception("No downloaded file found to extract.")
+
+        console_logger(f"Extracting {path.name}...")
+        
+        # Determine compression from file extension
+        ext = "xz" if path.suffix == ".xz" else "gz"
+        
+        # Call Manager to extract
+        success = self.manager.extract_tar(
+            path, 
+            self.base_dir, 
+            rel_data['tag'], 
+            compression=ext
+        )
+        
+        if success:
+            console_logger("\nExtraction complete.")
+        else:
+            raise Exception("Extraction failed.")
+    
     def update_progress(self, value):
         self.progress_bar.setValue(value)
         QApplication.processEvents()

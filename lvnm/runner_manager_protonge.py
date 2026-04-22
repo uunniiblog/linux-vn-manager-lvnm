@@ -53,7 +53,8 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
         dest_path = self.PROTON_RUNNER_DIR / target_name
         
         if RunnerManagerInterface.download_file(download_url, dest_path, progress_callback=progress_callback):
-            RunnerManagerInterface.extract_tar(dest_path, self.PROTON_RUNNER_DIR, tag, compression="gz")
+            return dest_path
+        return None
 
     def get_release_info(self, release_data):
         """ Lists assets for the specific Proton-GE release """
