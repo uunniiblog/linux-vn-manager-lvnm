@@ -47,3 +47,9 @@ class SettingsManager:
                 json.dump(self._settings, f, indent=4)
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
+
+    def remove(self, key):
+        """Completly remove an entry"""
+        if key in self._settings:
+            del self._settings[key]
+            self._save_to_disk()

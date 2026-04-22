@@ -3,10 +3,10 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QListWidget, 
     QListWidgetItem, QSplitter, QLineEdit, QFormLayout,
-    QPushButton, QComboBox, QFileDialog, QDialog, QApplication,
-    QMenu
+    QPushButton, QComboBox, QFileDialog, QDialog,
+    QMenu, QFrame, QLabel
 )
-from PySide6.QtCore import Qt, QSettings, QByteArray
+from PySide6.QtCore import Qt, QSettings, QByteArray, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QAction, QActionGroup
 from game_manager import GameManager
 from game_runner import GameRunner
@@ -150,6 +150,8 @@ class GameTab(QWidget):
         for i in range(self.game_list.count()):
             item = self.game_list.item(i)
             card = item.data(Qt.UserRole)
+            if card is None:
+                continue
 
             if card.name == game_name:
                 # Get the latest data from the Manager
@@ -166,52 +168,138 @@ class GameTab(QWidget):
                 return
 
     def refresh_list(self):
-        """Clears and repopulates the game list, filtered by the search bar."""
+        """Clears and repopulates the game list, grouped by labels."""
         self.game_list.clear()
+        self.section_items = {}
         
-        # Get query from search bar
         query = self.search_bar.text() if hasattr(self, 'search_bar') else None
         games_dict = GameManager.list_games(name_query=query)
-        game_cards = list(games_dict.values())
+        all_cards = list(games_dict.values())
+        saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+        show_headers = len(saved_labels) > 0
 
-        # Sort
+        groups = {lbl: [] for lbl in saved_labels}
+        groups[""] = []
+
+        # Group games by label
+        for card in all_cards:
+            lbl = getattr(card, 'label', "") or ""
+            
+            if lbl in groups:
+                # Game matches a known saved label
+                groups[lbl].append(card)
+            else:
+                # Game has no label, or a label that was deleted from settings
+                groups[""].append(card)
+
+        # Sort labels alphabetically, move uncategorized at the end
+        sorted_labels = sorted([l for l in groups.keys() if l != ""], key=str.lower)
+        final_label_order = sorted_labels + [""]
+
+        # Process each group
         sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
-        if sort_pref == "name":
-            # Alphabetical by name
-            game_cards.sort(key=lambda card: card.name.lower())
-        elif sort_pref == "prefix":
-            # Alphabetical by prefix, then by name
-            game_cards.sort(key=lambda card: (card.prefix.lower(), card.name.lower()))
-        elif sort_pref == "playtime":
-            # Sort by total playtime
-            log_mgr = LogManager()
-            playtime_cache = {}            
-            for card in game_cards:
-                log_file = log_mgr.get_log_name_from_path(card.path) if card.path else ""
-                playtime_cache[card.name] = log_mgr.get_total_app_playtime(log_file)
-            game_cards.sort(key=lambda card: playtime_cache[card.name], reverse=True)
-        else:
-            # Default: Latest Played
-            game_cards.sort(
-                key=lambda card: card.last_played if card.last_played else "0000-00-00 00:00:00", 
-                reverse=True
-            )
+        log_mgr = LogManager()
+
+        for lbl in final_label_order:
+            if lbl not in groups: continue
+
+            if show_headers:
+                self.section_items[lbl] = []
+
+            # Header
+            is_expanded = True # Default if headers are off
+            if show_headers:
+                header_item = QListWidgetItem(self.game_list)
+                # Load if it was expanded
+                is_expanded = self.user_settings.get(f"section_expanded_{lbl}", True)
+
+                header_widget = SectionHeader(lbl, is_expanded=is_expanded, zoom_factor=self.zoom)
+                header_item.setSizeHint(header_widget.sizeHint())
+                header_item.setFlags(Qt.NoItemFlags)
+                
+                # Connect Header Signals
+                header_widget.toggled.connect(lambda state, l=lbl: self.toggle_section(l, state))
+                header_widget.deleteRequested.connect(self.delete_label_globally)
+                
+                self.game_list.addItem(header_item)
+                self.game_list.setItemWidget(header_item, header_widget)
+            
+            group_cards = groups[lbl]
+            
+            # Sort games within this group based on user preference
+            if sort_pref == "name":
+                # Alphabetical by name
+                group_cards.sort(key=lambda c: c.name.lower())
+            elif sort_pref == "prefix":
+                # Alphabetical by prefix, then by name
+                group_cards.sort(key=lambda c: (c.prefix.lower(), c.name.lower()))
+            elif sort_pref == "playtime":
+                # Sort by total playtime
+                group_cards.sort(key=lambda c: log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(c.path)), reverse=True)
+            else: 
+                # Default: Latest
+                group_cards.sort(key=lambda c: c.last_played if c.last_played else "0", reverse=True)
+
+            # Add the Game Items
+            for card in group_cards:
+                item = QListWidgetItem(self.game_list)
+                widget = GameListItem(card, zoom_factor=self.zoom)
+                item.setSizeHint(widget.sizeHint())
+                item.setData(Qt.UserRole, card)
+                
+                # Connect signals
+                widget.doubleClicked.connect(self.on_game_launch_requested)
+                widget.requestOpen.connect(self.on_game_selected_from_card)
+                widget.requestRun.connect(self.on_game_launch_requested)
+                widget.requestStop.connect(self.on_game_stop_requested)
+                widget.requestRefresh.connect(self.refresh_list)
+                
+                self.game_list.addItem(item)
+                self.game_list.setItemWidget(item, widget)
+                
+                # Register list to its section
+                if show_headers:
+                    self.section_items[lbl].append(item)
+                     # Apply initial collapsed state
+                    if not is_expanded:
+                        item.setHidden(True)
+
+    def toggle_section(self, label_name, expanded):
+        """Hides or shows all QListWidgetItems associated with a label."""
+        # Save state
+        self.user_settings.set(f"section_expanded_{label_name}", expanded)
         
-        for card in game_cards:
-            item = QListWidgetItem(self.game_list)
-            widget = GameListItem(card, zoom_factor=self.zoom)
-            item.setSizeHint(widget.sizeHint())
-            item.setData(Qt.UserRole, card)
-            widget.doubleClicked.connect(self.on_game_launch_requested)
-            widget.requestOpen.connect(self.on_game_selected_from_card)
-            widget.requestRun.connect(self.on_game_launch_requested)
-            widget.requestStop.connect(self.on_game_stop_requested)
-            widget.requestRefresh.connect(self.refresh_list)
-            self.game_list.addItem(item)
-            self.game_list.setItemWidget(item, widget)
+        if label_name in self.section_items:
+            for item in self.section_items[label_name]:
+                item.setHidden(not expanded)
+
+    def delete_label_globally(self, label_name):
+        """Removes the label from the global list and all games."""
+        # Remove from saved labels
+        saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+        if label_name in saved_labels:
+            saved_labels.remove(label_name)
+            self.user_settings.set(config.USER_CONF_SAVED_LABELS, saved_labels)
+
+        # Remove section state from userconfig
+        expansion_key = f"section_expanded_{label_name}"
+        self.user_settings.remove(expansion_key)
+
+        # Strip label from every game that has it
+        all_games = GameManager.list_games()
+        for name, card in all_games.items():
+            if getattr(card, 'label', None) == label_name:
+                card.label = ""
+                GameManager.update_game(name, card.to_dict())
+        
+        logger.info(f"Deleted label '{label_name}' and updated games.")
+        self.refresh_list()
 
     def on_game_selected(self, item):
+        """Load data and open sidebar"""
         self.card = item.data(Qt.UserRole)
+        if not self.card:
+            return
         self.sidebar.load_game(self.card)
         self.show_sidebar_safely()
 
@@ -356,3 +444,77 @@ class RunInPrefixDialog(QDialog):
 
         # Close the dialog
         self.accept()
+
+class SectionHeader(QWidget):
+    """A non-clickable visual separator for the list"""
+    # Emits True if expanded, False if collapsed
+    toggled = Signal(bool)
+    # Emits the label name to be deleted
+    deleteRequested = Signal(str)
+
+    def __init__(self, title, is_expanded=True, zoom_factor=1.0, parent=None):
+        super().__init__(parent)
+        self.label_name = title
+        self.expanded = is_expanded
+        self.zoom = zoom_factor
+
+        # Allow the widget to receive mouse events
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setCursor(Qt.PointingHandCursor)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(int(10 * zoom_factor), int(15 * zoom_factor), 10, int(5 * zoom_factor))
+
+        # Expand/Collapse
+        self.indicator = QLabel("▼" if is_expanded else "▶")
+        self.indicator.setFixedSize(int(20 * zoom_factor), int(20 * zoom_factor))
+        self.indicator.setStyleSheet("color: #888888; font-weight: bold;")
+        layout.addWidget(self.indicator)
+        
+        # Label title
+        display_text = self.tr("UNCATEGORIZED") if not title else title.upper()
+        self.label = QLabel(display_text)
+        self.label.setStyleSheet(f"""
+            font-weight: bold; 
+            font-size: {int(10 * zoom_factor)}pt; 
+            letter-spacing: 1px;
+        """)
+        
+        layout.addWidget(self.label)
+        
+        # Add line separatory
+        line = QFrame()
+
+        line.setFrameShape(QFrame.NoFrame)
+        thickness = int(10 * zoom_factor) 
+        line.setFixedHeight(thickness)
+        line.setStyleSheet("""
+            background-color: #444444; 
+            border: none;
+            border-radius: 1px;
+        """)
+        
+        layout.addWidget(line, stretch=1)
+
+    def _toggle_state(self):
+        self.expanded = not self.expanded
+        self.indicator.setText("▼" if self.expanded else "▶")
+        self.toggled.emit(self.expanded)
+
+    def contextMenuEvent(self, event):
+        """Right-click to delete the section"""
+        if not self.label_name: # Don't allow deleting the 'Uncategorized' label itself
+            return
+
+        menu = QMenu(self)
+        delete_action = menu.addAction(self.tr(f"Delete Label: {self.label_name}"))
+        
+        action = menu.exec(event.globalPos())
+        if action == delete_action:
+            self.deleteRequested.emit(self.label_name)
+
+    def mousePressEvent(self, event):
+        """Handle click on any part of the header"""
+        if event.button() == Qt.LeftButton:
+            self._toggle_state()
+        super().mousePressEvent(event)

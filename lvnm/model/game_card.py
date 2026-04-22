@@ -27,6 +27,7 @@ class GameCard:
     dlloverride: Dict[str, str] = field(default_factory=dict)
     gamescope: GameScope = field(default_factory=GameScope)
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+    label: str = ""
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

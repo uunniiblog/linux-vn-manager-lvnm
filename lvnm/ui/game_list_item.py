@@ -2,7 +2,8 @@ import logging
 import config
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
-    QMenu, QDialog, QPlainTextEdit
+    QMenu, QDialog, QPlainTextEdit, QPushButton,
+    QLineEdit
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
@@ -186,7 +187,27 @@ class GameListItem(QWidget):
         act_log = menu.addAction(self.tr("Show Logs"))
         act_open = menu.addAction(self.tr("Open Sidebar"))
         act_browse = menu.addAction(self.tr("Browse Files"))
+        act_refresh = menu.addAction(self.tr("Refresh List"))
+
+        label_menu = menu.addMenu(self.tr("Label"))
+        # Load existing labels
+        saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+        current_game_label = getattr(self.game_card, 'label', "")
+        label_actions = {}
+        if saved_labels:
+            for lbl in saved_labels:
+                act = label_menu.addAction(lbl)
+                act.setCheckable(True)
+                # Highlight it
+                if lbl == current_game_label:
+                    act.setChecked(True)
+                label_actions[act] = lbl            
+        # Add new label section
+        label_menu.addSeparator()
+        act_add_label = label_menu.addAction(self.tr("Add new label..."))
+
         menu.addSeparator()
+
         act_regedit = menu.addAction(self.tr("Open Regedit"))
         act_winecfg = menu.addAction(self.tr("Open Winecfg"))
         act_cmd = menu.addAction(self.tr("Open windows cmd"))
@@ -195,7 +216,6 @@ class GameListItem(QWidget):
         act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
         act_steam = menu.addAction(self.tr("Steam Shortcut"))
         menu.addSeparator()
-        act_refresh = menu.addAction(self.tr("Refresh List"))
         act_dup = menu.addAction(self.tr("Duplicate"))
         act_del = menu.addAction(self.tr("Delete"))
 
@@ -218,6 +238,13 @@ class GameListItem(QWidget):
 
         elif action == act_browse:
             self.browse_game(self.game_card.path)
+
+        elif action == act_add_label:
+            self.prompt_add_new_label()
+            
+        elif action in label_actions:
+            selected_label = label_actions[action]
+            self.toggle_label_on_game(selected_label)
 
         elif action == act_regedit:
             self.run_in_prefix("regedit")
@@ -280,6 +307,31 @@ class GameListItem(QWidget):
 
     def shortcut(self):
         SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.vndb)
+
+    def prompt_add_new_label(self):
+        """Opens a dialog to create a new label, saves it, and applies it."""
+        dialog = AddLabelDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            new_label = dialog.get_label_name()
+            if new_label:
+                saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+                if new_label not in saved_labels:
+                    saved_labels.append(new_label.strip())
+                    self.user_settings.set("saved_labels", saved_labels)
+                
+                self.toggle_label_on_game(new_label)
+                
+                logger.debug(f"Successfully created and applied new label: {new_label}")
+
+    def toggle_label_on_game(self, label_name):
+        """Applies or removes the selected label from the current game card."""
+        logger.debug(f"Toggling label '{label_name}' on game: {self.game_card.name}")
+        if self.game_card.label.strip() != label_name.strip():
+            self.game_card.label = label_name
+        else:
+            self.game_card.label = ""
+        GameManager.update_game(self.game_card.name, self.game_card.to_dict())
+        self.requestRefresh.emit(self.game_card)
 
     def _format_total_time(self, seconds):
         """Custom formatter: 10h 50m or 30m"""
@@ -370,3 +422,39 @@ class LogViewerDialog(QDialog):
     def closeEvent(self, event):
         self.timer.stop()
         event.accept()
+
+class AddLabelDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Add New Label"))
+        self.setMinimumWidth(300)
+
+        layout = QVBoxLayout(self)
+
+        # Input field
+        self.label_input = QLineEdit()
+        self.label_input.setPlaceholderText(self.tr("Enter label name..."))
+        layout.addWidget(self.label_input)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        self.btn_cancel = QPushButton(self.tr("Cancel"))
+        self.btn_accept = QPushButton(self.tr("Accept"))
+        self.btn_accept.setDefault(True)
+        
+        # Style the accept button to match your existing app theme
+        self.btn_accept.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
+
+        # Connect buttons
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_accept.clicked.connect(self.accept)
+
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.btn_cancel)
+        btn_layout.addWidget(self.btn_accept)
+
+        layout.addLayout(btn_layout)
+
+    def get_label_name(self):
+        """Returns the trimmed string from the input."""
+        return self.label_input.text().strip()
