@@ -1,4 +1,6 @@
 import os
+import re
+import glob
 import sys
 import platform
 import subprocess
@@ -344,6 +346,109 @@ class SystemUtils:
         session = os.environ.get("XDG_SESSION_TYPE", "x11").lower()
         logger.debug(f"session_type {session}")
         return session
+
+    @staticmethod
+    def get_mainscreen_resolution_xrandr():
+        """ Returns main screen resolution"""
+        try:
+            out = subprocess.check_output(
+                ["xrandr", "--listmonitors"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=3,
+            )
+        except Exception:
+            return None
+
+        for line in out.splitlines():
+            # 0: +*DP-1 3840/597x2160/336+3200+0  DP-1
+            # 1: +DP-2 3200/597x1800/336+0+0  DP-2
+            if "*" in line:
+                # Extract the WIDTHxHEIGHT before the slash/mm part
+                m = re.search(r"(\d+)/\d+x(\d+)/\d+", line)
+                if m:
+                    logger.debug(f"{int(m.group(1))}, {int(m.group(2))}")
+                    return int(m.group(1)), int(m.group(2))
+        
+        return None
+
+    @staticmethod
+    def get_mainscreen_resolution() -> tuple[int, int]:
+        """
+        Returns the primary monitor's physical resolution by reading
+        EDID directly from the kernel sysfs.
+        """
+
+        def _get_primary_output_name() -> str | None:
+            """Use xrandr --listmonitors to find the primary output name."""
+            try:
+                out = subprocess.check_output(
+                    ["xrandr", "--listmonitors"],
+                    stderr=subprocess.DEVNULL, text=True, timeout=3
+                )
+            except Exception:
+                return None
+            for line in out.splitlines():
+                if "*" in line:
+                    return line.strip().split()[-1]  # last token is the output name
+            return None
+
+        def _parse_edid_resolution(edid_bytes: bytes) -> tuple[int, int] | None:
+            """
+            Parse the preferred (native) resolution from EDID binary data.
+
+            EDID spec (section 3.10): bytes 54-71 are the first detailed
+            timing descriptor, which encodes the native/preferred resolution.
+
+            byte 56      : H active pixels, low 8 bits
+            byte 58 >> 4 : H active pixels, high 4 bits
+            byte 59      : V active lines,  low 8 bits
+            byte 61 >> 4 : V active lines,  high 4 bits
+            """
+            if len(edid_bytes) < 72:
+                return None
+
+            # Validate EDID header (first 8 bytes must be 00 FF FF FF FF FF FF 00)
+            if edid_bytes[:8] != b'\x00\xff\xff\xff\xff\xff\xff\x00':
+                return None
+
+            h_active = ((edid_bytes[58] >> 4) << 8) | edid_bytes[56]
+            v_active = ((edid_bytes[61] >> 4) << 8) | edid_bytes[59]
+
+            if h_active > 0 and v_active > 0:
+                logger.debug(f"h_active: {h_active}, v_active: {v_active}")
+                return h_active, v_active
+            return None
+
+        def _edid_resolution(output_name: str) -> tuple[int, int] | None:
+            """
+            Find the EDID file for the given output name in sysfs.
+            Kernel exposes EDID at: /sys/class/drm/card<N>-<output>/edid
+            e.g. DP-1 → /sys/class/drm/card0-DP-1/edid
+            """
+            # Glob handles multiple cards (card0, card1, etc.)
+            pattern = f"/sys/class/drm/card*-{output_name}/edid"
+            matches = glob.glob(pattern)
+
+            for edid_path in matches:
+                try:
+                    with open(edid_path, "rb") as f:
+                        edid_bytes = f.read()
+                    if edid_bytes:
+                        result = _parse_edid_resolution(edid_bytes)
+                        if result:
+                            return result
+                except OSError:
+                    continue
+            return None
+
+        primary = _get_primary_output_name()
+        if primary:
+            result = _edid_resolution(primary)
+            if result:
+                return result
+
+        return SystemUtils.get_mainscreen_resolution_xrandr()
 
     @staticmethod
     def get_tool_path(tool_name: str) -> str:

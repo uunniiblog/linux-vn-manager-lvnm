@@ -95,7 +95,8 @@ class PrefixManager:
             if executor:
                 # Add wineboot to the queue
                 executor.add_task(cmd, self.env, desc, on_finished_callback=finalize_creation)
-                
+                self.set_prefix_dpi(executor=executor)
+
                 # Add Codecs and Winetricks to the queue
                 if self.codecs:
                     self.install_codecs(self.codecs, executor=executor)
@@ -104,6 +105,7 @@ class PrefixManager:
             else:
                 ExecutionManager.run(cmd, self.env, wait=True)
                 finalize_creation()
+                self.set_prefix_dpi()
                 if self.codecs:
                     self.install_codecs(self.codecs)
                 if self.winetricks:
@@ -358,6 +360,51 @@ class PrefixManager:
             executor.add_task(run_dxvk_logic, self.env, "Downloading and Installing DXVK")
         else:
             run_dxvk_logic()
+
+    def set_prefix_dpi(self, executor=None):
+        """
+        Sets the Wine prefix DPI based on the primary monitor's physical resolution.
+        
+        Thresholds:
+        <= 1080p          → 96  DPI (Wine default, no change)
+        1081p – 1439p     → 144 DPI
+        >= 1440p (4K etc) → 168 DPI
+        
+        DPI is written to the registry key Wine reads on startup:
+        HKCU\\Control Panel\\Desktop → LogPixels (DWORD)
+        """
+        width, height = SystemUtils.get_mainscreen_resolution()
+        
+        if height <= 1080:
+            #dpi = 96
+            return
+        elif height < 1440:
+            dpi = 144
+        elif height >= 1440:
+            dpi = 168
+        else:
+            # Probably screen resolution could not be calculated
+            return
+
+        logger.info(f"Setting DPI for prefix '{self.name}' to {dpi} (detected resolution: {width}x{height})")
+
+        cmd = self.runner_command + [
+            "reg", "add",
+            r"HKCU\Control Panel\Desktop",
+            "/v", "LogPixels",
+            "/t", "REG_DWORD",
+            "/d", str(dpi),
+            "/f"
+        ]
+
+        def finalize():
+            logger.info(f"DPI set to {dpi} successfully.")
+
+        if executor:
+            executor.add_task(cmd, self.env, f"Setting prefix DPI to {dpi}", on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True)
+            finalize()
 
     def check_prefix_exists(self):
         if Path(self.prefix_path).exists():
