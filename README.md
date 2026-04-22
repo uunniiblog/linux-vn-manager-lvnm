@@ -7,7 +7,7 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - Download proton-ge and wine (normal and wow64 builds) runners directly from the application.
  - Create and manage prefixes with video codecs and winetricks easily from interface.
  - Game management to test games easily in all diferent prefixes with useful environment variables for VNs.
- - Real time tracking support to have an accurate play count (Only KDE 6 and SteamOS gamescope session).
+ - Real time tracking support to have an accurate play count (Check Timetracking section for details).
  - VNDB api integration to get covers and links.
  - Easy texthooking
  - PySide QT 6 interface.
@@ -60,7 +60,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Prefix: Combo with all prefixes in the application, choose one. Mandatory.
         - VNDB: the VNDB id for the game (v11,v12, etc). Will fetch the cover and display vndb/egs link at the top. Optional.
         - Gamescope: Enable/disable gamescope and launch parameters, example: -W 3840 -H 2160 -f -r 60. Can be configured in settings to be filled automatically.
-        - Environment Variables: Enable/Disable them as they fit for your game. Mouse over them to show the exact command. Can be configured in settings to be filled automatically. More can be added at https://github.com/uunniiblog/linux-vn-manager-lvnm/blob/main/lvnm/config.py in ENV_VARIABLES.
+        - Environment Variables: Enable/Disable them as they fit for your game. Mouse over them to show the exact command. Can be configured in settings to be filled automatically. There are a few common environment variables preloaded in the application, but can add more or remove them freely from settings tab.
         - Some variables are exclusive to proton/wine, won't show if they don't apply.
     - Edit game: Click one game from the list to show current data to edit. Same fields. Can also Start game from there.
     - Run in prefix: Run a game in a prefix without adding an entry, maybe useful to run some installers quickly. Environment variables will be gotten from global ones at settings.
@@ -75,13 +75,14 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
                 <li>Name: Will show the name, with the prefix and path below. </li>
                 <li>Last played date and playtime count.</li>
             </ul>
-        - Steam/desktop shortcut: Right click an entry to add. The application will be run without gui.
+        - Steam/desktop shortcut: Right click an entry to add. The application will be run headless without GUI in this mode. Timetracking will still work in the background if enabled.
 4. Statistics tab: If timetracking has been enabled when you run a game it will count your playtime. This tab shows some simple graphs by app or global based on your playtime.
 5. Settings tab
     - Functional Settings:
         - Font folder: Path to a folder with your fonts. This fonts can be symlinked to prefixes to reduce disk space.
         - Gamescope: Enable gamescope and global parameters. When you add a game this setting will be automatically loaded, can be edited later per game as it fit.
         - Global Env Variables: Enable global environt variables checkboxes. When you add a game this setting will be automatically loaded, can be edited later per game as it fit. Will also be used when running a game in "Run in prefix".
+        - Manage Variables: To add and remove new environment variables, if you remove one variable from the application being used by a game it will be deleted from the game.
     - Appearance Settings:
         - Dark/Light mode.
         - Ui scaling.
