@@ -136,6 +136,7 @@ class GameProcessManager(QObject):
 
             game_to_update = GameManager.get_game(name) 
             if game_to_update:
+                game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')      
                 GameManager.update_game(name, game_to_update.to_dict())
             
             # Notify UI
