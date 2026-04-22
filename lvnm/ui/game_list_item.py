@@ -1,13 +1,14 @@
 import logging
+import config
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
-    QFrame, QMenu, QDialog, QPlainTextEdit, QPushButton, QApplication
+    QMenu, QDialog, QPlainTextEdit
 )
-from PySide6.QtGui import QPixmap, QPainter, QColor
+from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
 from game_manager import GameManager
 from system_utils import SystemUtils
-from ui.game_sidebar import GameSidebar
+from game_process_manager import GameProcessManager
 from game_runner import GameRunner
 from timetracker.log_manager import LogManager
 from settings_manager import SettingsManager
@@ -26,6 +27,7 @@ class GameListItem(QWidget):
     def __init__(self, game_card, zoom_factor=1.0, parent=None):
         super().__init__(parent)
         self.user_settings = SettingsManager()
+        self.process_manager = GameProcessManager.get_instance()
         self.setMouseTracking(True)
         self.zoom = zoom_factor
         self.game_card = game_card
@@ -172,7 +174,7 @@ class GameListItem(QWidget):
 
         th_settings = self.user_settings.get(config.USER_CONF_TEXTHOOKER, {})
         
-        is_running = self.game_card.name in GameSidebar.active_runners
+        is_running = self.process_manager.is_game_running(self.game_card.name)        
         if is_running:
             act_run_stop = menu.addAction(self.tr("Stop Game"))
         else:
@@ -298,6 +300,7 @@ class LogViewerDialog(QDialog):
         self.resize(800, 600)
         self.setModal(False)
         self.runner = None
+        self.process_manager = GameProcessManager.get_instance()
         self.name = name
         self.history_buffer = ""
         
@@ -329,7 +332,10 @@ class LogViewerDialog(QDialog):
         Update logs in real time. If a new instance starts running append it to current logs.
         Logs can be an active runner or a string data if the game was closed        
         """
-        data = GameSidebar.runners.get(self.name)
+        # Check for live logs or get full log from closed game
+        data = self.process_manager.active_runners.get(self.name)
+        if not data:
+            data = self.process_manager.runners_logs.get(self.name)
 
         # Detect transition to a NEW active runner instance
         is_new_runner = hasattr(data, "get_full_log") and data != self.runner
