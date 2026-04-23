@@ -164,6 +164,17 @@ class PrefixTab(QWidget):
                 prefix.add_fonts(fonts_path, executor=console)
                 has_tasks = True
 
+            # Handle DPI
+            if data["dpi"] != prefix.dpi:
+                if data["dpi"]:
+                    prefix.set_prefix_dpi(disable=False, executor=console)
+                    prefix.dpi = True
+                else:
+                    # Reset to 96 DPI
+                    prefix.set_prefix_dpi(disable=True, executor=console)
+                    prefix.dpi = False
+                has_tasks = True
+
             # Handle Wayland Driver change
             if data["wayland"] != prefix.wayland_driver:
                 if data["wayland"]:
@@ -198,6 +209,7 @@ class PrefixTab(QWidget):
             data = dialog.get_data()
             name = data["name"]
             fonts_path = data.get("fonts", None)
+            dpi = data.get("dpi", False)
             wayland = data.get("wayland", False)
             
             # Check if it already exists in JSON
@@ -217,6 +229,7 @@ class PrefixTab(QWidget):
                 runner_path=data["runner_path"], 
                 codecs=data["codecs"], 
                 winetricks=data["winetricks"],
+                dpi=dpi,
                 wayland=wayland,
                 executor=console
             )
@@ -224,10 +237,12 @@ class PrefixTab(QWidget):
             if success:
                 if fonts_path:
                     prefix.add_fonts(fonts_path, executor=console)
-                if prefix.type == "wine":
-                    prefix.install_dxvk(executor=console)
+                if dpi:
+                    prefix.set_prefix_dpi(executor=console)             
                 if wayland:
                     prefix.enable_wayland_driver(executor=console)
+                if prefix.type == "wine":
+                    prefix.install_dxvk(executor=console)
                     
                 console.start_queue()
                 console.exec()
@@ -362,6 +377,11 @@ class EditPrefixDialog(QDialog):
             self.font_checkbox.setDisabled(True)
         self.layout.addWidget(self.font_checkbox)
 
+        # DPI checkbox
+        self.dpi_checkbox = QCheckBox(self.tr("Automatically Scale DPI based on monitor resolution"))
+        self.dpi_checkbox.setChecked(bool(self.manager.dpi))
+        self.layout.addWidget(self.dpi_checkbox)
+
         # Wayland checkbox
         self.wayland_checkbox = QCheckBox(self.tr("Enable Wayland driver (Do not recommended)"))
         self.wayland_checkbox.setChecked(bool(self.manager.wayland_driver))
@@ -472,6 +492,7 @@ class EditPrefixDialog(QDialog):
             "path": self.path_edit.text(),
             "codecs": " ".join(new_codecs),
             "winetricks": " ".join(new_tricks),
+            "dpi": self.dpi_checkbox.isChecked(),
             "wayland": self.wayland_checkbox.isChecked()
         }
 
@@ -534,6 +555,11 @@ class CreatePrefixDialog(QDialog):
         self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
         self.font_checkbox.setChecked(bool(self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")))
         self.layout.addWidget(self.font_checkbox)
+
+         # --- DPI checkbox ---
+        self.dpi_checkbox = QCheckBox(self.tr("Automatically Scale DPI based on monitor resolution"))
+        self.dpi_checkbox.setChecked(False)
+        self.layout.addWidget(self.dpi_checkbox)
 
         # --- Wayland checkbox ---
         self.wayland_checkbox = QCheckBox(self.tr("Enable Wayland driver (Do not recommended)"))
@@ -616,14 +642,13 @@ class CreatePrefixDialog(QDialog):
             "name": self.name_edit.text().strip(),
             "runner_path": self.available_runners[selected_runner_name],
             "codecs": " ".join(new_codecs),
-            "winetricks": " ".join(new_tricks)
+            "winetricks": " ".join(new_tricks),
+            "dpi": self.dpi_checkbox.isChecked(),
+            "wayland": self.wayland_checkbox.isChecked(),
         }
 
         if self.font_checkbox.isChecked():
             data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
-
-        if self.wayland_checkbox.isChecked():
-            data["wayland"] = True
 
         return data
 

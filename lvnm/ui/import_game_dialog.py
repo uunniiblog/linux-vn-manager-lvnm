@@ -79,7 +79,7 @@ class ImportGameDialog(QDialog):
 
         path_layout = QHBoxLayout()
         self.edit_path = QLineEdit(self.game_data.get("path", ""))
-        self.edit_path.setPlaceholderText(self.tr("Path to .exe / .sh / .bin"))
+        self.edit_path.setPlaceholderText(self.tr("Path to game .exe"))
         self.btn_browse = QPushButton(self.tr("Browse"))
         self.btn_browse.clicked.connect(self._browse_exe)
         path_layout.addWidget(self.edit_path)
@@ -149,6 +149,12 @@ class ImportGameDialog(QDialog):
 
         fonts = self.prefix_data.get("fonts", False)
         self._add_readonly_row(prefix_ro_form, self.tr("Fonts"), self.tr("Yes") if fonts else self.tr("No"))
+
+        dpi = self.prefix_data.get("dpi", False)
+        self._add_readonly_row(prefix_ro_form, self.tr("DPI"), self.tr("Yes") if dpi else self.tr("No"))
+
+        wayland = self.prefix_data.get("wayland", False)
+        self._add_readonly_row(prefix_ro_form, self.tr("Wayland Driver"), self.tr("Yes") if wayland else self.tr("No"))
 
         content_layout.addWidget(prefix_ro_group)
         content_layout.addStretch()
@@ -353,6 +359,10 @@ class ImportGameDialog(QDialog):
                     lambda logger: logger("[WARNING] Skipping font symlink. Not configured in Settings."),
                     {}, "Fonts"
                 )
+
+        prefix.dpi = prefix_data.get("dpi", False)
+        if prefix.dpi:
+            prefix.set_prefix_dpi(executor=console)
 
         prefix.wayland_driver = prefix_data.get("wayland", False)
         if prefix.wayland_driver:

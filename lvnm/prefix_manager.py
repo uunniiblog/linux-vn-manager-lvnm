@@ -32,6 +32,7 @@ class PrefixManager:
         self.env = SystemUtils.get_clean_env()
         self.env["WINEPREFIX"] = str(self.prefix_path)
         self.fonts = False
+        self.dpi = False
         self.wayland_driver = False
         
         # Automatically load data if it exists
@@ -48,6 +49,7 @@ class PrefixManager:
             self.codecs = self.card.codecs
             self.winetricks = self.card.winetricks
             self.fonts = self.card.fonts
+            self.dpi = self.card.dpi
             self.wayland_driver = self.card.wayland
             self._setup_env()
             return True
@@ -73,13 +75,14 @@ class PrefixManager:
             self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
             self.runner_command = [str(wine_bin)]
 
-    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", wayland: bool = False, executor=None):
+    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", dpi: bool = False, wayland: bool = False, executor=None):
         """Physical creation and initialization of the prefix."""
         logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
         self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
         self.codecs = codecs
         self.winetricks = winetricks
+        self.dpi = dpi
         self.wayland_driver = wayland
         self._setup_env()
 
@@ -98,7 +101,6 @@ class PrefixManager:
             if executor:
                 # Add wineboot to the queue
                 executor.add_task(cmd, self.env, desc, on_finished_callback=finalize_creation)
-                self.set_prefix_dpi(executor=executor)
 
                 # Add Codecs and Winetricks to the queue
                 if self.codecs:
@@ -108,7 +110,6 @@ class PrefixManager:
             else:
                 ExecutionManager.run(cmd, self.env, wait=True)
                 finalize_creation()
-                self.set_prefix_dpi()
                 if self.codecs:
                     self.install_codecs(self.codecs)
                 if self.winetricks:
@@ -212,6 +213,7 @@ class PrefixManager:
             codecs=self.codecs,
             winetricks=self.winetricks,
             fonts=self.fonts,
+            dpi=self.dpi,
             wayland=self.wayland_driver
         )
         json_file[self.name] = card.to_dict()
@@ -365,7 +367,7 @@ class PrefixManager:
         else:
             run_dxvk_logic()
 
-    def set_prefix_dpi(self, executor=None):
+    def set_prefix_dpi(self, disable:bool = False, executor=None):
         """
         Sets the Wine prefix DPI based on the primary monitor's physical resolution.
         
@@ -379,8 +381,11 @@ class PrefixManager:
         """
         width, height = SystemUtils.get_mainscreen_resolution()
         
-        if height <= 1080:
-            #dpi = 96
+        if disable:
+            # Leave default dpi
+            dpi = 96
+        elif height <= 1080:
+            # don't do anything leave default
             return
         elif height < 1440:
             dpi = 144
