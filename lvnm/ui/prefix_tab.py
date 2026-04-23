@@ -164,9 +164,17 @@ class PrefixTab(QWidget):
                 prefix.add_fonts(fonts_path, executor=console)
                 has_tasks = True
 
+            # Handle Wayland Driver change
+            if data["wayland"] != prefix.wayland_driver:
+                if data["wayland"]:
+                    prefix.enable_wayland_driver(executor=console)
+                    prefix.wayland_driver = True
+                else:
+                    prefix.disable_wayland_driver(executor=console)
+                    prefix.wayland_driver = False
+                has_tasks = True
+
             if has_tasks:
-                #console.set_header_info(prefix.prefix_path, prefix.runner_path)
-                #console.show()
                 console.start_queue()
                 console.exec()
             else:
@@ -189,7 +197,8 @@ class PrefixTab(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             name = data["name"]
-            fonts_path = data.get("fonts", None)            
+            fonts_path = data.get("fonts", None)
+            wayland = data.get("wayland", False)
             
             # Check if it already exists in JSON
             if PrefixManager.get_prefix_info(name):
@@ -207,7 +216,8 @@ class PrefixTab(QWidget):
             success = prefix.create_prefix(
                 runner_path=data["runner_path"], 
                 codecs=data["codecs"], 
-                winetricks=data["winetricks"], 
+                winetricks=data["winetricks"],
+                wayland=wayland,
                 executor=console
             )
             
@@ -216,6 +226,8 @@ class PrefixTab(QWidget):
                     prefix.add_fonts(fonts_path, executor=console)
                 if prefix.type == "wine":
                     prefix.install_dxvk(executor=console)
+                if wayland:
+                    prefix.enable_wayland_driver(executor=console)
                     
                 console.start_queue()
                 console.exec()
@@ -350,6 +362,11 @@ class EditPrefixDialog(QDialog):
             self.font_checkbox.setDisabled(True)
         self.layout.addWidget(self.font_checkbox)
 
+        # Wayland checkbox
+        self.wayland_checkbox = QCheckBox(self.tr("Enable Wayland driver (Do not recommended)"))
+        self.wayland_checkbox.setChecked(bool(self.manager.wayland_driver))
+        self.layout.addWidget(self.wayland_checkbox)
+
         # Codecs Section
         self.codec_boxes = {}
         self.layout.addWidget(self.create_check_group(
@@ -454,7 +471,8 @@ class EditPrefixDialog(QDialog):
             "name": self.name_edit.text(),
             "path": self.path_edit.text(),
             "codecs": " ".join(new_codecs),
-            "winetricks": " ".join(new_tricks)
+            "winetricks": " ".join(new_tricks),
+            "wayland": self.wayland_checkbox.isChecked()
         }
 
         if self.font_checkbox.isChecked():
@@ -516,6 +534,11 @@ class CreatePrefixDialog(QDialog):
         self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
         self.font_checkbox.setChecked(bool(self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")))
         self.layout.addWidget(self.font_checkbox)
+
+        # --- Wayland checkbox ---
+        self.wayland_checkbox = QCheckBox(self.tr("Enable Wayland driver (Do not recommended)"))
+        self.wayland_checkbox.setChecked(False)
+        self.layout.addWidget(self.wayland_checkbox)
 
         # --- Codecs Section ---
         self.codec_boxes = {}
@@ -598,6 +621,9 @@ class CreatePrefixDialog(QDialog):
 
         if self.font_checkbox.isChecked():
             data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
+
+        if self.wayland_checkbox.isChecked():
+            data["wayland"] = True
 
         return data
 

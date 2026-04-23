@@ -6,7 +6,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QLineEdit, QPushButton, QFileDialog, QScrollArea, QWidget,
-    QMessageBox
+    QMessageBox, QSizePolicy
 )
 from PySide6.QtCore import Signal, QSettings, Qt
 
@@ -177,6 +177,7 @@ class ImportGameDialog(QDialog):
         lbl = QLabel(str(value))
         lbl.setStyleSheet(READONLY_STYLE)
         lbl.setWordWrap(True)
+        lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         form.addRow(label, lbl)
 
     def _browse_exe(self):
@@ -352,6 +353,10 @@ class ImportGameDialog(QDialog):
                     lambda logger: logger("[WARNING] Skipping font symlink. Not configured in Settings."),
                     {}, "Fonts"
                 )
+
+        prefix.wayland_driver = prefix_data.get("wayland", False)
+        if prefix.wayland_driver:
+            prefix.enable_wayland_driver(executor=console)
 
         if runner_type == "wine":
             prefix.install_dxvk(executor=console)

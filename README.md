@@ -35,6 +35,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             <li>Path: locked field, will be stored in ~/.local/share/lvnm/prefixes/ with the name given.</li>
             <li>Runner: Select a runner from all the installed runners.</li>
             <li>Symlink fonts into prefix: Makes a symlink of the all the fonts folder configured in Settings into the new prefix.</li>
+            <li>Wayland driver: To activate wayland native driver at regedit level, useful for wine runners that do not have the environment variable to enable it. Do not recommended since it breaks fullscreen even harder in a lot of older VNs, but maybe useful for some cases like installers or editing winecfg </li>
             <li>Codecs: Install custom codecs into the prefix from https://www.vnwiki.xyz/linux/special-codecs.html </li>
             <li>Winetricks: Install preconfigured winetricks. They are configured at https://github.com/uunniiblog/linux-vn-manager-lvnm/blob/main/lvnm/config.py in WINETRICKS_LIST. </li>
             <li> Umu store and Umu ID for proton runners (not really tested but should work). </li>

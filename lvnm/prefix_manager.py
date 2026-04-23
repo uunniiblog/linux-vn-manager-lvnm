@@ -32,6 +32,7 @@ class PrefixManager:
         self.env = SystemUtils.get_clean_env()
         self.env["WINEPREFIX"] = str(self.prefix_path)
         self.fonts = False
+        self.wayland_driver = False
         
         # Automatically load data if it exists
         self._load_from_json()
@@ -47,6 +48,7 @@ class PrefixManager:
             self.codecs = self.card.codecs
             self.winetricks = self.card.winetricks
             self.fonts = self.card.fonts
+            self.wayland_driver = self.card.wayland
             self._setup_env()
             return True
 
@@ -71,13 +73,14 @@ class PrefixManager:
             self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
             self.runner_command = [str(wine_bin)]
 
-    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", executor=None):
+    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", wayland: bool = False, executor=None):
         """Physical creation and initialization of the prefix."""
         logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
         self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
         self.codecs = codecs
         self.winetricks = winetricks
+        self.wayland_driver = wayland
         self._setup_env()
 
         try:
@@ -208,7 +211,8 @@ class PrefixManager:
             type=self.type,
             codecs=self.codecs,
             winetricks=self.winetricks,
-            fonts=self.fonts
+            fonts=self.fonts,
+            wayland=self.wayland_driver
         )
         json_file[self.name] = card.to_dict()
 
@@ -402,6 +406,55 @@ class PrefixManager:
 
         if executor:
             executor.add_task(cmd, self.env, f"Setting prefix DPI to {dpi}", on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True)
+            finalize()
+
+    def enable_wayland_driver(self, executor=None):
+        """
+        Enables Wine's native Wayland driver by modifying the registry.
+        Requires Wine 9.0+ built with Wayland support.
+        """
+        logger.info(f"Enabling native Wayland driver for prefix '{self.name}'")
+
+        cmd = self.runner_command + [
+            "reg", "add",
+            r"HKCU\Software\Wine\Drivers",
+            "/v", "Graphics",
+            "/t", "REG_SZ",
+            "/d", "wayland",
+            "/f"
+        ]
+
+        def finalize():
+            logger.info(f"Wayland driver enabled successfully for '{self.name}'.")
+
+        if executor:
+            executor.add_task(cmd, self.env, "Enabling Wayland driver", on_finished_callback=finalize)
+        else:
+            ExecutionManager.run(cmd, self.env, wait=True)
+            finalize()
+
+    def disable_wayland_driver(self, executor=None):
+        """
+        Disables the native Wayland driver by forcing it back to X11.
+        """
+        logger.info(f"Disabling native Wayland driver for prefix '{self.name}'")
+
+        cmd = self.runner_command + [
+            "reg", "add",
+            r"HKCU\Software\Wine\Drivers",
+            "/v", "Graphics",
+            "/t", "REG_SZ",
+            "/d", "x11",
+            "/f"
+        ]
+
+        def finalize():
+            logger.info(f"Wayland driver disabled successfully for '{self.name}'.")
+
+        if executor:
+            executor.add_task(cmd, self.env, "Disabling Wayland driver", on_finished_callback=finalize)
         else:
             ExecutionManager.run(cmd, self.env, wait=True)
             finalize()

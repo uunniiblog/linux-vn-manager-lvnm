@@ -15,6 +15,7 @@ class Prefix:
     winetricks: str = ""
     fonts: bool = False
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+    wayland: bool = True
 
     @classmethod
     def from_dict(cls, name: str, data: dict):
