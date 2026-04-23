@@ -1,6 +1,7 @@
 import config
 import urllib.parse
 import logging
+import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
@@ -208,6 +209,9 @@ class GameSidebar(QFrame):
         # Styling it red to indicate a destructive action
         self.delete_btn.setStyleSheet("background-color: #c62828; color: white; font-weight: bold;")
         self.delete_btn.clicked.connect(self.delete_game_action)
+        # Export
+        self.export_btn = QPushButton(self.tr("Export"))
+        self.export_btn.clicked.connect(self.export_game_action)
 
         # Save & Cancel (Right side)
         self.save_btn = QPushButton(self.tr("Save"))
@@ -221,6 +225,7 @@ class GameSidebar(QFrame):
 
         # Add them to the layout in the requested order
         btns.addWidget(self.delete_btn)
+        btns.addWidget(self.export_btn)
         btns.addStretch() # This pushes everything after it to the far right
         btns.addWidget(self.cancel_btn)
         btns.addWidget(self.save_btn)
@@ -571,6 +576,34 @@ class GameSidebar(QFrame):
             
             # Close the sidebar
             self.on_close()
+
+    def export_game_action(self):
+        """Call Game Manager to create json data and call file browser to save it"""
+        json_data = GameManager.export_game(self.current_game.name)
+        if not json_data:
+            logger.error("No json data to export")
+            return
+
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(self.tr("Export Game"))
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setFileMode(QFileDialog.AnyFile)
+        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setViewMode(QFileDialog.Detail)
+        dialog.selectFile(f"{self.current_game.name}.json")
+
+        if dialog.exec():
+            selected_files = dialog.selectedFiles()
+            if selected_files:
+                save_path = selected_files[0]
+                if not save_path.endswith(".json"):
+                    save_path += ".json"
+                try:
+                    with open(save_path, 'w', encoding='utf-8') as f:
+                        json.dump(json_data, f, indent=4, ensure_ascii=False)
+                    logging.info(f"Game '{self.current_game.name}' exported to '{save_path}'")
+                except Exception as e:
+                    logging.error(f"Failed to export game: {e}")
 
     def open_create_prefix_dialog(self):        
         created_name = PrefixTab.create_new_prefix_flow(self)

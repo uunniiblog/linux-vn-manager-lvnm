@@ -24,6 +24,7 @@ class GameListItem(QWidget):
     requestRun = Signal(object)
     requestStop = Signal(object)
     requestRefresh = Signal(object)
+    requestExport = Signal(object)
 
     def __init__(self, game_card, zoom_factor=1.0, parent=None):
         super().__init__(parent)
@@ -216,6 +217,7 @@ class GameListItem(QWidget):
         act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
         act_steam = menu.addAction(self.tr("Steam Shortcut"))
         menu.addSeparator()
+        act_export = menu.addAction(self.tr("Export"))
         act_dup = menu.addAction(self.tr("Duplicate"))
         act_del = menu.addAction(self.tr("Delete"))
 
@@ -257,6 +259,9 @@ class GameListItem(QWidget):
 
         elif action == act_bash:
             self.run_bash()
+
+        elif action == act_export:
+            self.requestExport.emit(self.game_card)
             
         elif action == act_dup:
             self.duplicate_game(self.game_card.name)

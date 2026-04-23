@@ -253,6 +253,7 @@ class GameTab(QWidget):
                 widget.requestRun.connect(self.on_game_launch_requested)
                 widget.requestStop.connect(self.on_game_stop_requested)
                 widget.requestRefresh.connect(self.refresh_list)
+                widget.requestExport.connect(self.on_export_game)
                 
                 self.game_list.addItem(item)
                 self.game_list.setItemWidget(item, widget)
@@ -354,6 +355,12 @@ class GameTab(QWidget):
     def on_game_stop_requested(self, game_card):
         """ Handles stoping game """
         self.sidebar.stop_game(game_card.name)
+
+    def on_export_game(self, game_card):
+        """ Handles stoping game """
+        self.sidebar.load_game(game_card)
+        self.show_sidebar_safely()
+        self.sidebar.export_game_action()
 
 class RunInPrefixDialog(QDialog):
     def __init__(self, parent=None):

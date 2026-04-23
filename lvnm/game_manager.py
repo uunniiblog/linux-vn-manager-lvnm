@@ -206,6 +206,27 @@ class GameManager:
         return True
 
     @staticmethod
+    def export_game(name: str):
+        """Create json with all game and prefix data"""
+        
+        source_card = GameManager.get_game(name)
+        game_data = source_card.to_dict()
+        game_data["path"] = ""
+
+        prefix_json = PrefixManager.get_prefix_info(source_card.prefix)
+        prefix_data = dict(prefix_json)
+        prefix_data["path"] = ""
+        raw_runner = prefix_data.get("runner", "")
+        prefix_data["runner"] = Path(raw_runner).name
+
+        export = {
+            "game": game_data,
+            "prefix": prefix_data or {}
+        }
+        
+        return export
+
+    @staticmethod
     def cleanup_env_vars(current_env_vars: list[str]):
         """
         Removes any environment variables from all games that are not in the env vars list.
