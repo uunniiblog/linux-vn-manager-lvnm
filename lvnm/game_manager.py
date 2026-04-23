@@ -212,6 +212,7 @@ class GameManager:
         source_card = GameManager.get_game(name)
         game_data = source_card.to_dict()
         game_data["path"] = ""
+        game_data["last_played"] = ""
 
         prefix_json = PrefixManager.get_prefix_info(source_card.prefix)
         prefix_data = dict(prefix_json)

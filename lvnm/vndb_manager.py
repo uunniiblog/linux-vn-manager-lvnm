@@ -59,6 +59,8 @@ class VndbManager:
                 # Download cover if URL exists and image doesn't
                 if vn.get("image") and vn["image"].get("url") and not existing_path:
                     VndbManager._download_cover(vn["id"], vn["image"]["url"])
+                else:
+                    logger.debug(f"[VNDB] cover already exists, not downloading")
             
             return results
 
@@ -103,7 +105,7 @@ class VndbManager:
                 return t.get('title')
 
         # If no 'ja' found, return the main title
-        logger.debug(f"If no 'ja' found, return the main title {data.get['title']}")
+        logger.debug(f"If no 'ja' found, return the main title {data.get('title')}")
         return data.get('title')
 
 class VndbWorker(QThread):

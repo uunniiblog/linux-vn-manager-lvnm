@@ -13,6 +13,7 @@ from game_runner import GameRunner
 from prefix_manager import PrefixManager
 from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
+from ui.import_game_dialog import ImportGameDialog
 from model.game_card import GameCard
 from settings_manager import SettingsManager
 from timetracker.log_manager import LogManager
@@ -96,10 +97,20 @@ class GameTab(QWidget):
         self.game_list.itemClicked.connect(self.on_game_selected)
         list_layout.addWidget(self.game_list)
 
-        # Bottom Button: Add Game
+        # Bottom Buttons: Import & Add Game
+        bottom_btn_layout = QHBoxLayout()
+        bottom_btn_layout.setSpacing(6)
+
+        self.btn_import_game = QPushButton(self.tr("Import"))
+        self.btn_import_game.clicked.connect(self.on_import_game_clicked)
+
         self.btn_add_game = QPushButton(self.tr("Add Game"))
         self.btn_add_game.clicked.connect(self.on_add_game_clicked)
-        list_layout.addWidget(self.btn_add_game)
+
+        bottom_btn_layout.addWidget(self.btn_import_game, 15)  # 15% width
+        bottom_btn_layout.addWidget(self.btn_add_game, 85)     # 85% width
+
+        list_layout.addLayout(bottom_btn_layout)
         
         # Right Side: Sidebar
         self.sidebar = GameSidebar(self)
@@ -318,6 +329,28 @@ class GameTab(QWidget):
         self.sidebar.load_create_game(empty_card)
         
         self.show_sidebar_safely()
+
+    def on_import_game_clicked(self):
+        """Call file browser for json file, calls manager to import"""
+        # Open file browser to search for json files
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(self.tr("Import Game"))
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setViewMode(QFileDialog.Detail)
+
+        if dialog.exec():
+            selected_files = dialog.selectedFiles()
+            if selected_files:
+                import_path = selected_files[0]
+                try:
+                    logging.debug(f"Loaded import file: '{import_path}'")
+                    import_dialog = ImportGameDialog(import_path, parent=self)
+                    import_dialog.import_finished.connect(self.refresh_list)
+                    result = import_dialog.exec()
+                    #self.refresh_list()
+                except Exception as e:
+                    logging.error(f"Failed to read import file: {e}")
 
     def show_sidebar_safely(self):
         """ Show sidebar """
