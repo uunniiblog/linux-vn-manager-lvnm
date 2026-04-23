@@ -265,6 +265,7 @@ class GameTab(QWidget):
                 widget.requestStop.connect(self.on_game_stop_requested)
                 widget.requestRefresh.connect(self.refresh_list)
                 widget.requestExport.connect(self.on_export_game)
+                widget.requestCloseSidebar.connect(self.close_sidebar)
                 
                 self.game_list.addItem(item)
                 self.game_list.setItemWidget(item, widget)

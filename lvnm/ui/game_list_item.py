@@ -25,6 +25,7 @@ class GameListItem(QWidget):
     requestStop = Signal(object)
     requestRefresh = Signal(object)
     requestExport = Signal(object)
+    requestCloseSidebar = Signal()
 
     def __init__(self, game_card, zoom_factor=1.0, parent=None):
         super().__init__(parent)
@@ -298,6 +299,7 @@ class GameListItem(QWidget):
     def delete_game(self, name):
         if GameManager.delete_game(name):
             self.requestRefresh.emit(self.game_card)
+            self.requestCloseSidebar.emit()
 
     def browse_game(self, path):
         SystemUtils.browse_files(path)
