@@ -9,7 +9,9 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - Game management to test games easily in all diferent prefixes with useful environment variables for VNs.
  - Real time tracking support to have an accurate play count (Check Timetracking section for details).
  - VNDB api integration to get covers and links.
- - Easy texthooking
+ - Import and export game and prefixes configuration.
+ - Easy texthooking.
+ - Create Steam shortcuts with covers for the Steam Deck.
  - PySide QT 6 interface.
 
  ![lvnm-Screenshot](.github/images/lvnm.jpg)
@@ -79,6 +81,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             </ul>
         - Steam/desktop shortcut: Right click an entry to add. The application will be run headless without GUI in this mode. Timetracking will still work in the background if enabled.
         - Label: Can right click a game to create labels (Playing, Finished, etc) to group games in sections. Sections can be expaned or collapsed to hide all the games in one section. Can right click over the header of a section to delete it.
+        - Export and Import: from the sidebar or right clicking a game you can export the configuration of the game and prefix in a json file. It can be imported with the Import button at the botton next to add game.
 4. Statistics tab: If timetracking has been enabled when you run a game it will count your playtime. This tab shows some simple graphs by app or global based on your playtime.
 5. Settings tab
     - Functional Settings:
