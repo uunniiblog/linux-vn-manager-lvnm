@@ -124,7 +124,6 @@ There will be a button to open a dialog where you can manually select an opened 
 The autostart tracking detects the running by searching the pid of the process executed first. Manual tracking directly selects the window ID that the compositor gives so it is more direct and should work better. Both will store in the same csv file name so saved playing times will be shared between both autostart and manual.
 
 ## Planned
-- export/import prefixes and entire game configurations
 - Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs
 - One game one prefix. Automatically copies the selected prefix making prefixes unique per games.
 - More suggestions are always welcomed.
