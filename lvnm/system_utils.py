@@ -304,7 +304,13 @@ class SystemUtils:
             folder_path = os.path.dirname(os.path.abspath(path))
 
         if os.path.exists(folder_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
+            appdir = os.environ.get("APPDIR")
+            if appdir:
+                # running from appimage
+                clean_env = SystemUtils.get_clean_env()
+                subprocess.Popen(["xdg-open", folder_path], env=clean_env)
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
         else:
             logger.error(f"[Error] Path does not exist: {folder_path}")
 
