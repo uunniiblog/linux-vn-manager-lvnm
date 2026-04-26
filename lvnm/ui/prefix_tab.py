@@ -397,13 +397,41 @@ class EditPrefixDialog(QDialog):
         ))
 
         # Winetricks Section
+        # self.trick_boxes = {}
+        # self.layout.addWidget(self.create_check_group(
+        #     self.tr("Winetricks"), 
+        #     config.WINETRICKS_LIST, 
+        #     self.manager.winetricks.split() if hasattr(self.manager, 'winetricks') else [],
+        #     self.trick_boxes
+        # ))
+
+        # Winetricks Section
         self.trick_boxes = {}
-        self.layout.addWidget(self.create_check_group(
+        installed_tricks = self.manager.winetricks.split() if hasattr(self.manager, 'winetricks') else []
+        
+        # Get winetricks from the default list
+        known_ids = [item['id'] for item in config.WINETRICKS_LIST]
+        
+        # Merge with the extra installed ones
+        ui_display_list = list(config.WINETRICKS_LIST)
+        for trick_id in installed_tricks:
+            if trick_id not in known_ids:
+                ui_display_list.append({'id': trick_id})
+
+        winetricks_group = self.create_check_group(
             self.tr("Winetricks"), 
-            config.WINETRICKS_LIST, 
-            self.manager.winetricks.split() if hasattr(self.manager, 'winetricks') else [],
+            ui_display_list, 
+            installed_tricks,
             self.trick_boxes
-        ))
+        )
+
+        self.extra_tricks_edit = QLineEdit()
+        self.extra_tricks_edit.setPlaceholderText(self.tr("vcrun2015 dotnet45"))
+        
+        winetricks_group.layout().addWidget(QLabel(self.tr("Custom Winetricks:")))
+        winetricks_group.layout().addWidget(self.extra_tricks_edit)
+        
+        self.layout.addWidget(winetricks_group)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -486,6 +514,9 @@ class EditPrefixDialog(QDialog):
         """Returns the current state of the UI fields"""
         new_codecs = [id for id, cb in self.codec_boxes.items() if cb.isChecked() and cb.isEnabled()]
         new_tricks = [id for id, cb in self.trick_boxes.items() if cb.isChecked() and cb.isEnabled()]
+        manual_tricks = self.extra_tricks_edit.text().strip()
+        if manual_tricks:
+            new_tricks.extend(manual_tricks.split())
         
         data = {
             "name": self.name_edit.text(),
@@ -574,9 +605,17 @@ class CreatePrefixDialog(QDialog):
 
         # --- Winetricks Section ---
         self.trick_boxes = {}
-        self.layout.addWidget(self.create_check_group(
+        winetricks_group = self.create_check_group(
             self.tr("Winetricks"), config.WINETRICKS_LIST, [], self.trick_boxes
-        ))
+        )
+
+        # Extra Winetricks Textfield
+        self.extra_tricks_edit = QLineEdit()
+        self.extra_tricks_edit.setPlaceholderText(self.tr("vcrun2015 dotnet45"))
+        winetricks_group.layout().addWidget(QLabel(self.tr("Custom Winetricks:")))
+        winetricks_group.layout().addWidget(self.extra_tricks_edit)
+
+        self.layout.addWidget(winetricks_group)
 
         # --- Buttons ---
         btn_layout = QHBoxLayout()
@@ -637,6 +676,9 @@ class CreatePrefixDialog(QDialog):
         selected_runner_name = self.runner_combo.currentText()
         new_codecs = [id for id, cb in self.codec_boxes.items() if cb.isChecked()]
         new_tricks = [id for id, cb in self.trick_boxes.items() if cb.isChecked()]
+        manual_tricks = self.extra_tricks_edit.text().strip()
+        if manual_tricks:
+            new_tricks.extend(manual_tricks.split())
         
         data = {
             "name": self.name_edit.text().strip(),
