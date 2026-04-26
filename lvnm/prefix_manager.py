@@ -81,7 +81,7 @@ class PrefixManager:
         self.runner_path = Path(runner_path)
         self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
         self.codecs = codecs
-        self.winetricks = winetricks
+        self.winetricks = ""
         self.dpi = dpi
         self.wayland_driver = wayland
         self._setup_env()
@@ -105,15 +105,15 @@ class PrefixManager:
                 # Add Codecs and Winetricks to the queue
                 if self.codecs:
                     self.install_codecs(self.codecs, executor=executor)
-                if self.winetricks:
-                    self.install_winetricks(self.winetricks, executor=executor)
+                if winetricks:
+                    self.install_winetricks(winetricks, executor=executor)
             else:
                 ExecutionManager.run(cmd, self.env, wait=True)
                 finalize_creation()
                 if self.codecs:
                     self.install_codecs(self.codecs)
-                if self.winetricks:
-                    self.install_winetricks(self.winetricks)
+                if winetricks:
+                    self.install_winetricks(winetricks)
 
             return True
 
@@ -159,9 +159,15 @@ class PrefixManager:
             logging.debug(f"   {var:<18}: {self.env[var]}")
 
         def finalize():
-            new_tricks = set(self.winetricks.split()) | set(winetricks_list.split())
-            self.winetricks = " ".join(sorted(new_tricks))
-            self._save_metadata()
+            valid_verbs = [v for v in winetricks_list.split() if self.winetrick_exists(v)]
+            invalid_verbs = [v for v in winetricks_list.split() if v not in valid_verbs]
+            if invalid_verbs:
+                logger.warning(f"Unknown winetricks: {invalid_verbs}")
+            
+            if valid_verbs:
+                new_tricks = set(self.winetricks.split()) | set(valid_verbs)
+                self.winetricks = " ".join(sorted(new_tricks))
+                self._save_metadata()
 
         if executor:
             executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
@@ -170,6 +176,22 @@ class PrefixManager:
             finalize()
 
         return True
+
+    @staticmethod
+    def winetrick_exists(verb: str) -> bool:
+        """Returns True if the given winetricks verb is known/valid."""
+        try:
+            result = subprocess.run(
+                ["winetricks", "list-all"],
+                capture_output=True, text=True
+            )
+            for line in result.stdout.splitlines():
+                if line.split()[0] == verb if line.split() else False:
+                    return True
+            return False
+        except Exception as e:
+            logger.warning(f"winetrick_exists check failed for '{verb}': {e}")
+            return False
 
     def add_fonts(self, fonts_source_path: str, executor=None):
         """Links fonts from a source folder into the Wine prefix."""
