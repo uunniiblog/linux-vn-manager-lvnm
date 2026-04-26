@@ -350,6 +350,7 @@ class GameSidebar(QFrame):
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
         self.current_game = card
+        self.set_ui_start_state()
 
         # Clear Header UI Fields
         self.lbl_display_name.setText(self.tr("New Game"))
