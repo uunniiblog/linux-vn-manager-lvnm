@@ -139,10 +139,14 @@ class GameTab(QWidget):
     def refresh_active_tab(self):
         """Forces the currently visible sub-tab to reload its data"""
         if self.card is not None:
-            fresh_card = GameManager.get_game(self.card.name)
-            if fresh_card:
-                self.card = fresh_card
-                self.sidebar.load_game(self.card)
+            if not self.card.name:
+                # New game sidebar
+                self.sidebar.refresh_prefix_combo()
+            else:
+                fresh_card = GameManager.get_game(self.card.name)
+                if fresh_card:
+                    self.card = fresh_card
+                    self.sidebar.load_game(self.card)
 
         # Reload list if zoom changed
         new_zoom = self.user_settings.get(config.USER_CONF_UI_ZOOM, 1.0)
@@ -327,6 +331,7 @@ class GameTab(QWidget):
         
         # Create a blank game card to populate the sidebar text fields
         empty_card = GameCard(name="", path="", prefix="", vndb="")
+        self.card = empty_card
         self.sidebar.load_create_game(empty_card)
         
         self.show_sidebar_safely()
@@ -363,6 +368,7 @@ class GameTab(QWidget):
     def close_sidebar(self):
         self.sidebar.setVisible(False)
         self.game_list.clearSelection()
+        self.card = None
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
