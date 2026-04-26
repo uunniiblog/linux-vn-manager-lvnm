@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = 'v0.3.0'
+VERSION = 'v0.3.1'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
