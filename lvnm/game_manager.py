@@ -214,6 +214,8 @@ class GameManager:
         game_data["path"] = ""
         game_data["last_played"] = ""
         game_data["label"] = ""
+        if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":
+            game_data["gamescope"]["parameters"] = ""
 
         prefix_json = PrefixManager.get_prefix_info(source_card.prefix)
         prefix_data = dict(prefix_json)
