@@ -485,7 +485,7 @@ class GameRunner:
                 umu_dir = os.path.dirname(umu_full_path)
                 current_path = self.env.get("PATH", os.environ.get("PATH", ""))
                 self.env["PATH"] = f"{winetricks_dir}:{umu_full_path}:{current_path}"
-                logger.debug(f"Terminal PATH updated with {winetricks_dir} amd {umu_full_path}")
+                logger.debug(f"Terminal PATH updated with {winetricks_dir} and {umu_full_path}")
 
             # Maybe useful
             self.env["RUN_GAME"] = " ".join(self.cmd)
