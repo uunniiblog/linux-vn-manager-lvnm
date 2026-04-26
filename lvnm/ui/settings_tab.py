@@ -273,15 +273,15 @@ class SettingsTab(QWidget):
         tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
 
         # Warning Message
-        warning_label = QLabel(self.tr("Timetracking only works in KDE 6 Desktop and Gamescope session."))
-        warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
-        warning_label.setWordWrap(True)
-        timetracker_layout.addRow(warning_label)
+        self.tt_warning_label = QLabel(self.tr("In Desktops other than KDE it only works through XWayland. Check github for details."))
+        self.tt_warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
+        self.tt_warning_label.setWordWrap(True)
+        timetracker_layout.addRow(self.tt_warning_label)
 
         # Enable Checkbox
         self.timetracking_enable = QCheckBox(self.tr("Enable"))
         self.timetracking_enable.setChecked(tt_settings.get("timetracking", False))
-        timetracker_layout.addRow(QLabel(self.tr("Enable timetracking:")), self.timetracking_enable) 
+        timetracker_layout.addRow(QLabel(self.tr("Enable timetracking:")), self.timetracking_enable)
 
         # AFK Idle Timer
         afk_layout = QHBoxLayout()
@@ -289,10 +289,13 @@ class SettingsTab(QWidget):
         self.afk_timer_edit.setValidator(QIntValidator(0, 999))
         self.afk_timer_edit.setFixedWidth(60)
         self.afk_timer_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)))
+        self.afk_label_suffix = QLabel(self.tr("minutes (requires swayidle)"))
         afk_layout.addWidget(self.afk_timer_edit)
-        afk_layout.addWidget(QLabel(self.tr("minutes (requires swayidle)")))
+        afk_layout.addWidget(self.afk_label_suffix)
         afk_layout.addStretch()
-        timetracker_layout.addRow(QLabel(self.tr("AFK Idle Timer:")), afk_layout)
+        
+        self.afk_label_prefix = QLabel(self.tr("AFK Idle Timer:"))
+        timetracker_layout.addRow(self.afk_label_prefix, afk_layout)
 
         # Periodic Save Interval
         save_interval_layout = QHBoxLayout()
@@ -300,15 +303,37 @@ class SettingsTab(QWidget):
         self.save_interval_edit.setValidator(QIntValidator(1, 999))
         self.save_interval_edit.setFixedWidth(60)
         self.save_interval_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)))
+        self.save_label_suffix = QLabel(self.tr("minutes"))
         save_interval_layout.addWidget(self.save_interval_edit)
-        save_interval_layout.addWidget(QLabel(self.tr("minutes")))
+        save_interval_layout.addWidget(self.save_label_suffix)
         save_interval_layout.addStretch()
-        timetracker_layout.addRow(QLabel(self.tr("Periodic Save Interval:")), save_interval_layout)
+        
+        self.save_label_prefix = QLabel(self.tr("Periodic Save Interval:"))
+        timetracker_layout.addRow(self.save_label_prefix, save_interval_layout)
 
         # Auto Start timetracking
         self.timetracking_autostart = QCheckBox(self.tr("Automatically Start Time Tracking When Game Launches"))
         self.timetracking_autostart.setChecked(tt_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False))
-        timetracker_layout.addRow(QLabel(self.tr("Auto Start")), self.timetracking_autostart) 
+        self.autostart_label = QLabel(self.tr("Auto Start"))
+        timetracker_layout.addRow(self.autostart_label, self.timetracking_autostart)
+
+        self.tt_dependent_widgets = [
+            self.tt_warning_label,
+            self.afk_timer_edit,
+            self.afk_label_prefix,
+            self.afk_label_suffix,
+            self.save_interval_edit,
+            self.save_label_prefix,
+            self.save_label_suffix,
+            self.timetracking_autostart,
+            self.autostart_label
+        ]
+
+        # Connect the checkbox signal
+        self.timetracking_enable.toggled.connect(self._on_timetracking_toggled)
+        
+        # Set initial state
+        self._on_timetracking_toggled(self.timetracking_enable.isChecked())
 
         return timetracker_group
 
@@ -396,6 +421,11 @@ class SettingsTab(QWidget):
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
+    
+    def _on_timetracking_toggled(self, checked):
+        """Helper to enable/disable all timetracking sub-widgets"""
+        for widget in self.tt_dependent_widgets:
+            widget.setEnabled(checked)
 
     def _toggle_env_extra(self, force_hide=False):
         """Toggles the visibility of checkboxes beyond the first row."""
