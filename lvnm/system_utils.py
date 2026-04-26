@@ -308,6 +308,8 @@ class SystemUtils:
             if appdir:
                 # running from appimage
                 clean_env = SystemUtils.get_clean_env()
+                clean_env.pop("LD_LIBRARY_PATH", None)
+                logger.debug("browse_files using xdg-open")
                 subprocess.Popen(["xdg-open", folder_path], env=clean_env)
             else:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
