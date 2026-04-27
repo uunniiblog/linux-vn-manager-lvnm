@@ -1,7 +1,6 @@
 import time
 import datetime
 import os
-import config
 import logging
 from PySide6.QtCore import QThread, Signal
 from timetracker.kde_utils import KdeUtils
@@ -37,7 +36,7 @@ class TrackerWorker(QThread):
             return
 
         # Initialize the LogManager
-        self.logger = LogManager(config.LOG_DIR)
+        self.logger = LogManager()
 
         self.refresh_interval = int(refresh_interval)
         self.save_interval = int(save_interval) * 60

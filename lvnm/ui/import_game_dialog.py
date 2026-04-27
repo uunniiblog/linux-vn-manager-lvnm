@@ -238,7 +238,8 @@ class ImportGameDialog(QDialog):
             return
 
         runner_path = (
-            config.PROTON_RUNNERS_DIR if runner_type == "proton" else config.WINE_RUNNERS_DIR
+            self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR) if runner_type == "proton" 
+            else self.user_settings.get("WINE_RUNNERS_DIR", config.WINE_RUNNERS_DIR)
         ) / runner_name
         runner_exists = RunnerManagerInterface.is_runner_valid(runner_path)
 
@@ -325,7 +326,7 @@ class ImportGameDialog(QDialog):
         if not path or not path.exists():
             raise Exception("No downloaded archive found to extract.")
 
-        dest_dir = config.PROTON_RUNNERS_DIR if runner_type == "proton" else config.WINE_RUNNERS_DIR
+        dest_dir = self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR) if runner_type == "proton" else self.user_settings.get("WINE_RUNNERS_DIR", config.WINE_RUNNERS_DIR)
         compression = "xz" if path.suffix == ".xz" else "gz"
 
         console_logger(f"Extracting {path.name}...")

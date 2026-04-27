@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QGroupBox, QFormLayout,
     QHBoxLayout, QLineEdit, QPushButton,
     QCheckBox, QFileDialog, QScrollArea, QFrame,
-    QGridLayout
+    QGridLayout, QMessageBox
 )
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from PySide6.QtCore import Qt
@@ -14,6 +14,8 @@ import logging
 from settings_manager import SettingsManager
 from game_manager import GameManager
 from logging_manager import setup_logging
+from prefix_manager import PrefixManager
+from game_process_manager import GameProcessManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ class SettingsTab(QWidget):
         main_layout.addWidget(self._build_appearance_group())
         main_layout.addWidget(self._build_timetracking_group())
         main_layout.addWidget(self._build_texthooking_group())
+        main_layout.addWidget(self._build_directories_group())
         main_layout.addWidget(self._build_sysinfo_group())
         main_layout.addWidget(self._build_about_group())
         main_layout.addStretch()
@@ -79,25 +82,25 @@ class SettingsTab(QWidget):
         gs_layout.addWidget(self.gs_params)
         settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
         
-        # Save Data Management
-        save_layout = QHBoxLayout()
-        self.save_checkbox = QCheckBox(self.tr("Enable"))
-        self.save_edit = QLineEdit(self.user_settings.get(config.USER_CONF_SAVE_DATA_FOLDER, ""))
-        self.save_edit.setPlaceholderText(self.tr("Main folder for save files..."))
-        self.save_btn = QPushButton(self.tr("Browse..."))
-        save_layout.addWidget(self.save_checkbox)
-        save_layout.addWidget(self.save_edit)
-        save_layout.addWidget(self.save_btn)
-        self.save_checkbox.setEnabled(False)
-        self.save_edit.setEnabled(False)
-        self.save_btn.setEnabled(False)
-        settings_layout.addRow(QLabel(self.tr("Save Management:")), save_layout)
+        # Save Data Management TODO
+        # save_layout = QHBoxLayout()
+        # self.save_checkbox = QCheckBox(self.tr("Enable"))
+        # self.save_edit = QLineEdit(self.user_settings.get(config.USER_CONF_SAVE_DATA_FOLDER, ""))
+        # self.save_edit.setPlaceholderText(self.tr("Main folder for save files..."))
+        # self.save_btn = QPushButton(self.tr("Browse..."))
+        # save_layout.addWidget(self.save_checkbox)
+        # save_layout.addWidget(self.save_edit)
+        # save_layout.addWidget(self.save_btn)
+        # self.save_checkbox.setEnabled(False)
+        # self.save_edit.setEnabled(False)
+        # self.save_btn.setEnabled(False)
+        # settings_layout.addRow(QLabel(self.tr("Save Management:")), save_layout)
         
-        # One Game One Prefix
-        self.ogop_checkbox = QCheckBox(self.tr("Enable"))
-        self.ogop_checkbox.setChecked(self.user_settings.get(config.USER_CONF_ONE_GAME_PREFIX, False))
-        self.ogop_checkbox.setEnabled(False)
-        settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
+        # One Game One Prefix TODO
+        # self.ogop_checkbox = QCheckBox(self.tr("Enable"))
+        # self.ogop_checkbox.setChecked(self.user_settings.get(config.USER_CONF_ONE_GAME_PREFIX, False))
+        # self.ogop_checkbox.setEnabled(False)
+        # settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
         
         # Global Env Variables
         settings_layout.addRow(
@@ -363,6 +366,52 @@ class SettingsTab(QWidget):
 
         return texthooker_group
 
+    def _build_directories_group(self):
+        directories_group = QGroupBox(self.tr("Directories"))
+        directories_layout = QFormLayout(directories_group)
+
+        self.folder_label = QLabel(self.tr("Folder configuration paths. Changing the folder will move all current files in the folder to the new selected folder.\nUse an empty folder if modifying them. Restart the application after changing any of them."))
+        self.folder_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
+        self.folder_label.setWordWrap(True)
+        directories_layout.addRow(self.folder_label)
+
+        game_manager = GameProcessManager.get_instance()
+        is_game_running = len(game_manager.active_runners) > 0
+        self.folder_widgets = []
+        self.folder_inputs = []
+
+        folder_settings = [
+            (self.tr("Prefixes Dir:"), config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR),
+            (self.tr("Wine Runners Dir:"), config.USER_CONF_WINE_RUNNERS_PATH, config.WINE_RUNNERS_DIR),
+            (self.tr("Proton Runners Dir:"), config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR),
+            (self.tr("Covers Dir:"), config.USER_CONF_COVERS_PATH, config.COVERS_DIR),
+            (self.tr("Log Dir:"), config.USER_CONF_LOGS_PATH, config.LOG_DIR),
+        ]
+        
+        for label_text, key, default_val in folder_settings:
+            layout = QHBoxLayout()
+            
+            # Use settings if modified, otherwise fallback to config default
+            current_val = self.user_settings.get(key, str(default_val))
+            
+            edit = QLineEdit(current_val)
+            edit.setPlaceholderText(self.tr("Select folder..."))
+            btn = QPushButton(self.tr("Browse..."))
+
+            # Disable if a game is already running
+            edit.setEnabled(not is_game_running)
+            btn.setEnabled(not is_game_running)
+            
+            layout.addWidget(edit)
+            layout.addWidget(btn)
+            directories_layout.addRow(QLabel(label_text), layout)
+            
+            # Store references so we can connect their signals later
+            self.folder_inputs.append((key, edit, btn))
+            self.folder_widgets.extend([edit, btn])
+
+        return directories_group
+
     def _build_sysinfo_group(self):
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
@@ -413,7 +462,7 @@ class SettingsTab(QWidget):
         self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
-        self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
+        # self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
@@ -421,6 +470,61 @@ class SettingsTab(QWidget):
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
+
+        # Connect signals for dynamic folder inputs
+        for key, edit_widget, btn_widget in self.folder_inputs:
+            self._connect_folder_signal(key, edit_widget, btn_widget)
+
+        gp_manager = GameProcessManager.get_instance()
+        gp_manager.game_started.connect(lambda: self._set_folders_enabled(False))
+        gp_manager.game_stopped.connect(lambda: self._check_should_re_enable_folders())
+
+    def _connect_folder_signal(self, key, edit_widget, btn_widget):
+        """Helper to bind signals without loop closure issues."""
+        btn_widget.clicked.connect(lambda: self.browse_directory_for_widget(edit_widget, key))
+        edit_widget.textChanged.connect(lambda t: self.save_setting(key, t))
+        
+    def browse_directory_for_widget(self, edit_widget, key):
+        """Browse directory for folders, ask confirm and move files"""
+        old_path = edit_widget.text()        
+        new_path = QFileDialog.getExistingDirectory(
+            self, 
+            self.tr(f"Select Folder for {key}"), 
+            old_path # Open dialog at the current location
+        )
+
+        if new_path and new_path != old_path:
+            reply = QMessageBox.question(
+                self,
+                self.tr("Move files?"),
+                self.tr(f"Do you want to move your data from:\n{old_path}\n\nto:\n{new_path}?"),
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply == QMessageBox.Yes:
+                success = SystemUtils.move_directory_contents(old_path, new_path)
+                if success:
+                    if key in [config.USER_CONF_WINE_RUNNERS_PATH, config.USER_CONF_PROTON_RUNNERS_PATH, config.USER_CONF_PREFIXES_PATH]:
+                        PrefixManager.relocate_metadata_paths(old_path, new_path)
+                else:
+                    QMessageBox.warning(self, self.tr("Error"), self.tr("Failed to move some files. Check logs."))
+
+            edit_widget.setText(new_path)
+
+    def _set_folders_enabled(self, enabled: bool):
+        """Disables or enables all folder selection widgets."""
+        for widget in self.folder_widgets:
+            widget.setEnabled(enabled)
+        
+        if not enabled:
+            self.folder_label.setText(self.tr("Folder configuration is locked while a game is running."))
+        else:
+            self.folder_label.setText(self.tr("Folder configuration paths. Changing the folder will move all current files in the folder to the new selected folder.\nUse an empty folder if modifying them. Restart the application after changing any of them."))
+
+    def _check_should_re_enable_folders(self):
+        """Checks if all games are closed before re-enabling inputs."""
+        if len(GameProcessManager.get_instance().active_runners) == 0:
+            self._set_folders_enabled(True)
     
     def _on_timetracking_toggled(self, checked):
         """Helper to enable/disable all timetracking sub-widgets"""

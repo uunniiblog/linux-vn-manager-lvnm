@@ -13,17 +13,18 @@ from pathlib import Path
 from model.prefix import Prefix
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
 class PrefixManager:
     CODEC_SH = config.CODEC_SCRIPT
-    DATA_ROOT = config.PREFIXES_DIR
     PREFIXES_FILE = config.PREFIXES_DATA
     DXVK_DIR = config.DXVK_DIR
     DXVK_API_URL = config.DXVK_API_URL
 
     def __init__(self, name: str):
+        self.user_settings = SettingsManager()
         self.name = name
         self.prefix_path = self.DATA_ROOT / name
         self.runner_path = None
@@ -37,6 +38,15 @@ class PrefixManager:
         
         # Automatically load data if it exists
         self._load_from_json()
+
+    @property
+    def DATA_ROOT(self) -> Path:
+        """
+        Dynamically retrieves the prefixes folder directory.
+        """
+        # Fetch from JSON settings, fallback to the hardcoded config path
+        path_val = self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR)
+        return Path(path_val)
 
     def _load_from_json(self):
         """Attempts to populate object attributes from the JSON file."""
@@ -505,3 +515,48 @@ class PrefixManager:
             return {}
         with open(config.PREFIXES_DATA, "r") as f:
             return json.load(f)
+
+    @staticmethod
+    def relocate_metadata_paths(old_base_path: str, new_base_path: str):
+        """
+        Iterates through all prefixes in the JSON and updates 'path' or 'runner' 
+        if they are sub-paths of the old_base_path.
+        """
+        if not Path(config.PREFIXES_DATA).exists():
+            return
+
+        try:
+            with open(config.PREFIXES_DATA, "r") as f:
+                prefixes_data = json.load(f)
+
+            updated = False
+            old_p = Path(old_base_path).resolve()
+            new_p = Path(new_base_path).resolve()
+
+            for name, data in prefixes_data.items():
+                # We check both 'runner' and 'path' fields
+                for field in ["runner", "path"]:
+                    current_val = data.get(field)
+                    if not current_val:
+                        continue
+                    
+                    p_current = Path(current_val).resolve()
+                    try:
+                        # Check if current path is inside old path
+                        rel_path = p_current.relative_to(old_p)
+                        # If no error, it is a subpath. Update
+                        new_full_path = new_p / rel_path
+                        data[field] = str(new_full_path)
+                        updated = True
+                        logger.info(f"Relocated {field} for prefix '{name}': {data[field]}")
+                    except ValueError:
+                        # Not a subpath of the directory being moved
+                        continue
+
+            if updated:
+                with open(config.PREFIXES_DATA, "w") as f:
+                    json.dump(prefixes_data, f, indent=4)
+                logger.info("Prefix metadata paths updated successfully.")
+
+        except Exception as e:
+            logger.error(f"Failed to relocate metadata paths: {e}")

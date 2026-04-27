@@ -169,6 +169,11 @@ USER_CONF_TIMETRACKER_PERIODIC_SAVE = "log_periodic_save"
 USER_CONF_TIMETRACKER_AFK_TIMER = "afk_timer"
 USER_CONF_TIMETRACKER_AUTOSTART = "autostart"
 USER_CONF_SAVED_LABELS = "saved_labels"
+USER_CONF_COVERS_PATH = "covers_dir"
+USER_CONF_WINE_RUNNERS_PATH = "wine_runners_dir"
+USER_CONF_PROTON_RUNNERS_PATH = "proton_runners_dir"
+USER_CONF_PREFIXES_PATH = "prefixes_dir"
+USER_CONF_LOGS_PATH = "logs_dir"
 
 # User config
 GAMESCOPE_INSTALLED = False

@@ -569,7 +569,7 @@ class CreatePrefixDialog(QDialog):
         form_layout.addRow(self.tr("Name:"), self.name_edit)
 
         # --- Path Field (Read-only dynamic label) ---
-        self.path_label = QLabel(str(config.PREFIXES_DIR / "..."))
+        self.path_label = QLabel(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / "..."))
         self.path_label.setStyleSheet("color: gray;")
         form_layout.addRow(self.tr("Path:"), self.path_label)
 
@@ -635,9 +635,9 @@ class CreatePrefixDialog(QDialog):
     def _update_path_label(self, text):
         """Updates the path preview label as the user types"""
         if text.strip():
-            self.path_label.setText(str(config.PREFIXES_DIR / text.strip()))
+            self.path_label.setText(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / text.strip()))
         else:
-            self.path_label.setText(str(config.PREFIXES_DIR / "..."))
+            self.path_label.setText(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / "..."))
 
     def create_check_group(self, title, data_list, installed_list, storage_dict):
         """Reused helper from Edit dialog"""

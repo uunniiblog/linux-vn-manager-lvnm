@@ -5,10 +5,7 @@ from PySide6.QtCharts import (QChart, QChartView, QBarSeries, QBarSet,
                                QHorizontalBarSeries)
 from PySide6.QtGui import QIcon, QColor, QPainter, QFont, QCursor
 from PySide6.QtCore import Qt
-
 from timetracker.log_manager import LogManager
-import config
-
 
 class StatsTab(QWidget):
     def __init__(self, theme_manager=None):
@@ -16,7 +13,7 @@ class StatsTab(QWidget):
         self.theme_manager = theme_manager
         if self.theme_manager:
             self.theme_manager.theme_changed.connect(self.refresh_data)
-        self.log_manager = LogManager(config.LOG_DIR)
+        self.log_manager = LogManager()
 
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)

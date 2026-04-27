@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from steam_manager import SteamManager
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,37 @@ class SystemUtils:
         # logger.debug("="*60)
 
     @staticmethod
+    def move_directory_contents(old_path, new_path):
+        """Moves all files and folders from old_path to new_path."""
+        old_dir = Path(old_path)
+        new_dir = Path(new_path)
+
+        if not old_dir.exists() or not old_dir.is_dir():
+            logger.info(f"Source directory {old_dir} does not exist. Nothing to move.")
+            return True
+
+        if old_dir.resolve() == new_dir.resolve():
+            logger.info("Old and new paths are the exact same. Skipping move.")
+            return True
+
+        try:
+            for item in old_dir.iterdir():
+                target_path = new_dir / item.name
+                if target_path.exists():
+                    logger.warning(f"Target {target_path} already exists. Skipping")
+                    continue
+
+                # Move the item (file or folder)
+                shutil.move(str(item), str(target_path))
+                logger.debug(f"Moved {str(item)} to {str(target_path)}")
+
+            logger.info(f"Successfully moved contents from {old_dir} to {new_dir}")
+            return True
+        except Exception as e:
+            logger.error(f"Critical error moving files from {old_dir} to {new_dir}: {e}")
+            return False
+
+    @staticmethod
     def get_runtime_type() -> str:
         """Returns the runtime environment type: 'appimage', 'flatpak', 'dev', etc."""
         if os.environ.get("APPDIR"):
@@ -325,7 +357,8 @@ class SystemUtils:
         if not vndb_id:
             return ""
 
-        covers_dir = Path(config.COVERS_DIR)
+        settings = SettingsManager()
+        covers_dir = Path(settings.get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
         if not covers_dir.exists():
             return ""
 

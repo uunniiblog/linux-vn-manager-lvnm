@@ -5,16 +5,24 @@ import config
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
 class LogManager:
-    def __init__(self, log_dir=config.LOG_DIR):
-        self.log_dir = Path(log_dir)
+    def __init__(self):
+        self.user_settings = SettingsManager()
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.header = "Timestamp_Start;Timestamp_End;Duration;ActiveTime;App;Title;Status;Tags\n"
         self.metadata_file = config.LAST_PLAYED_METADATA
 
+    @property
+    def log_dir(self) -> Path:
+        """Dynamically retrieves the logs directory from settings."""
+        # Using the same key you defined in SettingsTab: "logs_dir"
+        path_val = self.user_settings.get(config.USER_CONF_LOGS_PATH, config.LOG_DIR)
+        return Path(path_val)
+        
     def format_duration(self, seconds):
         """Converts seconds to H:MM:SS."""
         seconds = int(seconds)

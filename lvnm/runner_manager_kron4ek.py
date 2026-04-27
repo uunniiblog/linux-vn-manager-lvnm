@@ -2,15 +2,24 @@ import config
 import logging
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
 class RunnerManagerKron4ek(RunnerManagerInterface):
-    WINE_RUNNERS_PATH = config.WINE_RUNNERS_DIR
     API_URL = config.KRON4EK_API_URL
 
     def __init__(self):
-        self.WINE_RUNNERS_PATH.mkdir(parents=True, exist_ok=True)
+        self.user_settings = SettingsManager()
+
+    @property
+    def WINE_RUNNERS_PATH(self) -> Path:
+        """
+        Dynamically retrieves the Wine runners directory.
+        """
+        # Fetch from JSON settings, fallback to the hardcoded config path
+        path_val = self.user_settings.get(config.USER_CONF_WINE_RUNNERS_PATH, config.WINE_RUNNERS_DIR)
+        return Path(path_val)
 
     def get_runner_all_releases(self, page=1, per_page=30):
         """ Fetches wine releases and identifies arch availability """

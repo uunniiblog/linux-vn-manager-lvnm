@@ -12,9 +12,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 class RunnerManagerInterface:
-    PROTON_DIR = config.PROTON_RUNNERS_DIR
-    WINE_DIR = config.WINE_RUNNERS_DIR
-
     @abstractmethod
     def get_runner_all_releases(self, page=1, per_page=30): pass
 
@@ -143,7 +140,7 @@ class RunnerManagerInterface:
     @staticmethod
     def get_all_installed_runners():
         """Returns a dict mapping 'Runner Name' to its full path"""
-        runner_dirs = [config.WINE_RUNNERS_DIR, config.PROTON_RUNNERS_DIR]
+        runner_dirs = [self.user_settings.get("WINE_RUNNERS_DIR", config.WINE_RUNNERS_DIR), self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR)]
         runners = [
             (d.name, str(d))
             for base in runner_dirs

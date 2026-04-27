@@ -2,15 +2,24 @@ import config
 import logging
 from pathlib import Path
 from runner_manager import RunnerManagerInterface
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
 class RunnerManagerProtonGE(RunnerManagerInterface):
-    PROTON_RUNNER_DIR = config.PROTON_RUNNERS_DIR
     API_URL = config.PROTONGE_API_URL
 
     def __init__(self):
-        self.PROTON_RUNNER_DIR.mkdir(parents=True, exist_ok=True)
+        self.user_settings = SettingsManager()
+
+    @property
+    def PROTON_RUNNER_DIR(self) -> Path:
+        """
+        Dynamically retrieves the Proton runners directory.
+        """
+        # Fetch from JSON settings, fallback to the hardcoded config path
+        path_val = self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR)
+        return Path(path_val)
 
     def get_runner_all_releases(self, page=1, per_page=30):
         """ Fetches all GE-Proton releases from GitHub """

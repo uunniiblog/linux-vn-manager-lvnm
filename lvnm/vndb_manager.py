@@ -3,12 +3,18 @@ import requests
 import config
 import logging
 logger = logging.getLogger(__name__)
+from pathlib import Path
 from PySide6.QtCore import QThread, Signal
 from system_utils import SystemUtils
+from settings_manager import SettingsManager
 
 class VndbManager:
     API_URL = config.VNDB_API_URL
-    COVERS_DIR = config.COVERS_DIR
+
+    @staticmethod
+    def get_covers_dir() -> Path:
+        """Always returns the current covers directory from settings."""
+        return Path(SettingsManager().get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
 
     @staticmethod
     def fetch_and_store_vn(vndb_id: str = None, name: str = None):
@@ -72,10 +78,10 @@ class VndbManager:
     def _download_cover(vn_id: str, url: str):
         """Downloads and saves the image to COVERS_DIR."""
         try:
-            VndbManager.COVERS_DIR.mkdir(parents=True, exist_ok=True)
+            VndbManager.get_covers_dir().mkdir(parents=True, exist_ok=True)
 
             ext = os.path.splitext(url)[1] or ".jpg"
-            target_path = VndbManager.COVERS_DIR / f"{vn_id}{ext}"
+            target_path = VndbManager.get_covers_dir() / f"{vn_id}{ext}"
 
             # Only download if we don't already have it
             if not target_path.exists():
