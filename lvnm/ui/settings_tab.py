@@ -58,7 +58,8 @@ class SettingsTab(QWidget):
 
     def _build_settings_group(self):
         settings_group = QGroupBox(self.tr("Settings"))
-        settings_layout = QFormLayout(settings_group)    
+        settings_layout = QFormLayout(settings_group)
+        settings_layout.setLabelAlignment(Qt.AlignLeft)
         
         # Font Folder
         font_layout = QHBoxLayout()
@@ -103,8 +104,10 @@ class SettingsTab(QWidget):
         # settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
         
         # Global Env Variables
+        env_label = QLabel(self.tr("Global Env variables:"))
+        env_label.setToolTip(self.tr("These environment variables will be automatically selected when adding a new game.\n They will also be automatically applied from the 'Run in Prefix' dialog."))
         settings_layout.addRow(
-            QLabel(self.tr("Global Env variables:")),
+            env_label,
             self._build_env_var_widget()
         )
 
@@ -147,7 +150,7 @@ class SettingsTab(QWidget):
         self.env_expand_btn.setCursor(Qt.PointingHandCursor)
         self.env_expand_btn.clicked.connect(self._toggle_env_extra)
         
-        self.manage_env_btn = QPushButton(self.tr("Manage Variables"))
+        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
         self.manage_env_btn.setFlat(True)
         self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
         self.manage_env_btn.setCursor(Qt.PointingHandCursor)
@@ -248,6 +251,7 @@ class SettingsTab(QWidget):
     def _build_appearance_group(self):
         appearance_group = QGroupBox(self.tr("Appearance"))
         appearance_layout = QFormLayout(appearance_group)
+        appearance_layout.setLabelAlignment(Qt.AlignLeft)
         
         self.theme_combo = QComboBox()
         self.theme_combo.addItems([self.tr("System Default"), self.tr("Light"), self.tr("Dark")])
@@ -272,6 +276,7 @@ class SettingsTab(QWidget):
     def _build_timetracking_group(self):
         timetracker_group = QGroupBox(self.tr("Timetracker"))
         timetracker_layout = QFormLayout(timetracker_group)
+        timetracker_layout.setLabelAlignment(Qt.AlignLeft)
 
         tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
 
@@ -343,6 +348,7 @@ class SettingsTab(QWidget):
     def _build_texthooking_group(self):
         texthooker_group = QGroupBox(self.tr("Texthooker"))
         texthooker_layout = QFormLayout(texthooker_group)
+        texthooker_layout.setLabelAlignment(Qt.AlignLeft)
 
         # Retrieve current settings
         th_settings = self.user_settings.get(config.USER_CONF_TEXTHOOKER, {})
@@ -369,6 +375,7 @@ class SettingsTab(QWidget):
     def _build_directories_group(self):
         directories_group = QGroupBox(self.tr("Directories"))
         directories_layout = QFormLayout(directories_group)
+        directories_layout.setLabelAlignment(Qt.AlignLeft)
 
         self.folder_label = QLabel(self.tr("Folder configuration paths. Changing the folder will move all current files in the folder to the new selected folder.\nUse an empty folder if modifying them. Restart the application after changing any of them."))
         self.folder_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
@@ -385,7 +392,7 @@ class SettingsTab(QWidget):
             (self.tr("Wine Runners Dir:"), config.USER_CONF_WINE_RUNNERS_PATH, config.WINE_RUNNERS_DIR),
             (self.tr("Proton Runners Dir:"), config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR),
             (self.tr("Covers Dir:"), config.USER_CONF_COVERS_PATH, config.COVERS_DIR),
-            (self.tr("Log Dir:"), config.USER_CONF_LOGS_PATH, config.LOG_DIR),
+            (self.tr("Timetrack Logs Dir:"), config.USER_CONF_LOGS_PATH, config.LOG_DIR),
         ]
         
         for label_text, key, default_val in folder_settings:
@@ -415,6 +422,7 @@ class SettingsTab(QWidget):
     def _build_sysinfo_group(self):
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
+        sysinfo_layout.setLabelAlignment(Qt.AlignLeft)
         
         sys_data = SystemUtils.get_system_info()
         software = SystemUtils.get_software_support()
@@ -438,7 +446,7 @@ class SettingsTab(QWidget):
         sysinfo_layout.addRow(QLabel(self.tr("Winetricks:")), QLabel(self.check(software.get('winetricks'))))
 
         for pkg, installed in software.get('gstreamer_packages', {}).items():
-            sysinfo_layout.addRow(QLabel(f"  {pkg}:"), QLabel(self.check(installed)))
+            sysinfo_layout.addRow(QLabel(f"{pkg}:"), QLabel(self.check(installed)))
         
         return sysinfo_group
 
@@ -446,6 +454,8 @@ class SettingsTab(QWidget):
         about_group = QGroupBox(self.tr("About"))
         about_layout = QFormLayout(about_group)
         about_layout.addRow(QLabel(self.tr("LVNM version:")), QLabel(config.VERSION))
+        about_layout.setLabelAlignment(Qt.AlignLeft)
+
         github_label = QLabel(f'<a href="{config.GIT_URL}">{config.GIT_URL}</a>')
         github_label.setOpenExternalLinks(True)
         about_layout.addRow(QLabel(self.tr("Github:")), github_label)
