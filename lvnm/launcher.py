@@ -19,7 +19,7 @@ def main():
     setproctitle.setproctitle("linux-vn-manager-lvnm")
     settings = SettingsManager()
 
-    if os.environ.get("APPDIR"):
+    if SystemUtils.get_runtime_type() == "appimage":
         # Force system CA bundle instead of PyInstaller's bundled one
         cert_path = certifi.where()
         os.environ['SSL_CERT_FILE'] = cert_path

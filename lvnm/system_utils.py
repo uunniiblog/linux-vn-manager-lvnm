@@ -211,47 +211,6 @@ class SystemUtils:
             logger.debug(f"{status} {pkg}")
         logger.debug("="*50)
 
-        # # --- APPIMAGE TEST UMU ---
-        # appdir = os.environ.get("APPDIR")
-        # if appdir:
-        #     logger.debug("--- AppImage Bundled Tools ---")
-        #     tools_dir = Path(appdir) / "usr" / "bin" / "tools"
-            
-        #     bundled_tools = {
-        #         'umu-run': ["--version", False],
-        #         'winetricks': ["--version", True]
-        #     }
-
-        #     # Create a clean environment for the subprocess to prevent GUI popups
-        #     test_env = os.environ.copy()
-        #     test_env["WINETRICKS_GUI"] = "0"  # Force winetricks to CLI mode
-
-        #     for tool, config in bundled_tools.items():
-        #         version_flag, use_shell = config
-        #         path = tools_dir / tool
-                
-        #         if path.exists():
-        #             try:
-        #                 result = subprocess.run(
-        #                     [str(path), version_flag],
-        #                     capture_output=True,
-        #                     text=True,
-        #                     check=True,
-        #                     shell=use_shell,
-        #                     env=test_env
-        #                 )
-                        
-        #                 # Clean up the output
-        #                 version_info = result.stdout.strip().split('\n')[0]
-        #                 logger.debug(f"✅ {tool:10} : {version_info}")
-        #                 logger.debug(f"    Path: {path}")
-        #             except Exception as e:
-        #                 logger.debug(f"❌ {tool:10} : Found but failed to execute: {e}")
-        #         else:
-        #             logger.debug(f"❓ {tool:10} : NOT found in bundled tools folder")
-        
-        # logger.debug("="*60)
-
     @staticmethod
     def move_directory_contents(old_path, new_path):
         """Moves all files and folders from old_path to new_path."""
@@ -285,13 +244,9 @@ class SystemUtils:
 
     @staticmethod
     def get_runtime_type() -> str:
-        """Returns the runtime environment type: 'appimage', 'flatpak', 'dev', etc."""
+        """Returns the runtime environment type."""
         if os.environ.get("APPDIR"):
             return "appimage"
-        if os.environ.get("FLATPAK_ID"):
-            return "flatpak"
-        if os.environ.get("SNAP"):
-            return "snap"
         return "dev"
 
     @staticmethod
@@ -336,8 +291,8 @@ class SystemUtils:
             folder_path = os.path.dirname(os.path.abspath(path))
 
         if os.path.exists(folder_path):
-            appdir = os.environ.get("APPDIR")
-            if appdir:
+            runtime = SystemUtils.get_runtime_type()
+            if runtime == "appimage":
                 # running from appimage
                 clean_env = SystemUtils.get_clean_env()
                 clean_env.pop("LD_LIBRARY_PATH", None)

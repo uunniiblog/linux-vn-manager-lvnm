@@ -531,8 +531,8 @@ class GameRunner:
 
     def inject_appimage_gstreamer(self):
         """Unused method to try load gstreamer from appimage"""
-        appdir = os.environ.get("APPDIR")
-        if appdir:
+        runtime = SystemUtils.get_runtime_type()
+        if runtime == "appimage":
             base_lib = os.path.join(appdir, "usr", "lib", "x86_64-linux-gnu")
             logger.debug(f"gst_lib_dir: {base_lib}")
             gst_plugin_path = os.path.join(base_lib, "gstreamer-1.0")
