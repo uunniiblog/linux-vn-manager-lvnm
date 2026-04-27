@@ -1,5 +1,6 @@
 import config
 import logging
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
@@ -569,7 +570,7 @@ class CreatePrefixDialog(QDialog):
         form_layout.addRow(self.tr("Name:"), self.name_edit)
 
         # --- Path Field (Read-only dynamic label) ---
-        self.path_label = QLabel(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / "..."))
+        self.path_label = QLabel(str(Path(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR)) / "..."))
         self.path_label.setStyleSheet("color: gray;")
         form_layout.addRow(self.tr("Path:"), self.path_label)
 

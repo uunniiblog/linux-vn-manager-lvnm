@@ -142,43 +142,6 @@ class KdeUtils(DesktopUtilsInterface):
         self._refresh_cache()
         return self._window_cache.get(wid, {}).get("pid", "0")
 
-    def find_window_id_by_title(self, target_title):
-        """ Gets window ID of a window name."""
-        # Escaping the title for JS
-        safe_title = target_title.replace('"', '\\"')
-        
-        # KWin Script: Filters the window list and returns the internal ID
-        script = f"""
-        (function() {{
-            var windows = workspace.windowList();
-            var foundId = null;
-
-            for (var i = 0; i < windows.length; i++) {{
-                var w = windows[i];
-                
-                // Skip non-normal windows (panels, desktops, etc)
-                if (!w.normalWindow) continue;
-                
-                // Check for exact caption match
-                if (w.caption === "{safe_title}") {{
-                    foundId = w.internalId;
-                    break;
-                }}
-            }}
-            print("SEARCH_RESULT:" + foundId);
-        }})();
-        """
-
-        #logger.debug(f'find_window_id_by_title script: {script}')
-        
-        result = self._run_kwin_script(script)
-        #logger.debug(f'find_window_id_by_title result {result}')
-        for line in result.splitlines():
-            if "SEARCH_RESULT:" in line:
-                val = line.split("SEARCH_RESULT:")[1].strip()
-                return val if val != "null" else None
-        return None
-
     def find_window_by_pid(self, target_pid, target_process_path):
         """
         Returns (window_id, window_title) for a specific PID and process path.

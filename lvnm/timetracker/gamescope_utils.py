@@ -37,6 +37,4 @@ class GamescopeUtils(DesktopUtilsInterface):
         return None, None
         
         return None, None
-
-    def find_window_id_by_title(self, target_title):
-        return None
+        

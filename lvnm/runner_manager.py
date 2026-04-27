@@ -8,6 +8,7 @@ import re
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,12 @@ class RunnerManagerInterface:
     @staticmethod
     def get_all_installed_runners():
         """Returns a dict mapping 'Runner Name' to its full path"""
-        runner_dirs = [self.user_settings.get("WINE_RUNNERS_DIR", config.WINE_RUNNERS_DIR), self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR)]
+        user_settings = SettingsManager()
+        runner_dirs = [
+            Path(user_settings.get(config.USER_CONF_WINE_RUNNERS_PATH, config.WINE_RUNNERS_DIR)), 
+            Path(user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR))
+        ]
+
         runners = [
             (d.name, str(d))
             for base in runner_dirs

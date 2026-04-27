@@ -14,8 +14,5 @@ class DesktopUtilsInterface(ABC):
     def get_active_window_id(self): pass
 
     @abstractmethod
-    def find_window_id_by_title(self, target_title): pass
-
-    @abstractmethod
     def find_window_by_pid(self, target_pid, target_process_path): pass
 

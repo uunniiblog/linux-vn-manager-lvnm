@@ -237,10 +237,11 @@ class ImportGameDialog(QDialog):
             logger.error(f"Unknown runner type '{runner_type}' in import file.")
             return
 
-        runner_path = (
+        base_path = (
             self.user_settings.get(config.USER_CONF_PROTON_RUNNERS_PATH, config.PROTON_RUNNERS_DIR) if runner_type == "proton" 
-            else self.user_settings.get("WINE_RUNNERS_DIR", config.WINE_RUNNERS_DIR)
-        ) / runner_name
+            else self.user_settings.get(config.USER_CONF_WINE_RUNNERS_PATH, config.WINE_RUNNERS_DIR)
+        )
+        runner_path = Path(base_path) / runner_name
         runner_exists = RunnerManagerInterface.is_runner_valid(runner_path)
 
         shared_data = {

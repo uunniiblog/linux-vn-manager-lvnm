@@ -171,27 +171,6 @@ class SystemUtils:
             return "Unknown"
 
     @staticmethod
-    def get_exe_name_from_cmdline( pid):
-        """Extracts the filename from /proc/pid/cmdline (handles Windows and Linux paths)."""
-        try:
-            with open(f"/proc/{pid}/cmdline", "r") as f:
-                args = f.read().split('\0')
-                logger.debug(f"PID {pid} arguments: {args}")
-
-                for arg in args:
-                    if arg.lower().endswith('.exe'):
-                        target = ntpath.basename(arg)
-                        logger.debug(f"Extracted exe target: {target}")
-                        return target
-                
-                # maybe useful at some point
-                fallback = ntpath.basename(args[0])
-                logger.debug(f"Extracted native target: {fallback}")
-                return fallback
-        except:
-            return None
-
-    @staticmethod
     def is_swayidle_installed():
         return shutil.which("swayidle") is not None
 

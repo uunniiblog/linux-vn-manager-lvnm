@@ -80,13 +80,6 @@ class X11Utils(DesktopUtilsInterface):
             pass
         return 0
 
-    def find_window_id_by_title(self, target_title):
-        """Finds the first window ID that matches the target title exactly."""
-        for wid in self.get_all_window_ids():
-            if self.get_window_name(wid) == target_title:
-                return wid
-        return None
-
     def find_window_by_pid(self, target_pid, target_process_path):
         """
         Returns (window_id, window_title) for a specific PID and process path.

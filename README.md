@@ -100,6 +100,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Path: Select the .exe of your texthooker. Right click a running game "Open Texthooker" to run it targeted to the game.
         - Textractor will automatically hook to the game with -pgame.exe, also tested Luna and Agent, both can hook through the program's interface. 
         - Note that some hook codes behave differently through wine/proton and may crash the game.
+    - Directories: Modify paths of data folders for prefixes, runners, vndb covers and timetracker log files. Useful if you have low disk space in your main system drive. Restart the application after doing any changes here to fully reload the new paths.
     - System info: List useful system info and gstreamer libraries I have found pretty useful to run videos in VNs with wow64 wine builds.
 
 Config and data stored at: ~/.local/share/lvnm/

@@ -302,7 +302,6 @@ class GameRunner:
         
         # Actual check
         return self._is_game_process_in_proc()
-        # return len(self._get_game_pids()) > 0
 
     def _is_game_process_in_proc(self) -> bool:
         """
@@ -333,33 +332,6 @@ class GameRunner:
 
         return False
 
-    def _is_prefix_active(self) -> bool:
-        """
-        Check if any process is still running in the Wine prefix by scanning /proc.
-        Unusued maybe useful later
-        """
-        prefix_path = self.env.get("WINEPREFIX", "")
-        if not prefix_path:
-            return False
-
-        try:
-            target = f"WINEPREFIX={prefix_path}".encode()
-            for pid_dir in Path("/proc").iterdir():
-                if not pid_dir.name.isdigit():
-                    continue
-                
-                try:
-                    environ_data = (pid_dir / "environ").read_bytes().split(b'\x00')
-                    if target in environ_data:
-                        logger.debug(f"target {target} in environ for game {self.game}")
-                        return True
-                except (PermissionError, FileNotFoundError, ProcessLookupError):
-                    continue
-        except Exception as e:
-            logging.error(f"is_prefix_active error: {e}")
-
-        return False
-
     def stop(self, running_prefix_count = 1):
         """Gracefully attempts to terminate the running game process."""
         if not self.is_running():
@@ -368,8 +340,6 @@ class GameRunner:
 
         try:
             logging.info(f"Stopping game '{self.name}'...")
-            # pgid = os.getpgid(self.process.pid)
-            # os.killpg(pgid, signal.SIGKILL)
             self._kill_specific_prefix_processes_by_cmdline()
             runner_path = Path(self.prefix_info["runner"])
 
@@ -528,72 +498,6 @@ class GameRunner:
             # If no original path exists, clear it to let system/Proton decide
             self.env.pop("LD_LIBRARY_PATH", None)
         return var
-
-    def inject_appimage_gstreamer(self):
-        """Unused method to try load gstreamer from appimage"""
-        runtime = SystemUtils.get_runtime_type()
-        if runtime == "appimage":
-            base_lib = os.path.join(appdir, "usr", "lib", "x86_64-linux-gnu")
-            logger.debug(f"gst_lib_dir: {base_lib}")
-            gst_plugin_path = os.path.join(base_lib, "gstreamer-1.0")
-            logger.debug(f"gst_plugin_dir: {gst_plugin_path}")
-            gst_scanner = os.path.join(base_lib, "gstreamer1.0", "gstreamer-1.0", "gst-plugin-scanner")
-            logger.debug(f"gst_scanner: {gst_scanner}")
-        
-            if os.path.exists(base_lib):
-                # --- DEBUG LOGGING START ---
-                try:
-                    all_files = os.listdir(base_lib)
-                    # Filter for things we care about to keep logs readable
-                    gst_related = [f for f in all_files if "gst" in f or "libicu" in f or "libav" in f]
-                    
-                    logger.debug(f"--- AppImage Library Audit ---")
-                    logger.debug(f"Total files in base_lib: {len(all_files)}")
-                    logger.debug(f"GStreamer/Codec related files found: {gst_related}")
-                    
-                    # Specifically check for the 'smoking gun' file
-                    if "libgstgl-1.0.so.0" in all_files:
-                        logger.debug("CHECK: libgstgl-1.0.so.0 is PRESENT in bundle.")
-                    else:
-                        logger.warning("CHECK: libgstgl-1.0.so.0 is MISSING from bundle!")
-
-                    scanner_exists = os.path.isfile(gst_scanner)
-                    logger.debug(f"CHECK: gst-plugin-scanner found at target path? {scanner_exists}")
-                    if not scanner_exists:
-                        logger.warning(f"SCANNER NOT FOUND at: {gst_scanner}")
-                        parent_dir = os.path.join(base_lib, "gstreamer1.0")
-                        if os.path.exists(parent_dir):
-                            try:
-                                sub_contents = os.listdir(parent_dir)
-                                logger.debug(f"Contents of {parent_dir}: {sub_contents}")
-                            except Exception as e:
-                                logger.error(f"Could not list parent_dir: {e}")
-                        else:
-                            logger.error(f"Parent directory {parent_dir} does not exist")
-                except Exception as e:
-                    logger.error(f"Failed to audit AppImage libs: {e}")
-                # --- DEBUG LOGGING END ---
-
-                logger.debug("Injecting bundled AppImage GStreamer libraries into environment.")
-
-                # Prepend the bundled lib directory to LD_LIBRARY_PATH so winegstreamer finds it
-                current_ld = self.env.get("LD_LIBRARY_PATH", "")
-                self.env["LD_LIBRARY_PATH"] = f"{base_lib}:{gst_plugin_path}:{current_ld}".strip(":")
-                
-                # Tell GStreamer exactly where its plugins are
-                self.env["GST_PLUGIN_SYSTEM_PATH_1_0"] = gst_plugin_path
-                self.env["GST_PLUGIN_PATH"] = gst_plugin_path 
-                self.env["GST_PLUGIN_SCANNER"] = gst_scanner
-                self.env["GST_REGISTRY_FORK"] = "no"
-                gst_registry_path = os.path.join(self.prefix_info["path"], "gstreamer.registry")
-                if os.path.exists(gst_registry_path):
-                    os.remove(gst_registry_path)
-                self.env["GST_REGISTRY"] = gst_registry_path
-
-                self.env["GST_DEBUG"] = "3"
-                self.env["GST_DEBUG_NO_COLOR"] = "1"
-                
-                logger.debug(f"GStreamer environment sealed to AppImage: {base_lib}")
     
     def _add_log_line(self, line):
         """Callback used by ExecutionManager"""

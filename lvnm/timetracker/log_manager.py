@@ -193,35 +193,6 @@ class LogManager:
             logger.error(f"Error getting apps {e}")
             return self.get_all_tracked_apps()
 
-    def get_grouped_logs_for_app(self, combined_name):
-        """
-        Returns an OrderedDict grouped by date: { "2026-01-18": [rows], "2026-01-17": [rows] }
-        """
-        from collections import OrderedDict
-        from collections import defaultdict
-        
-        grouped_data = defaultdict(list)
-        target_process = self._extract_process(combined_name)
-        log_file = self.get_app_file(target_process)
-
-        if not log_file.exists():
-            return OrderedDict()
-
-        try:
-            lines = log_file.read_text(encoding="utf-8").splitlines()
-            if len(lines) > 1:
-                for line in lines[1:]: # Skip header
-                    parts = line.split(";")
-                    if len(parts) >= 5:
-                        # parts[0] is Timestamp_Start (e.g., '2026-01-18 14:30:00')
-                        date_str = parts[0].split(' ')[0] 
-                        grouped_data[date_str].append(parts)
-        except Exception as e:
-            logger.error(f"ERROR getting grouped logs {e}")
-            
-        # Sort the dictionary by date descending
-        return OrderedDict(sorted(grouped_data.items(), reverse=True))
-
     def _extract_process(self, combined_name):
         """Helper to get process from title formatted as 'Title - Process'"""
         if not combined_name: return ""
