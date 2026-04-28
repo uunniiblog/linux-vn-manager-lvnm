@@ -243,6 +243,21 @@ class SystemUtils:
             return False
 
     @staticmethod
+    def rename_folder(old_path, new_path) -> bool:
+        try:
+            if old_path.exists():
+                if new_path.exists():
+                    logger.error(f"Target folder {new_path} already exists on disk.")
+                    return False
+                
+                shutil.move(str(old_path), str(new_path))
+                logger.info(f"Folder renamed from {old_path} to {new_path}")
+                return True
+        except Exception as e:
+            logger.error(f"Physical folder rename failed: {e}")
+            return False
+
+    @staticmethod
     def get_runtime_type() -> str:
         """Returns the runtime environment type."""
         if os.environ.get("APPDIR"):

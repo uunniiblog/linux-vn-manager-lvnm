@@ -279,6 +279,13 @@ class PrefixManager:
         try:
             # Update variables
             self.name = new_name
+            old_path = Path(self.prefix_path)
+            new_path = old_path.parent / new_name
+            sucess = SystemUtils.rename_folder(old_path, new_path)
+            if sucess:
+                self.prefix_path = new_path
+                self.card.path = str(new_path)
+                self.card.name = new_name
 
             # Rewrite json file
             if self.PREFIXES_FILE.exists():
@@ -292,6 +299,7 @@ class PrefixManager:
                     # Extract the old data and update the specific fields
                     prefix_data = json_file.pop(old_name)
                     prefix_data["name"] = new_name
+                    prefix_data["path"]: str(new_path)
                     prefix_data["update_date"] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
                     
                     # Insert under the new key

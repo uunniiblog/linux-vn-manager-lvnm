@@ -146,10 +146,6 @@ class PrefixTab(QWidget):
                                       self.tr("Could not rename prefix. Name might already exist."))
                     return
 
-            # Handle path
-            if data["path"] != prefix.prefix_path:
-                prefix.prefix_path = data["path"]
-
             # Handle Codecs
             if data["codecs"]:
                 prefix.install_codecs(data["codecs"], executor=console)
@@ -346,20 +342,24 @@ class EditPrefixDialog(QDialog):
 
         # Name Field
         self.name_edit = QLineEdit(self.manager.name)
+        self.name_edit.textChanged.connect(self._update_path_preview)
         form_layout.addRow(self.tr("Name:"), self.name_edit)
 
+        # Read Only Info
         # Path Field
         path_layout = QHBoxLayout()
-        self.path_edit = QLineEdit(str(self.manager.prefix_path))
-        self.path_btn = QPushButton(self.tr("Browse..."))
-        self.path_btn.clicked.connect(self.browse_path)
+        self.path_edit = QLabel(str(self.manager.prefix_path))
+        self.path_edit.setEnabled(False)
+        self.path_edit.setStyleSheet("color: gray;")
         path_layout.addWidget(self.path_edit)
-        path_layout.addWidget(self.path_btn)
         form_layout.addRow(self.tr("Path:"), path_layout)
 
-        # Read Only Info
+        # Runner label
         self.runner_label = QLabel(str(self.manager.runner_path))
+        self.runner_label.setEnabled(False)
+        self.runner_label.setStyleSheet("color: gray;")
         self.type_label = QLabel(self.manager.type.capitalize())
+
         # Safe access to update_date from the card
         update_date = getattr(self.manager.card, 'update_date', self.tr("Never"))
         self.date_label = QLabel(update_date)
@@ -532,6 +532,15 @@ class EditPrefixDialog(QDialog):
             data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
 
         return data
+
+    def _update_path_preview(self, new_name):
+        """Visually updates the path label to show the folder will be renamed to."""
+        if not new_name.strip():
+            return
+        base_dir = Path(self.manager.prefix_path).parent
+        new_path = base_dir / new_name
+        self.path_edit.setText(str(new_path))
+
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
