@@ -93,11 +93,14 @@ class RunnerManagerInterface:
         if not path.exists():
             return False
         
-        if "wine" in str(path).lower():
-            return (path / "bin" / "wine").exists()
-            
-        return True
+        # Check for standard Wine structure: /bin/wine
+        wine_exe = path / "bin" / "wine"
+        # Check for standard Proton structure: /files/bin/wine or the 'proton' script
+        proton_exe = path / "files" / "bin" / "wine"
+        proton_script = path / "proton"
 
+        return wine_exe.exists() or proton_exe.exists() or proton_script.exists()
+            
     @staticmethod
     def get_local_runners(runner_dir, prefixes_data):
         """Returns a list of folder names in the runners directory"""
@@ -116,7 +119,7 @@ class RunnerManagerInterface:
 
         display_list = []
         for d in runner_dir.iterdir():
-            if d.is_dir():
+            if d.is_dir() and RunnerManagerInterface.is_runner_valid(d):
                 folder_name = d.name
                 prefixes = runner_usage.get(folder_name, [])
                 
