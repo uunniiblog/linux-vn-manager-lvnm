@@ -55,11 +55,13 @@ class PrefixTab(QWidget):
         btn_layout_2 = QHBoxLayout()
         self.regedit_btn = QPushButton(self.tr("Regedit"))
         self.winecfg_btn = QPushButton(self.tr("Winecfg"))
+        self.winefile_btn = QPushButton(self.tr("Winefile"))
         self.console_btn = QPushButton(self.tr("wineboot cmd"))
         self.bash_btn = QPushButton(self.tr("Bash"))
         
         btn_layout_2.addWidget(self.regedit_btn)
         btn_layout_2.addWidget(self.winecfg_btn)
+        btn_layout_2.addWidget(self.winefile_btn)
         btn_layout_2.addWidget(self.console_btn)
         btn_layout_2.addWidget(self.bash_btn)
         main_layout.addLayout(btn_layout_2)
@@ -72,6 +74,7 @@ class PrefixTab(QWidget):
 
         self.regedit_btn.clicked.connect(lambda: self.run_utility("regedit"))
         self.winecfg_btn.clicked.connect(lambda: self.run_utility("winecfg"))
+        self.winefile_btn.clicked.connect(lambda: self.run_utility("winefile"))
         self.console_btn.clicked.connect(lambda: self.run_utility("wineconsole"))
         self.bash_btn.clicked.connect(self.run_bash_utility)
 

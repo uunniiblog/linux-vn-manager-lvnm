@@ -212,6 +212,7 @@ class GameListItem(QWidget):
 
         act_regedit = menu.addAction(self.tr("Open Regedit"))
         act_winecfg = menu.addAction(self.tr("Open Winecfg"))
+        act_winefile = menu.addAction(self.tr("Open Winefile"))
         act_cmd = menu.addAction(self.tr("Open windows cmd"))
         act_bash = menu.addAction(self.tr("Open Bash Terminal"))
         menu.addSeparator()
@@ -254,6 +255,9 @@ class GameListItem(QWidget):
 
         elif action == act_winecfg:
             self.run_in_prefix("winecfg")
+
+        elif action == act_winefile:
+            self.run_in_prefix("winefile")
 
         elif action == act_cmd:
             self.run_in_prefix("wineconsole")
