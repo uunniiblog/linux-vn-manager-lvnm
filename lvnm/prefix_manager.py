@@ -35,6 +35,7 @@ class PrefixManager:
         self.fonts = False
         self.dpi = False
         self.wayland_driver = False
+        self.threetwop = False
         
         # Automatically load data if it exists
         self._load_from_json()
@@ -61,6 +62,7 @@ class PrefixManager:
             self.fonts = self.card.fonts
             self.dpi = self.card.dpi
             self.wayland_driver = self.card.wayland
+            self.threetwop = self.card.threetwop
             self._setup_env()
             return True
 
@@ -84,8 +86,10 @@ class PrefixManager:
             self.env["WINE"] = str(wine_bin)
             self.env["PATH"] = f"{wine_bin.parent}:{self.env.get('PATH', '')}"
             self.runner_command = [str(wine_bin)]
+            if self.threetwop:
+                self.env["WINEARCH"] = "win32"
 
-    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", dpi: bool = False, wayland: bool = False, executor=None):
+    def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", dpi: bool = False, wayland: bool = False, threetwop: bool = False, executor=None):
         """Physical creation and initialization of the prefix."""
         logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
@@ -94,6 +98,7 @@ class PrefixManager:
         self.winetricks = ""
         self.dpi = dpi
         self.wayland_driver = wayland
+        self.threetwop = threetwop
         self._setup_env()
 
         try:
@@ -246,7 +251,8 @@ class PrefixManager:
             winetricks=self.winetricks,
             fonts=self.fonts,
             dpi=self.dpi,
-            wayland=self.wayland_driver
+            wayland=self.wayland_driver,
+            threetwop=self.threetwop
         )
         json_file[self.name] = card.to_dict()
 

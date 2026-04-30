@@ -156,6 +156,9 @@ class ImportGameDialog(QDialog):
         wayland = self.prefix_data.get("wayland", False)
         self._add_readonly_row(prefix_ro_form, self.tr("Wayland Driver"), self.tr("Yes") if wayland else self.tr("No"))
 
+        threetwop = self.prefix_data.get("threetwop", False)
+        self._add_readonly_row(prefix_ro_form, self.tr("32 bit prefix"), self.tr("Yes") if threetwop else self.tr("No"))
+
         content_layout.addWidget(prefix_ro_group)
         content_layout.addStretch()
 
@@ -346,6 +349,7 @@ class ImportGameDialog(QDialog):
             runner_path=str(runner_path),
             codecs=prefix_data.get("codecs", ""),
             winetricks=prefix_data.get("winetricks", ""),
+            threetwop=prefix_data.get("threetwop", False),
             executor=console
         )
         if not success:

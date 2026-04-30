@@ -17,6 +17,7 @@ class Prefix:
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     wayland: bool = False
     dpi: bool = False
+    threetwop: bool = False
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

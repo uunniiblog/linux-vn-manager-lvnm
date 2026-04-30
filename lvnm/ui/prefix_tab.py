@@ -195,31 +195,34 @@ class PrefixTab(QWidget):
             self.refresh_list()
 
     def on_add(self):
-        created_name = self.create_new_prefix_flow(self)
+        # Now calling the instance method without passing self
+        created_name = self.create_new_prefix_flow()
         if created_name:
             self.refresh_list()
-            
-    @staticmethod
-    def create_new_prefix_flow(parent_widget):
-        dialog = CreatePrefixDialog(parent_widget)
+
+    def create_new_prefix_flow(self):
+        """Create new prefix logic"""
+        # We use 'self' directly as the parent widget
+        dialog = CreatePrefixDialog(self)
         if dialog.exec():
             data = dialog.get_data()
             name = data["name"]
             fonts_path = data.get("fonts", None)
             dpi = data.get("dpi", False)
             wayland = data.get("wayland", False)
+            threetwop = data.get("32bit", False)
             
             # Check if it already exists in JSON
             if PrefixManager.get_prefix_info(name):
-                QMessageBox.warning(parent_widget, parent_widget.tr("Error"), parent_widget.tr(f"Prefix '{name}' already exists."))
+                QMessageBox.warning(self, self.tr("Error"), self.tr(f"Prefix '{name}' already exists."))
                 return None
                 
             # Instantiate Manager
             prefix = PrefixManager(name)
             
             # Prepare the Console
-            console = ConsoleDialog(parent_widget)
-            console.setWindowTitle(parent_widget.tr(f"Creating Prefix: {name}"))
+            console = ConsoleDialog(self)
+            console.setWindowTitle(self.tr(f"Creating Prefix: {name}"))
             
             # Add tasks to queue
             success = prefix.create_prefix(
@@ -228,6 +231,7 @@ class PrefixTab(QWidget):
                 winetricks=data["winetricks"],
                 dpi=dpi,
                 wayland=wayland,
+                threetwop=threetwop,
                 executor=console
             )
             
@@ -245,7 +249,7 @@ class PrefixTab(QWidget):
                 console.exec()
                 return name
             else:
-                QMessageBox.warning(parent_widget, parent_widget.tr("Error"), parent_widget.tr("Failed to prepare prefix creation."))
+                QMessageBox.warning(self, self.tr("Error"), self.tr("Failed to prepare prefix creation."))
                 return None
         return None
 
@@ -388,6 +392,13 @@ class EditPrefixDialog(QDialog):
         self.wayland_checkbox.setChecked(bool(self.manager.wayland_driver))
         self.layout.addWidget(self.wayland_checkbox)
 
+        # --- 32 bit checkbox ---
+        self.useless_checkbox = QCheckBox(self.tr("32 bit prefix"))
+        self.useless_checkbox.setChecked(self.manager.threetwop)
+        self.layout.addWidget(self.useless_checkbox)
+        self.useless_checkbox.setVisible(self.manager.threetwop)
+        self.useless_checkbox.setDisabled(True)
+
         # Codecs Section
         self.codec_boxes = {}
         self.layout.addWidget(self.create_check_group(
@@ -396,15 +407,6 @@ class EditPrefixDialog(QDialog):
             self.manager.codecs.split(),
             self.codec_boxes
         ))
-
-        # Winetricks Section
-        # self.trick_boxes = {}
-        # self.layout.addWidget(self.create_check_group(
-        #     self.tr("Winetricks"), 
-        #     config.WINETRICKS_LIST, 
-        #     self.manager.winetricks.split() if hasattr(self.manager, 'winetricks') else [],
-        #     self.trick_boxes
-        # ))
 
         # Winetricks Section
         self.trick_boxes = {}
@@ -607,6 +609,13 @@ class CreatePrefixDialog(QDialog):
         self.wayland_checkbox.setChecked(False)
         self.layout.addWidget(self.wayland_checkbox)
 
+        # --- 32 bit checkbox ---
+        self.useless_checkbox = QCheckBox(self.tr("Use 32 bit prefix"))
+        self.useless_checkbox.setChecked(False)
+        self.layout.addWidget(self.useless_checkbox)
+        self.runner_combo.currentTextChanged.connect(self._update_arch_visibility)
+        self._update_arch_visibility()
+
         # --- Codecs Section ---
         self.codec_boxes = {}
         self.layout.addWidget(self.create_check_group(
@@ -645,9 +654,9 @@ class CreatePrefixDialog(QDialog):
     def _update_path_label(self, text):
         """Updates the path preview label as the user types"""
         if text.strip():
-            self.path_label.setText(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / text.strip()))
+            self.path_label.setText(str(Path(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR)) / text.strip()))
         else:
-            self.path_label.setText(str(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR) / "..."))
+            self.path_label.setText(str(Path(self.user_settings.get(config.USER_CONF_PREFIXES_PATH, config.PREFIXES_DIR)) / "..."))
 
     def create_check_group(self, title, data_list, installed_list, storage_dict):
         """Reused helper from Edit dialog"""
@@ -697,12 +706,26 @@ class CreatePrefixDialog(QDialog):
             "winetricks": " ".join(new_tricks),
             "dpi": self.dpi_checkbox.isChecked(),
             "wayland": self.wayland_checkbox.isChecked(),
+            "32bit": self.useless_checkbox.isChecked()
         }
 
         if self.font_checkbox.isChecked():
             data["fonts"] = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")
 
         return data
+
+    def _update_arch_visibility(self):
+        """Shows the 32-bit checkbox based on runner compatibility."""
+        runner_text = self.runner_combo.currentText().lower()
+        
+        # Check if empty or contains "proton" or "wow64"
+        is_incompatible = not runner_text or "proton" in runner_text or "wow64" in runner_text
+        
+        self.useless_checkbox.setVisible(not is_incompatible)
+        
+        # Uncheck when hidden
+        if is_incompatible:
+            self.useless_checkbox.setChecked(False)
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""

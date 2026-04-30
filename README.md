@@ -41,7 +41,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             <li>Wayland driver: To activate wayland native driver at regedit level, useful for wine runners that do not have the environment variable to enable it. Do not recommended since it breaks fullscreen even harder in a lot of older VNs, but maybe useful for some cases like installers or editing winecfg. </li>
             <li>Codecs: Install custom codecs into the prefix from https://www.vnwiki.xyz/linux/special-codecs.html </li>
             <li>Winetricks: Install preconfigured winetricks. They are configured at https://github.com/uunniiblog/linux-vn-manager-lvnm/blob/main/lvnm/config.py in WINETRICKS_LIST. </li>
-            <li> Umu store and Umu ID for proton runners (not really tested but should work). </li>
+            <li> 32 bit prefix: Only available with wine builds that are not wow64. There isn't really much utility to it nowdays though. </li>
             </ul>
         - Edit prefix: Basically same options. I don't recommend to change name/path unless you want to break stuff.
         - Delete prefix: Perma delete a prefix, there is a confirm window.
@@ -66,6 +66,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Gamescope: Enable/disable gamescope and launch parameters, example: -W 3840 -H 2160 -f -r 60. Can be configured in settings to be filled automatically.
         - Environment Variables: Enable/Disable them as they fit for your game. Mouse over them to show the exact command. Can be configured in settings to be filled automatically. There are a few common environment variables preloaded in the application, but can add more or remove them freely from settings tab.
         - Some variables are exclusive to proton/wine, won't show if they don't apply.
+        - Umu store and Umu ID for proton runners (not really tested but should work).
     - Edit game: Click one game from the list to show current data to edit. Same fields. Can also Start game from there.
     - Run in prefix: Run a game in a prefix without adding an entry, maybe useful to run some installers quickly. Environment variables will be gotten from global ones at settings.
     - Search: Filter games by name.
