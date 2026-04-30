@@ -97,10 +97,11 @@ class GameRunner:
             gs_params = self.game.gamescope.parameters.split()
             self.cmd = ["gamescope"] + gs_params + ["--"] + self.cmd
 
-    def run_in_prefix(self, exe_path: str, prefix_name: str, env_vars: dict = None):
+    def run_in_prefix(self, exe_path: str, prefix_name: str):
         """
         Bypasses JSON loading to run an arbitrary executable in a selected prefix.
-        Useful for installers or utility stuff
+        Useful for installers or utility stuff.
+        Automatically applies global environment variables
         """
         try:
             # Manually fetch prefix info
@@ -116,8 +117,18 @@ class GameRunner:
                 vndb="",
             )
 
-            if env_vars:
-                self.game.envvar = env_vars
+            # Grab global env vars
+            global_env_status = self.settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+            env_definitions = self.settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
+            
+            env_vars = {}
+            for var in env_definitions:
+                var_id = var.get("id")
+                # Only add if the variable is toggled ON in global settings
+                if global_env_status.get(var_id):
+                    env_vars[var["key"]] = str(var["value"])
+
+            self.game.envvar = env_vars
             
             # Call same logic as run
             self.prepare_environment()

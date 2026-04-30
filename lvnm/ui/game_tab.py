@@ -468,16 +468,6 @@ class RunInPrefixDialog(QDialog):
             logger.debug("Please select both an executable and a prefix.")
             return
 
-        user_settings = SettingsManager()
-        global_env_var = user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
-        env_vars_definitions = user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
-        env_vars = {}
-
-        for var in env_vars_definitions:
-            var_id = var.get("id")
-            if global_env_var.get(var_id):
-                env_vars[var["key"]] = str(var["value"])
-
         logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
         if env_vars:
             logger.debug(f"Applying Global Env Vars: {env_vars}")
@@ -485,7 +475,7 @@ class RunInPrefixDialog(QDialog):
         try:
             # Instantiate GameRunner with our dummy card
             runner = GameRunner("Temp_Installer")
-            runner.run_in_prefix(exe_path, prefix_name, env_vars=env_vars)
+            runner.run_in_prefix(exe_path, prefix_name)
         except Exception as e:
             logger.error(f"[Error] Failed to run in prefix: {e}")
 
