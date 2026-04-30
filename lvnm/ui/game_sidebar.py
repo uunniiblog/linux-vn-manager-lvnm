@@ -19,6 +19,7 @@ from system_utils import SystemUtils
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from game_process_manager import GameProcessManager
+from ui.env_var_manager_dialog import EnvVarManagerDialog
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,19 @@ class GameSidebar(QFrame):
         self.env_group = QGroupBox(self.tr("Environment Variables"))
         self.env_layout = QVBoxLayout(self.env_group)
         self.env_checkboxes = {}
+        
+        self.env_checkbox_layout = QVBoxLayout()
+        self.env_layout.addLayout(self.env_checkbox_layout)
+
+        # Manage environment Button
+        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
+        self.manage_env_btn.setFlat(True)
+        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_env_btn.clicked.connect(self._open_env_manager)
+        
+        self.env_layout.addWidget(self.manage_env_btn)
+        
         form.addWidget(self.env_group)
 
         form.addStretch(1)
@@ -345,7 +359,46 @@ class GameSidebar(QFrame):
                 cb.setChecked(True)
                 
             self.env_checkboxes[var["id"]] = cb
-            self.env_layout.addWidget(cb)
+            self.env_checkbox_layout.addWidget(cb)
+
+    def _open_env_manager(self):
+        """Opens the dialog to add/remove/edit environment variables."""
+        current_vars = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
+        ui_active_vars = {}
+
+        # Save current selected variables
+        var_lookup = {v["id"]: v for v in current_vars}
+        for var_id, cb in self.env_checkboxes.items():
+            if cb.isChecked() and var_id in var_lookup:
+                var_def = var_lookup[var_id]
+                ui_active_vars[var_def["key"]] = var_def["value"]
+
+        dialog = EnvVarManagerDialog(current_vars, self)
+        
+        if dialog.exec():
+            new_vars = dialog.get_vars()
+            self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, new_vars)
+
+            # Clean ghost variables from game database
+            new_keys = [var["key"] for var in new_vars]
+            GameManager.cleanup_env_vars(new_keys)
+
+            # Sync the in-memory game card to remove deleted keys
+            self.current_game.envvar = {
+                k: v for k, v in self.current_game.envvar.items() 
+                if k in new_keys
+            }
+            
+            active_vars_for_ui = {
+                k: v for k, v in ui_active_vars.items()
+                if k in new_keys
+            }
+
+            # Refresh the current sidebar view using the preserved UI selections
+            prefix_name = self.combo_prefix.currentText()
+            prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
+            
+            self.refresh_env_vars(prefix_type, active_vars_for_ui)
 
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
@@ -356,9 +409,6 @@ class GameSidebar(QFrame):
         self.lbl_display_name.setText(self.tr("New Game"))
         self.media_container.hide() # Hide media for new games by default
         self.launch_btn.setVisible(False)
-
-        # Load Global Settings for Defaults
-        user_settings = SettingsManager()
         
         # Clear General UI Fields
         self.launch_btn.setVisible(False)
@@ -369,8 +419,8 @@ class GameSidebar(QFrame):
         self.edit_umu_id.clear()
         
         # Apply Gamescope Defaults from Settings or leave empty
-        gs_default_enabled = user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
-        gs_default_params = user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, "")
+        gs_default_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
+        gs_default_params = self.user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, "")
         
         self.gs_enabled.setChecked(gs_default_enabled)
         self.gs_params.setText(gs_default_params)
@@ -388,7 +438,7 @@ class GameSidebar(QFrame):
         self.update_umu_visibility("wine")
 
         # Environment variables logic
-        global_env_var = user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+        global_env_var = self.user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
         env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         default_env_vars = {}
         
