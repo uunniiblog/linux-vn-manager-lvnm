@@ -455,6 +455,20 @@ class GameRunner:
         )
         
         try:
+
+            # Grab global env vars
+            global_env_status = self.settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
+            env_definitions = self.settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
+            
+            env_vars = {}
+            for var in env_definitions:
+                var_id = var.get("id")
+                # Only add if the variable is toggled ON in global settings
+                if global_env_status.get(var_id):
+                    env_vars[var["key"]] = str(var["value"])
+
+            self.game.envvar = env_vars
+            
             self.prepare_environment()
             logger.debug(self.name)
 

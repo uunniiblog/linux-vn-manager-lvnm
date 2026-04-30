@@ -49,8 +49,9 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             <ul>
             <li>Regedit: Opens windows registry for the prefix.</li>
             <li>Winecfg: Opens Wine configuration window for the prefix.</li>
+            <li>Winefile: Opens Wine file explorer for the prefix </li>
             <li>wineboot cmd: Opens windows cmd terminal inside the prefix.</li>
-            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder. Useful to install extra winetricks or test stuff</li> 
+            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder. Useful to test stuff. Inherits global environment variables. Added $RUN_GAME with the path to the wine/proton runner of the prefix</li> 
             </ul>
             All utility options are also available from the game tab.
 
