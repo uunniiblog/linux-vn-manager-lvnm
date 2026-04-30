@@ -408,8 +408,9 @@ class PrefixManager:
                 return False
 
         if executor:
-            logger.debug("adding task: Downloading and Installing DXVK")
-            executor.add_task(run_dxvk_logic, self.env, "Downloading and Installing DXVK")
+            if not self.threetwop:
+                logger.debug("adding task: Downloading and Installing DXVK")
+                executor.add_task(run_dxvk_logic, self.env, "Downloading and Installing DXVK")
         else:
             run_dxvk_logic()
 
