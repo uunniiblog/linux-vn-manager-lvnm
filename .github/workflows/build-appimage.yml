@@ -66,6 +66,10 @@ jobs:
       - name: Bundle Winetricks
         run: |
           curl -L -o LVNM.AppDir/usr/bin/tools/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
+
+          sudo apt-get update && sudo apt-get install -y cabextract
+          cp $(which cabextract) LVNM.AppDir/usr/bin/tools/
+          
           chmod +x LVNM.AppDir/usr/bin/tools/*
 
       - name: Finalize AppDir Metadata
