@@ -487,7 +487,7 @@ class EditPrefixDialog(QDialog):
 
         scroll.setWidget(container)
         vbox.addWidget(scroll)
-        group.setMinimumHeight(150)
+        
         return group
 
     def browse_path(self):
@@ -613,7 +613,7 @@ class CreatePrefixDialog(QDialog):
         self.layout.addWidget(self.wayland_checkbox)
 
         # --- 32 bit checkbox ---
-        self.useless_checkbox = QCheckBox(self.tr("Use 32 bit prefix"))
+        self.useless_checkbox = QCheckBox(self.tr("Make 32 bit prefix"))
         self.useless_checkbox.setChecked(False)
         self.layout.addWidget(self.useless_checkbox)
         self.runner_combo.currentTextChanged.connect(self._update_arch_visibility)
@@ -681,7 +681,7 @@ class CreatePrefixDialog(QDialog):
 
         scroll.setWidget(container)
         vbox.addWidget(scroll)
-        group.setMinimumHeight(150)
+        
         return group
 
     def validate_and_accept(self):

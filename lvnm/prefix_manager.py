@@ -174,7 +174,7 @@ class PrefixManager:
             logging.debug(f"   {var:<18}: {self.env[var]}")
 
         def finalize():
-            valid_verbs = [v for v in winetricks_list.split() if self.winetrick_exists(v)]
+            valid_verbs = [v for v in winetricks_list.split() if self.winetrick_exists(v, winetricks_bin)]
             invalid_verbs = [v for v in winetricks_list.split() if v not in valid_verbs]
             if invalid_verbs:
                 logger.warning(f"Unknown winetricks: {invalid_verbs}")
@@ -193,11 +193,11 @@ class PrefixManager:
         return True
 
     @staticmethod
-    def winetrick_exists(verb: str) -> bool:
+    def winetrick_exists(verb: str, winetricks_bin: str) -> bool:
         """Returns True if the given winetricks verb is known/valid."""
         try:
             result = subprocess.run(
-                ["winetricks", "list-all"],
+                [winetricks_bin, "list-all"],
                 capture_output=True, text=True
             )
             for line in result.stdout.splitlines():
