@@ -52,6 +52,17 @@ class SystemUtils:
         clean_env.pop("PYTHONPATH", None)
         clean_env.pop("_PYI_ARCHIVE_FILE", None)
 
+        appdir = os.environ.get("APPDIR")
+        if appdir:
+            bundled_tools = str(Path(appdir) / "usr" / "bin" / "tools")
+            bundled_libs = str(Path(appdir) / "usr" / "lib")
+            
+            # Add tools to PATH so winetricks finds cabextract
+            clean_env["PATH"] = f"{bundled_tools}:{clean_env.get('PATH', '')}"
+            
+            # Add libs to LD_LIBRARY_PATH so cabextract finds libmspack
+            clean_env["LD_LIBRARY_PATH"] = f"{bundled_libs}:{clean_env.get('LD_LIBRARY_PATH', '')}"
+
         return clean_env
 
     @staticmethod

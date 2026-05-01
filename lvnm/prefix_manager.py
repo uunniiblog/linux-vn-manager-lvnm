@@ -185,6 +185,7 @@ class PrefixManager:
                 self._save_metadata()
 
         if executor:
+            logger.debug(f"install_winetricks self.env {self.env}")
             executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
         else:
             ExecutionManager.run(cmd, self.env, wait=True)
@@ -210,7 +211,7 @@ class PrefixManager:
 
             if result.stderr:
                 logger.debug(f"winetricks list-all stderr: {result.stderr.strip()}")
-                
+
             return False
         except Exception as e:
             logger.warning(f"winetrick_exists check failed for '{verb}': {e}")
