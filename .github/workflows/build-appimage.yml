@@ -69,7 +69,10 @@ jobs:
 
           sudo apt-get update && sudo apt-get install -y cabextract
           cp $(which cabextract) LVNM.AppDir/usr/bin/tools/
-          
+
+          mkdir -p LVNM.AppDir/usr/lib
+          cp /lib/x86_64-linux-gnu/libmspack.so.0* LVNM.AppDir/usr/lib/ || true
+
           chmod +x LVNM.AppDir/usr/bin/tools/*
 
       - name: Finalize AppDir Metadata
