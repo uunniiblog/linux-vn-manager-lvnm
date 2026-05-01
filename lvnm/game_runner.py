@@ -358,7 +358,7 @@ class GameRunner:
     def stop(self, running_prefix_count = 1):
         """Gracefully attempts to terminate the running game process."""
         if not self.is_running():
-            logging.error(f"Game '{self.name}' is not running.")
+            logging.info(f"Game '{self.name}' is not running.")
             return
 
         try:

@@ -67,8 +67,8 @@ class CliController(QObject):
             logger.info(f"{game} exited with code {runner.process.returncode}")
         else:
             logger.info(f"{game} is already running")
-            logging.shutdown()
-
+        
+        logging.shutdown()
         sys.exit(0)
 
     def update_game(self, game):
@@ -86,4 +86,7 @@ class CliController(QObject):
         
         runner.stop()
         self.update_game(game)
-        logging.shutdown()
+
+        if runner.game.exit_script.strip():
+            runner.run_external_script(runner.game.exit_script.strip())
+            
