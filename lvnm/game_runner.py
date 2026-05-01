@@ -55,9 +55,9 @@ class GameRunner:
         self.scrub_appimage_environment()
 
         if self.is_steam:
-            logging.info("Steam launch detected: LC_ALL = C.UTF-8...")
+            logging.info("Steam launch detected: Remvoing LC_ALL...")
             # Adjust this since it fucks with jp paths
-            self.env["LC_ALL"] = "C.UTF-8"
+            self.env.pop("LC_ALL")
             
         self.env["WINEPREFIX"] = self.prefix_info["path"]
         self.env["PWD"] = self.prefix_info["path"]
