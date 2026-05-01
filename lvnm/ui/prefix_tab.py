@@ -378,8 +378,15 @@ class EditPrefixDialog(QDialog):
         self.layout.addLayout(form_layout)
 
         # Font checkbox
+        font_path = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "").strip()
+        has_font_config = bool(font_path)
+
         self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
         self.font_checkbox.setChecked(bool(self.manager.fonts))
+        if not has_font_config and not bool(self.manager.fonts):
+            self.font_checkbox.setEnabled(False)
+            self.font_checkbox.setChecked(False)
+            self.font_checkbox.setToolTip(self.tr("Need to configure the font folder in settings first"))
         if self.manager.fonts:
             # Not gonna bother unlinking fonts from prefixes for now
             self.font_checkbox.setDisabled(True)
@@ -598,8 +605,19 @@ class CreatePrefixDialog(QDialog):
         self.layout.addLayout(form_layout)
 
         # --- Font checkbox ---
+        font_path = self.user_settings.get(config.USER_CONF_FONT_FOLDER, "").strip()
+        has_font_config = bool(font_path)
         self.font_checkbox = QCheckBox(self.tr("Symlink fonts into prefix"))
-        self.font_checkbox.setChecked(bool(self.user_settings.get(config.USER_CONF_FONT_FOLDER, "")))
+        if has_font_config:
+            # If configured allow use and set initial state to checked
+            self.font_checkbox.setEnabled(True)
+            self.font_checkbox.setChecked(True)
+        else:
+            # If empty disable and show tooltip
+            self.font_checkbox.setEnabled(False)
+            self.font_checkbox.setChecked(False)
+            self.font_checkbox.setToolTip(self.tr("Need to configure the font folder in settings first"))
+
         self.layout.addWidget(self.font_checkbox)
 
          # --- DPI checkbox ---
