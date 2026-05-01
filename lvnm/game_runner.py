@@ -483,17 +483,6 @@ class GameRunner:
             self.game.envvar = env_vars
             
             self.prepare_environment()
-            logger.debug(self.name)
-
-            # Add winetricks to path if appimage
-            winetricks_full_path = SystemUtils.get_tool_path("winetricks")
-            if "/" in winetricks_full_path:
-                umu_full_path = SystemUtils.get_tool_path("umu-run")
-                winetricks_dir = os.path.dirname(winetricks_full_path)
-                umu_dir = os.path.dirname(umu_full_path)
-                current_path = self.env.get("PATH", os.environ.get("PATH", ""))
-                self.env["PATH"] = f"{winetricks_dir}:{umu_full_path}:{current_path}"
-                logger.debug(f"Terminal PATH updated with {winetricks_dir} and {umu_full_path}")
 
             # Maybe useful
             self.env["RUN_GAME"] = " ".join(self.cmd)
