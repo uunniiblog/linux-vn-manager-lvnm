@@ -67,7 +67,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Gamescope: Enable/disable gamescope and launch parameters, example: -W 3840 -H 2160 -f -r 60. Can be configured in settings to be filled automatically.
         - Environment Variables: Enable/Disable them as they fit for your game. Mouse over them to show the exact command. Can be configured in settings to be filled automatically. There are a few common environment variables preloaded in the application, but can add more or remove them freely from settings tab.
         - Some variables are exclusive to proton/wine, won't show if they don't apply.
-        - Umu store and Umu ID for proton runners (not really tested but should work).
+        - Advanced settings: Opens a dialog with extra options that are rarely used: Umu store and Umu ID for proton runners, pre launch commands, arguments, pre launch and post exit script.
     - Edit game: Click one game from the list to show current data to edit. Same fields. Can also Start game from there.
     - Run in prefix: Run a game in a prefix without adding an entry, maybe useful to run some installers quickly. Environment variables will be gotten from global ones at settings.
     - Search: Filter games by name.

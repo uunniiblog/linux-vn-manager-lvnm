@@ -1,6 +1,5 @@
 import logging
 import config
-import gc
 from datetime import datetime
 from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
@@ -130,7 +129,8 @@ class GameProcessManager(QObject):
             if runner:
                 self.runners_logs[name] = runner.get_full_log()
                 runner.logs.clear()
-                # gc.collect()
+                if runner.game.exit_script.strip():
+                    runner.run_external_script(runner.game.exit_script.strip())
 
             self.stop_tracking(name)
 

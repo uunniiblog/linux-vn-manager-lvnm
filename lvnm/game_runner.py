@@ -4,6 +4,7 @@ import json
 import config
 import subprocess
 import shutil
+import shlex
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -91,6 +92,15 @@ class GameRunner:
 
         if not self.cmd:
             raise RuntimeError("Failed to build launch command.")
+
+        print(self.game.arguments)
+        if self.game.arguments.strip():
+            extra_args = shlex.split(self.game.arguments.strip(), posix=False)
+            self.cmd += extra_args
+
+        # Apply pre launch arguments
+        if self.game.pre_launch_args.strip():
+            self.cmd = [self.game.pre_launch_args.strip()] + self.cmd
 
         # Apply Gamescope Wrapper
         if self.game.gamescope.enabled.lower() == "true":
@@ -258,6 +268,9 @@ class GameRunner:
         except Exception as e:
             logging.error(f"Preparation failed: {e}")
             return False
+
+        if self.game.pre_launch_script.strip():
+            self.run_external_script(self.game.pre_launch_script.strip())
 
         self._log_run_command(Path(self.prefix_info["runner"]))
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless)
@@ -500,6 +513,28 @@ class GameRunner:
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
             return False
+    
+    def run_external_script(self, script_path: str):
+        """
+        Executes a script in a fully detached state.
+        """
+        if not script_path or not os.path.exists(script_path):
+            return
+
+        logger.info(f"Executing external script: {script_path}")
+        
+        try:
+            # Launch detached
+            subprocess.Popen(
+                ["bash", script_path],
+                env=self.env,
+                cwd=self.game_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True 
+            )
+        except Exception as e:
+            logger.error(f"Failed to launch script {script_path}: {e}")
     
     def scrub_appimage_environment(self):
         """Remove APPIMAGE ENVIRONMENT when running a game"""

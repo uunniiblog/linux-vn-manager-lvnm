@@ -99,12 +99,13 @@ class GameManager:
         old_vndb = current_card.vndb
 
         for key, value in updates.items():
-            if key == "gamescope"and isinstance(value, dict):
+            attr_key = key.replace("-", "_")
+            if key == "gamescope" and isinstance(value, dict):
                 for gs_key, gs_val in value.items():
                     setattr(current_card.gamescope, gs_key, gs_val)
-            elif hasattr(current_card, key):
-                setattr(current_card, key, value)
-
+            elif hasattr(current_card, attr_key):
+                setattr(current_card, attr_key, value)
+        
         new_name = current_card.name
         # Handle renaming: remove the old key if the name changed
         if new_name != original_name:

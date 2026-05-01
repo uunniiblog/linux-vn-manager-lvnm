@@ -28,6 +28,10 @@ class GameCard:
     gamescope: GameScope = field(default_factory=GameScope)
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     label: str = ""
+    pre_launch_args: str = ""
+    pre_launch_script: str = ""
+    exit_script: str = ""
+    arguments: str = ""
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

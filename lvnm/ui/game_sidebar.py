@@ -20,6 +20,7 @@ from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
+from ui.advanced_settings_dialog import AdvancedSettingsDialog
 
 logger = logging.getLogger(__name__)
 
@@ -164,18 +165,12 @@ class GameSidebar(QFrame):
 
         self.edit_vndb = QLineEdit()
         self.edit_vndb.setPlaceholderText("v11")
-        self.edit_umu_store = QLineEdit()
-        self.edit_umu_id = QLineEdit()
-        self.label_umu_store = QLabel(self.tr("UMU Store:"))
-        self.label_umu_id = QLabel(self.tr("UMU ID:"))
 
         gen_form.addRow(self.tr("Name:"), self.edit_name)
         gen_form.addRow(self.tr("Path:"), path_row)
         gen_form.addRow(self.tr("Prefix:"), prefix_row)
         gen_form.addRow("", self.prefix_warning)
         gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
-        gen_form.addRow(self.label_umu_store, self.edit_umu_store) # Use the stored label
-        gen_form.addRow(self.label_umu_id, self.edit_umu_id)       # Use the stored label
         form.addWidget(gen_group)
 
         # Gamescope
@@ -202,13 +197,21 @@ class GameSidebar(QFrame):
         # Manage environment Button
         self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
         self.manage_env_btn.setFlat(True)
-        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_env_btn.setStyleSheet("margin: 5px; padding: 4px 10px;")
         self.manage_env_btn.setCursor(Qt.PointingHandCursor)
         self.manage_env_btn.clicked.connect(self._open_env_manager)
         
         self.env_layout.addWidget(self.manage_env_btn)
         
         form.addWidget(self.env_group)
+
+        # Advanced Settings Button
+        self.advanced_btn = QPushButton(self.tr("Advanced Settings"))
+        self.advanced_btn.setMinimumHeight(35)
+        self.advanced_btn.setStyleSheet("margin: 5px; margin-top: 10px;padding: 4px 10px;")
+        self.advanced_btn.setCursor(Qt.PointingHandCursor)
+        self.advanced_btn.clicked.connect(self._open_advanced_settings)
+        form.addWidget(self.advanced_btn)
 
         form.addStretch(1)
 
@@ -305,9 +308,7 @@ class GameSidebar(QFrame):
         self.edit_name.setText(card.name)
         self.edit_path.setText(card.path)
         self.edit_vndb.setText(card.vndb)
-        self.edit_umu_store.setText(card.umu_store)
-        self.edit_umu_id.setText(card.umu_gameid)
-        
+
         # Filling Gamescope (using the nested dataclass)
         self.gs_enabled.setChecked(card.gamescope.enabled == "true")
         self.gs_params.setText(card.gamescope.parameters)
@@ -330,7 +331,6 @@ class GameSidebar(QFrame):
 
         current_prefix = self.combo_prefix.currentText()
         prefix_type = self.prefixes.get(current_prefix, {}).get("type", "wine")
-        self.update_umu_visibility(prefix_type)
 
         # Load Env Vars
         self.refresh_env_vars(prefix_type, card.envvar)
@@ -399,6 +399,19 @@ class GameSidebar(QFrame):
             prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
             
             self.refresh_env_vars(prefix_type, active_vars_for_ui)
+            
+    def _open_advanced_settings(self):
+        if not self.current_game:
+            return
+            
+        # Figure out the current prefix type to pass to the dialog
+        prefix_name = self.combo_prefix.currentText()
+        prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
+        
+        dialog = AdvancedSettingsDialog(prefix_type, self.current_game, self)
+        
+        # Advanced dialog already writes into self.current_game
+        dialog.exec()
 
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
@@ -415,8 +428,6 @@ class GameSidebar(QFrame):
         self.edit_name.clear()
         self.edit_path.clear()
         self.edit_vndb.clear()
-        self.edit_umu_store.clear()
-        self.edit_umu_id.clear()
         
         # Apply Gamescope Defaults from Settings or leave empty
         gs_default_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
@@ -433,9 +444,6 @@ class GameSidebar(QFrame):
         self.combo_prefix.setCurrentIndex(-1) # No selection initially
         self.prefix_warning.setVisible(False)
         self.combo_prefix.blockSignals(False)
-
-        # Default visibility (UMU hidden for new entries until prefix is picked)
-        self.update_umu_visibility("wine")
 
         # Environment variables logic
         global_env_var = self.user_settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
@@ -508,8 +516,6 @@ class GameSidebar(QFrame):
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
-        self.current_game.umu_store = self.edit_umu_store.text()
-        self.current_game.umu_gameid = self.edit_umu_id.text()
         
         # Env Vars
         env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
@@ -553,13 +559,6 @@ class GameSidebar(QFrame):
         self.on_saved()
         self.show_saved_feedback()
 
-    def update_umu_visibility(self, prefix_type):
-        is_proton = (prefix_type == "proton")
-        self.edit_umu_store.setVisible(is_proton)
-        self.edit_umu_id.setVisible(is_proton)
-        self.label_umu_store.setVisible(is_proton)
-        self.label_umu_id.setVisible(is_proton)
-
     def on_prefix_changed(self, prefix_name):
         if not prefix_name: 
             return
@@ -568,7 +567,6 @@ class GameSidebar(QFrame):
         self.prefix_warning.setVisible(False)
         
         prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
-        self.update_umu_visibility(prefix_type)
 
         env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         
