@@ -93,7 +93,6 @@ class GameRunner:
         if not self.cmd:
             raise RuntimeError("Failed to build launch command.")
 
-        print(self.game.arguments)
         if self.game.arguments.strip():
             extra_args = shlex.split(self.game.arguments.strip(), posix=False)
             self.cmd += extra_args
@@ -536,16 +535,12 @@ class GameRunner:
             "OWD"                   # Original Working Directory
         ]
         for var in appimage_vars:
+            logger.debug(f"Removing {var}: {self.env.get(var)}")
             self.env.pop(var, None)
         
-        # RESTORE LIBRARY PATH
-        # AppImages often prepend their internal libs to LD_LIBRARY_PATH.
-        # This can break Wine/Proton or cause them to use the manager's libs.
-        if "OLD_LD_LIBRARY_PATH" in self.env:
-            self.env["LD_LIBRARY_PATH"] = self.env.pop("OLD_LD_LIBRARY_PATH")
-        else:
-            # If no original path exists, clear it to let system/Proton decide
-            self.env.pop("LD_LIBRARY_PATH", None)
+        if "LD_LIBRARY_PATH" in self.env:
+            logger.debug(f"Removing LD_LIBRARY_PATH: {self.env.get('LD_LIBRARY_PATH')}")
+            self.env.pop("LD_LIBRARY_PATH")
         return var
     
     def _add_log_line(self, line):
