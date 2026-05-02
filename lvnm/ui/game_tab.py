@@ -469,8 +469,6 @@ class RunInPrefixDialog(QDialog):
             return
 
         logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
-        if env_vars:
-            logger.debug(f"Applying Global Env Vars: {env_vars}")
 
         try:
             # Instantiate GameRunner with our dummy card
