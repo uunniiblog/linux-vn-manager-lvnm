@@ -252,6 +252,10 @@ class SystemUtils:
         except Exception as e:
             logger.error(f"Critical error moving files from {old_dir} to {new_dir}: {e}")
             return False
+    
+    @staticmethod
+    def move_file(old_file, target_path):
+        shutil.move(str(old_file), str(target_path))
 
     @staticmethod
     def rename_folder(old_path, new_path) -> bool:
@@ -566,4 +570,9 @@ class SystemUtils:
         
         if success:
             logging.info(f"Added {game_card.name} to Steam. Please RESTART Steam.")
+
+    @staticmethod
+    def contains_japanese(text):
+        # Matches Hiragana, Katakana, and CJK Kanji
+        return bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text))
         

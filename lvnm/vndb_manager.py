@@ -83,17 +83,70 @@ class VndbManager:
             ext = os.path.splitext(url)[1] or ".jpg"
             target_path = VndbManager.get_covers_dir() / f"{vn_id}{ext}"
 
-            # Only download if we don't already have it
-            if not target_path.exists():
-                img_data = requests.get(url, timeout=5).content
-                with open(target_path, 'wb') as handler:
-                    handler.write(img_data)
-                logger.info(f"Saved cover: {target_path.name}")
-            else:
+            if target_path.exists():
                 logger.info(f"Cover already exists: {target_path.name}")
+                return
 
+            temp_dir = config.TEMP_COVERS
+            temp_source_path = temp_dir / f"{vn_id}{ext}"
+            if temp_source_path.exists():
+                logger.info(f"Found {vn_id} in temp. Moving to permanent storage...")
+                SystemUtils.move_file(str(temp_source_path), str(target_path))
+                return
+
+            # Only download if we don't already have it
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            with open(target_path, 'wb') as handler:
+                handler.write(response.content)
+            logger.info(f"Saved downloaded cover: {target_path.name}")
         except Exception as e:
             logger.error(f"[Error] Could not download {url}: {e}")
+
+    @staticmethod
+    def search_vn_temp(name: str):
+        """ Search by name max result 100, DL covers in tmp folder"""
+        endpoint = f"{VndbManager.API_URL}/vn"
+        payload = {
+            "filters": ["search", "=", name],
+            "fields": "id, title, titles.lang, titles.title, image.url",
+            "results": 100,
+            "sort": "searchrank"
+        }
+        
+        try:
+            response = requests.post(endpoint, json=payload, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            results = data.get("results", [])
+            has_more = data.get("more", False)
+            
+            temp_dir = config.TEMP_COVERS
+            temp_dir.mkdir(parents=True, exist_ok=True)
+
+            with requests.Session() as session:
+                for vn in results:
+                    if vn.get("image") and vn["image"].get("url"):
+                        url = vn["image"]["url"]
+                        ext = os.path.splitext(url)[1] or ".jpg"
+                        filename = f"{vn['id']}{ext}"
+                        target = temp_dir / filename
+
+                        if target.exists():
+                            vn["local_temp_path"] = str(target)
+                            continue
+                        
+                        if not target.exists():
+                            # Download only if we don't have it in temp
+                            img_data = session.get(url, timeout=5).content
+                            with open(target, 'wb') as f:
+                                f.write(img_data)
+                            vn["local_temp_path"] = str(target)
+            
+            return results, has_more
+        except Exception as e:
+            logger.error(f"Temp search failed: {e}")
+            return []
 
     @staticmethod
     def get_original_title(data):
@@ -114,6 +167,7 @@ class VndbManager:
         logger.debug(f"If no 'ja' found, return the main title {data.get('title')}")
         return data.get('title')
 
+# Workers to run in a separate thread
 class VndbWorker(QThread):
     # Signal that sends (game_name, results_list)
     finished = Signal(str, list)
@@ -124,6 +178,18 @@ class VndbWorker(QThread):
         self.vndb_id = vndb_id
 
     def run(self):
-        # This runs in a separate thread
+        # Fetch by vndb id individually
         results = VndbManager.fetch_and_store_vn(vndb_id=self.vndb_id)
         self.finished.emit(self.game_name, results or [])
+
+class VndbSearchWorker(QThread):
+    results_ready = Signal(str, list, bool)
+
+    def __init__(self, search_term):
+        super().__init__()
+        self.search_term = search_term
+
+    def run(self):
+        # Fetch using the name parameter
+        results, has_more = VndbManager.search_vn_temp(self.search_term)
+        self.results_ready.emit(self.search_term, results, has_more)

@@ -1,4 +1,5 @@
 from pathlib import Path
+import tempfile
 
 VERSION = 'v0.3.4'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
@@ -21,7 +22,8 @@ GAMES_DATA = DATA_DIR / ".games.json"
 UI_SETTINGS = DATA_DIR / ".ui.config"
 USER_SETTINGS = DATA_DIR / ".userconf.json"
 LAST_PLAYED_METADATA = LOG_DIR / ".last_played.json"
-AFK_FILE = Path("/tmp/lvnm_afk_detection_file")
+AFK_FILE = Path(tempfile.gettempdir()) / "lvnm" / "lvnm_afk_detection_file"
+TEMP_COVERS = Path(tempfile.gettempdir()) / "lvnm" / "search"
 
 # URLS
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
