@@ -294,3 +294,9 @@ class StatsTab(QWidget):
             hours.append(seconds / 3600)
 
         self.render_global_canvas(display_labels, hours, full_titles)
+
+    def refresh_active_tab(self):
+        """Forces the refresh data when opening the tab"""
+        current_widget = self.tabs.currentWidget()
+        if current_widget:
+            self.refresh_data()
