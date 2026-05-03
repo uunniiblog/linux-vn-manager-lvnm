@@ -411,7 +411,9 @@ class GameSidebar(QFrame):
         dialog = AdvancedSettingsDialog(prefix_type, self.current_game, self)
         
         # Advanced dialog already writes into self.current_game
-        dialog.exec()
+        # So we call save directly after closing to avoid having to double save
+        if dialog.exec():
+            self.save_data()
 
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
