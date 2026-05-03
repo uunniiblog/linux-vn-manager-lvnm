@@ -104,13 +104,13 @@ class VndbManager:
             logger.error(f"[Error] Could not download {url}: {e}")
 
     @staticmethod
-    def search_vn_temp(name: str):
-        """ Search by name max result 100, DL covers in tmp folder"""
+    def search_vn_temp(name: str, is_cancelled: callable = None):
+        """ Search by name max result 15, DL covers in tmp folder"""
         endpoint = f"{VndbManager.API_URL}/vn"
         payload = {
             "filters": ["search", "=", name],
             "fields": "id, title, titles.lang, titles.title, image.url",
-            "results": 100,
+            "results": 15,
             "sort": "searchrank"
         }
         
@@ -126,6 +126,9 @@ class VndbManager:
 
             with requests.Session() as session:
                 for vn in results:
+                    if is_cancelled and is_cancelled():
+                        logger.debug(f"[VNDB] Search for '{name}' cancelled mid-way")
+                        break
                     if vn.get("image") and vn["image"].get("url"):
                         url = vn["image"]["url"]
                         ext = os.path.splitext(url)[1] or ".jpg"
@@ -146,7 +149,7 @@ class VndbManager:
             return results, has_more
         except Exception as e:
             logger.error(f"Temp search failed: {e}")
-            return []
+            return [], False
 
     @staticmethod
     def get_original_title(data):
@@ -188,8 +191,13 @@ class VndbSearchWorker(QThread):
     def __init__(self, search_term):
         super().__init__()
         self.search_term = search_term
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
 
     def run(self):
         # Fetch using the name parameter
-        results, has_more = VndbManager.search_vn_temp(self.search_term)
-        self.results_ready.emit(self.search_term, results, has_more)
+        results, has_more = VndbManager.search_vn_temp(self.search_term, is_cancelled=lambda: self._cancelled)
+        if not self._cancelled:
+            self.results_ready.emit(self.search_term, results, has_more)

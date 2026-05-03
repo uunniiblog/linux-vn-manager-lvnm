@@ -41,8 +41,10 @@ class GameSidebar(QFrame):
         self.vndb_search_timer = QTimer()
         self.vndb_cached_search_term = ""
         self.vndb_cached_results = []
+        self.vndb_has_more = True 
         self.vndb_search_timer.setSingleShot(True)
         self.vndb_search_timer.timeout.connect(self.execute_vndb_search)
+        self.active_vndb_workers: list[VndbSearchWorker] = []
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
@@ -142,6 +144,7 @@ class GameSidebar(QFrame):
         self.autocomplete_list.itemClicked.connect(self.on_autocomplete_selected)
         # Monitor mouse press to hide the autocomplete
         QApplication.instance().installEventFilter(self)
+        QApplication.instance().applicationStateChanged.connect(self._on_app_state_changed)
         self.installEventFilter(self)
         
         # General Info
@@ -343,14 +346,19 @@ class GameSidebar(QFrame):
             self.update_autocomplete_popup(filtered)
             return
 
+        for worker in self.active_vndb_workers:
+            worker.cancel()
+
         logger.debug(f"Executing API call for: {search_term}")
         
         # Store this as the new base cache term
         self.vndb_cached_search_term = search_term
         
-        self.search_worker = VndbSearchWorker(search_term)
-        self.search_worker.results_ready.connect(self.on_search_results_received)
-        self.search_worker.start()
+        worker = VndbSearchWorker(search_term)
+        worker.results_ready.connect(self.on_search_results_received)
+        worker.finished.connect(lambda: self.active_vndb_workers.remove(worker))
+        self.active_vndb_workers.append(worker)
+        worker.start()
     
     def on_search_results_received(self, term, results, has_more):
         """ Receive results from VNDB"""
@@ -383,8 +391,11 @@ class GameSidebar(QFrame):
         # Dynamic size
         target_width = self.edit_name.width()
         target_max_height = self.window().height() // 3
+        n = self.autocomplete_list.count()
+        row_h = self.autocomplete_list.sizeHintForRow(0) if n > 0 else 80
+        content_height = n * row_h + 2 * self.autocomplete_list.frameWidth()
         self.autocomplete_list.setFixedWidth(target_width)
-        self.autocomplete_list.setFixedHeight(target_max_height)
+        self.autocomplete_list.setFixedHeight(min(content_height, target_max_height))
 
         # Position the list under the QLineEdit
         pos = self.edit_name.mapToGlobal(self.edit_name.rect().bottomLeft())
@@ -934,6 +945,10 @@ class GameSidebar(QFrame):
                     self.autocomplete_list.hide()
                     
         return super().eventFilter(obj, event)
+    
+    def _on_app_state_changed(self, state):
+        if state != Qt.ApplicationActive:
+            self.autocomplete_list.hide()
 
 class CoverLabel(QLabel):
     """
