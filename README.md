@@ -40,18 +40,18 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             <li>DPI: Automatically sets DPI for prefix based on monitor resolution, useful for old low resolution installers and maybe some games.</li>
             <li>Wayland driver: To activate wayland native driver at regedit level, useful for wine runners that do not have the environment variable to enable it. Do not recommended since it breaks fullscreen even harder in a lot of older VNs, but maybe useful for some cases like installers or editing winecfg. </li>
             <li>Codecs: Install custom codecs into the prefix from https://www.vnwiki.xyz/linux/special-codecs.html </li>
-            <li>Winetricks: Install preconfigured winetricks. They are configured at https://github.com/uunniiblog/linux-vn-manager-lvnm/blob/main/lvnm/config.py in WINETRICKS_LIST. </li>
+            <li>Winetricks: Install winetricks. There are some preconfigured here: https://github.com/uunniiblog/linux-vn-manager-lvnm/blob/main/lvnm/config.py in WINETRICKS_LIST. There is a text field to also install any extra winetricks you want. </li>
             <li> 32 bit prefix: Only available with wine builds that are not wow64. There isn't really much utility to it nowdays though. </li>
             </ul>
-        - Edit prefix: Basically same options. I don't recommend to change name/path unless you want to break stuff.
+        - Edit prefix: Basically same options. Can't remove codecs, winetricks or fonts installed already.
         - Delete prefix: Perma delete a prefix, there is a confirm window.
         - Utility buttons:
             <ul>
             <li>Regedit: Opens windows registry for the prefix.</li>
             <li>Winecfg: Opens Wine configuration window for the prefix.</li>
-            <li>Winefile: Opens Wine file explorer for the prefix </li>
+            <li>Winefile: Opens Wine file explorer for the prefix. </li>
             <li>wineboot cmd: Opens windows cmd terminal inside the prefix.</li>
-            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder. Useful to test stuff. Inherits global environment variables. Added $RUN_GAME with the path to the wine/proton runner of the prefix</li> 
+            <li>Bash: Opens linux terminal with wine/proton path and WINEPREFIX env variables preloaded at prefix folder. Useful to test stuff. Inherits global environment variables. Added $RUN_GAME with the path to the wine/proton runner of the prefix. </li> 
             </ul>
             All utility options are also available from the game tab.
 
@@ -88,7 +88,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
 5. Settings tab
     - Functional Settings:
         - Font folder: Path to a folder with your fonts. This fonts can be symlinked to prefixes to reduce disk space.
-        - Gamescope: Enable gamescope and global parameters. When you add a game this setting will be automatically loaded, can be edited later per game as it fit.
+        - Gamescope: Enable gamescope and global parameters. When you add a game this setting will be automatically loaded, can be edited later per game as it fits better.
         - Global Env Variables: Enable global environt variables checkboxes. When you add a game this setting will be automatically loaded, can be edited later per game as it fit. Will also be used when running a game in "Run in prefix".
         - Manage Variables: To add and remove new environment variables, if you remove one variable from the application being used by a game it will be deleted from the game.
     - Appearance Settings:
@@ -130,7 +130,7 @@ There will be a button to open a dialog where you can manually select an opened 
 The autostart tracking detects the running by searching the pid of the process executed first. Manual tracking directly selects the window ID that the compositor gives so it is more direct and should work better. Both will store in the same csv file name so saved playing times will be shared between both autostart and manual.
 
 ## Planned
-- Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs
+- Save data management: move all game saves to a shared folder in case of prefix deletions no data is lost. Try to auto detect common save paths for VNs.
 - One game one prefix. Automatically copies the selected prefix making prefixes unique per games.
 - More suggestions are always welcomed.
 
