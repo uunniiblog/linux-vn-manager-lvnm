@@ -2,6 +2,7 @@ import os
 import requests
 import config
 import logging
+import concurrent.futures
 logger = logging.getLogger(__name__)
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
@@ -124,27 +125,36 @@ class VndbManager:
             temp_dir = config.TEMP_COVERS
             temp_dir.mkdir(parents=True, exist_ok=True)
 
-            with requests.Session() as session:
-                for vn in results:
-                    if is_cancelled and is_cancelled():
-                        logger.debug(f"[VNDB] Search for '{name}' cancelled mid-way")
-                        break
-                    if vn.get("image") and vn["image"].get("url"):
-                        url = vn["image"]["url"]
-                        ext = os.path.splitext(url)[1] or ".jpg"
-                        filename = f"{vn['id']}{ext}"
-                        target = temp_dir / filename
+            session = requests.Session()
 
-                        if target.exists():
-                            vn["local_temp_path"] = str(target)
-                            continue
-                        
-                        if not target.exists():
-                            # Download only if we don't have it in temp
-                            img_data = session.get(url, timeout=5).content
-                            with open(target, 'wb') as f:
-                                f.write(img_data)
-                            vn["local_temp_path"] = str(target)
+            def download_single_image(vn):
+                # Respect cancellation mid-pool execution
+                if is_cancelled and is_cancelled():
+                    return vn
+
+                if vn.get("image") and vn["image"].get("url"):
+                    url = vn["image"]["url"]
+                    ext = os.path.splitext(url)[1] or ".jpg"
+                    target = temp_dir / f"{vn['id']}{ext}"
+
+                    if target.exists():
+                        vn["local_temp_path"] = str(target)
+                        return vn
+                    
+                    try:
+                        # Use a simple request here; ThreadPoolExecutor handles the concurrency
+                        img_res = session.get(url, timeout=5)
+                        img_res.raise_for_status()
+                        with open(target, 'wb') as f:
+                            f.write(img_res.content)
+                        vn["local_temp_path"] = str(target)
+                    except Exception as e:
+                        logger.error(f"Failed to download {url}: {e}")
+                return vn
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                # map runs the function across all results in parallel
+                list(executor.map(download_single_image, results))
             
             return results, has_more
         except Exception as e:
