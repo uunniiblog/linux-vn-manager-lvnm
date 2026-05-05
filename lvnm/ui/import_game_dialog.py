@@ -19,6 +19,7 @@ from runner_manager_kron4ek import RunnerManagerKron4ek
 from settings_manager import SettingsManager
 from model.game_card import GameCard
 from vndb_manager import VndbManager
+from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,11 @@ class ImportGameDialog(QDialog):
         editable_form = QFormLayout(editable_group)
         editable_form.setLabelAlignment(Qt.AlignLeft)
 
-        self.edit_name = QLineEdit(self.game_data.get("name", ""))
+        # VNDB autocomplete
+        self.edit_name = VndbAutocompleteLineEdit()
+        self.edit_name.setText(self.game_data.get("name", ""))
         editable_form.addRow(self.tr("Name *"), self.edit_name)
+        self.edit_name.vn_selected.connect(self._on_autocomplete_selected)
 
         path_layout = QHBoxLayout()
         self.edit_path = QLineEdit(self.game_data.get("path", ""))
@@ -416,6 +420,10 @@ class ImportGameDialog(QDialog):
             except Exception as e:
                 console_logger(f"VNDB fetch failed: {e}")
                 logger.error(f"VNDB fetch failed during import: {e}")
+
+    def _on_autocomplete_selected(self, vn_data: dict):
+        """Updates the VNDB input when an autocomplete result is clicked."""
+        self.edit_vndb.setText(vn_data.get("id", ""))
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
