@@ -5,6 +5,8 @@ import config
 import subprocess
 import shutil
 import shlex
+import threading
+import time
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -13,6 +15,9 @@ from model.game_card import GameCard, GameScope
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
 from settings_manager import SettingsManager
+from timetracker.utils_factory import get_desktop_utils
+from timetracker.system_utils import SystemUtils as TimeTrackUtils
+from timetracker.x11_utils import X11Utils
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +273,9 @@ class GameRunner:
             logging.error(f"Preparation failed: {e}")
             return False
 
-        if self.game.pre_launch_script.strip():
+        if self.game.pre_launch_script_wait and self.game.pre_launch_script.strip():
+            self._wait_for_game_then_run_script(self.game.pre_launch_script.strip())
+        elif self.game.pre_launch_script.strip():
             self.run_external_script(self.game.pre_launch_script.strip())
 
         self._log_run_command(Path(self.prefix_info["runner"]))
@@ -514,6 +521,9 @@ class GameRunner:
         try:
             # Launch detached
             cmd = ["bash"] + shlex.split(script_path)
+            logger.debug(f"run_external_script raw input : '{script_path}'")
+            logger.debug(f"run_external_script shlex tokens: {shlex.split(script_path)}")
+            logger.debug(f"run_external_script final cmd  : {cmd}")
             subprocess.Popen(
                 cmd,
                 env=self.env,
@@ -524,6 +534,41 @@ class GameRunner:
             )
         except Exception as e:
             logger.error(f"Failed to launch script {script_path}: {e}")
+
+    def _wait_for_game_then_run_script(self, script_path: str):
+        """
+        Spawns a background thread that polls until the game window is detected before calling run_external_script
+        20 attemps to grab the pid and window id. If wayland game and x11 utils then use /proc fallback
+        """
+        utils = get_desktop_utils()
+        process = os.path.basename(self.game.path)
+        is_proton_wayland = self.env.get("PROTON_ENABLE_WAYLAND") == "1"
+        def _is_game_running_poll():
+            max_attempts = 20
+            for attempt in range(1, max_attempts + 1):
+                logger.info(f"_wait_for_game_then_run_script: Waiting for game process... attempt {attempt}/{max_attempts}")
+                if is_proton_wayland and isinstance(utils, X11Utils):
+                    if self.is_running():
+                        logger.info(f"_wait_for_game_then_run_script: Game process detected after {attempt} attempt(s).")
+                        time.sleep(2)
+                        self.run_external_script(script_path)
+                        return
+                else:
+                    pid = TimeTrackUtils.get_pid_by_name(process)
+                    if pid:
+                        wid, title = utils.find_window_by_pid(pid, process)
+                        if wid and title:
+                            logger.info(f"_wait_for_game_then_run_script: Window detected  '{title}' (WID: {wid}). after {attempt} attempt(s). Launching script.")
+                            # headroom
+                            time.sleep(0.5)                        
+                            self.run_external_script(script_path)
+                            return
+
+                time.sleep(2)
+            logger.error(f"_wait_for_game_then_run_script: Game process not found after {max_attempts} attempts. Script NOT launched.")
+
+        t = threading.Thread(target=_is_game_running_poll, daemon=True, name="pre_launch_script_wait")
+        t.start()
     
     def scrub_appimage_environment(self):
         """Remove APPIMAGE ENVIRONMENT when running a game"""

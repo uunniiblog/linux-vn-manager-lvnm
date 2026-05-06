@@ -30,6 +30,7 @@ class GameCard:
     label: str = ""
     pre_launch_args: str = ""
     pre_launch_script: str = ""
+    pre_launch_script_wait: bool = False
     exit_script: str = ""
     arguments: str = ""
 

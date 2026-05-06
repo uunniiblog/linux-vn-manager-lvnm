@@ -1,7 +1,8 @@
 import config
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, 
-    QLineEdit, QLabel, QPushButton, QFileDialog
+    QLineEdit, QLabel, QPushButton, QFileDialog,
+    QCheckBox
 )
 from PySide6.QtCore import Qt, QSettings
 
@@ -51,11 +52,16 @@ class AdvancedSettingsDialog(QDialog):
         self.edit_pre_script = QLineEdit(getattr(self.current_game, "pre_launch_script", ""))
         self.btn_pre_script = QPushButton("...")
         self.btn_pre_script.clicked.connect(lambda: self.browse_file(self.edit_pre_script))
-        
+
         pre_script_layout = QHBoxLayout()
         pre_script_layout.addWidget(self.edit_pre_script)
         pre_script_layout.addWidget(self.btn_pre_script)
         form.addRow(self.tr("Pre-Launch Script:"), pre_script_layout)
+ 
+        # Pre-launch Script Wait
+        self.chk_pre_script_wait = QCheckBox(self.tr("Wait for game to open before executing script"))
+        self.chk_pre_script_wait.setChecked(getattr(self.current_game, "pre_launch_script_wait", False))
+        form.addRow("", self.chk_pre_script_wait)
 
         # Exit Script
         self.edit_exit_script = QLineEdit(getattr(self.current_game, "exit_script", ""))
@@ -104,6 +110,7 @@ class AdvancedSettingsDialog(QDialog):
         self.current_game.pre_launch_args = self.edit_pre_args.text()
         self.current_game.arguments = self.edit_arguments.text()
         self.current_game.pre_launch_script = self.edit_pre_script.text()
+        self.current_game.pre_launch_script_wait = self.chk_pre_script_wait.isChecked()
         self.current_game.exit_script = self.edit_exit_script.text()
         super().accept()
 
