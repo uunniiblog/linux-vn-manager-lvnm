@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
-    QMessageBox, QDialog, QListWidget, QListWidgetItem, QApplication
+    QMessageBox, QDialog,
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent
@@ -16,11 +16,12 @@ from game_manager import GameManager
 from prefix_manager import PrefixManager
 from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
-from vndb_manager import VndbManager, VndbWorker, VndbSearchWorker
+from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
+from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +37,6 @@ class GameSidebar(QFrame):
         self.is_running = None
         self.runner = None
         self.active_controller = None
-
-        # Search vndb
-        self.vndb_search_timer = QTimer()
-        self.vndb_cached_search_term = ""
-        self.vndb_cached_results = []
-        self.vndb_has_more = True 
-        self.vndb_search_timer.setSingleShot(True)
-        self.vndb_search_timer.timeout.connect(self.execute_vndb_search)
-        self.active_vndb_workers: list[VndbSearchWorker] = []
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
@@ -134,25 +126,13 @@ class GameSidebar(QFrame):
         tracking_layout.addRow(self.track_btn)
 
         form.addWidget(self.tracking_group)
-
-        # Autocomplete vndb search
-        self.autocomplete_list = QListWidget(self)
-        self.autocomplete_list.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
-        self.autocomplete_list.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.autocomplete_list.setFocusPolicy(Qt.NoFocus)
-        self.autocomplete_list.hide()
-        self.autocomplete_list.itemClicked.connect(self.on_autocomplete_selected)
-        # Monitor mouse press to hide the autocomplete
-        QApplication.instance().installEventFilter(self)
-        QApplication.instance().applicationStateChanged.connect(self._on_app_state_changed)
-        self.installEventFilter(self)
         
         # General Info
         gen_group = QGroupBox(self.tr("Edit Game"))
         gen_form = QFormLayout(gen_group)
         gen_form.setLabelAlignment(Qt.AlignLeft)
-        self.edit_name = QLineEdit()
-        self.edit_name.textEdited.connect(self.on_name_changed)
+        self.edit_name = VndbAutocompleteLineEdit()
+        self.edit_name.vn_selected.connect(self.on_vndb_item_selected)
         self.edit_path = QLineEdit()
         self.btn_path = QPushButton("...")
         self.btn_path.clicked.connect(self.browse_path)
@@ -305,111 +285,9 @@ class GameSidebar(QFrame):
             self.lbl_session_play.setText(stats.get("session_playtime", "00:00:00"))
             self.lbl_total_play.setText(stats.get("total_playtime", "00:00:00"))
 
-    def on_name_changed(self, new_text):
-        """Logic for the VNDB auto name search"""
-        min_length = 1 if SystemUtils.contains_japanese(new_text) else 3
-        if len(new_text) < min_length:
-            self.vndb_search_timer.stop()
-            #self.autocomplete_list.hide()
-            return
-
-        filtered = self.vndb_search_try_local_filter(new_text)
-        if filtered is not None:
-            logger.debug(f"Cache hit for '{new_text}': {len(filtered)} local matches")
-            self.update_autocomplete_popup(filtered)
-            return
-
-        logger.debug(f"No cache available for '{new_text}', scheduling API call")
-        self.vndb_search_timer.start(500)
-
-    def vndb_search_try_local_filter(self, text):
-        """Returns a filtered list if possible, or None if an API call is needed."""
-        if not self.vndb_cached_search_term:
-            return None
-
-        text_lower = text.lower()
-        cached_lower = self.vndb_cached_search_term.lower()
-
-        # Cache is only usable if it was complete (has_more=False) and the cached term is a prefix of the current text
-        if not self.vndb_has_more and text_lower.startswith(cached_lower):
-            return [vn for vn in self.vndb_cached_results if text_lower in vn["title"].lower()]
-
-        return None
-
-    def execute_vndb_search(self):
-        """Call VNDB search by name"""
-        search_term = self.edit_name.text()
-
-        filtered = self.vndb_search_try_local_filter(search_term)
-        if filtered is not None:
-            logger.debug(f"Cache hit at execute time for '{search_term}', skipping API call")
-            self.update_autocomplete_popup(filtered)
-            return
-
-        for worker in self.active_vndb_workers:
-            worker.cancel()
-
-        logger.debug(f"Executing API call for: {search_term}")
-        
-        # Store this as the new base cache term
-        self.vndb_cached_search_term = search_term
-        
-        worker = VndbSearchWorker(search_term)
-        worker.results_ready.connect(self.on_search_results_received)
-        worker.finished.connect(lambda: self.active_vndb_workers.remove(worker))
-        self.active_vndb_workers.append(worker)
-        worker.start()
-    
-    def on_search_results_received(self, term, results, has_more):
-        """ Receive results from VNDB"""
-        # Only update if the result is for the current text in the box
-        logger.debug(f"API returned {len(results)} results for '{term}' (has_more={has_more})")
-
-        self.vndb_cached_results = results
-        self.vndb_cached_search_term = term
-        self.vndb_has_more = has_more
-
-        if term == self.edit_name.text():
-            self.update_autocomplete_popup(results)
-
-    def update_autocomplete_popup(self, results):
-        """Display the popup autocomplete"""
-        if not results:
-            self.autocomplete_list.hide()
-            return
-
-        self.autocomplete_list.clear()
-        for vn in results:
-            item = QListWidgetItem(self.autocomplete_list)
-            item.setSizeHint(QSize(0, 80))
-            item.setData(Qt.UserRole, vn)
-            
-            widget = VndbResultWidget(vn)
-            self.autocomplete_list.addItem(item)
-            self.autocomplete_list.setItemWidget(item, widget)
-
-        # Dynamic size
-        target_width = self.edit_name.width()
-        target_max_height = self.window().height() // 3
-        n = self.autocomplete_list.count()
-        row_h = self.autocomplete_list.sizeHintForRow(0) if n > 0 else 80
-        content_height = n * row_h + 2 * self.autocomplete_list.frameWidth()
-        self.autocomplete_list.setFixedWidth(target_width)
-        self.autocomplete_list.setFixedHeight(min(content_height, target_max_height))
-
-        # Position the list under the QLineEdit
-        pos = self.edit_name.mapToGlobal(self.edit_name.rect().bottomLeft())
-        self.autocomplete_list.move(pos)
-        
-        self.autocomplete_list.show()
-        self.autocomplete_list.raise_()
-
-    def on_autocomplete_selected(self, item):
-        """Selected item from the autocomplete popup"""
-        vn_data = item.data(Qt.UserRole)
-        self.edit_name.setText(vn_data['title'])
-        self.edit_vndb.setText(vn_data['id'])
-        self.autocomplete_list.hide()
+    def on_vndb_item_selected(self, vn_data):
+        """Called when the VndbAutocompleteLineEdit emits a selection."""
+        self.edit_vndb.setText(vn_data.get('id', ''))
 
     def load_game(self, card: GameCard):
         """
@@ -1020,30 +898,3 @@ class CoverLabel(QLabel):
             super().setPixmap(scaled)
         else:
             super().clear()
-
-class VndbResultWidget(QWidget):
-    def __init__(self, vn_data, parent=None):
-        super().__init__(parent)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Left: Thumbnail
-        self.lbl_thumb = QLabel()
-        self.lbl_thumb.setFixedSize(50, 70)
-        self.lbl_thumb.setScaledContents(True)
-        if vn_data.get("local_temp_path"):
-            self.lbl_thumb.setPixmap(QPixmap(vn_data["local_temp_path"]))
-        layout.addWidget(self.lbl_thumb)
-        
-        # Right: Text info
-        text_layout = QVBoxLayout()
-        self.lbl_title = QLabel(vn_data.get("title", "Unknown"))
-        self.lbl_title.setStyleSheet("font-weight: bold; font-size: 12px;")
-        self.lbl_title.setWordWrap(True)
-        
-        self.lbl_id = QLabel(vn_data.get("id", ""))
-        self.lbl_id.setStyleSheet("color: #888; font-size: 10px;")
-        
-        text_layout.addWidget(self.lbl_title)
-        text_layout.addWidget(self.lbl_id)
-        layout.addLayout(text_layout)
