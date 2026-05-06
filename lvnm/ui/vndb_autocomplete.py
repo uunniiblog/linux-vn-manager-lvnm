@@ -35,7 +35,7 @@ class VndbAutocompleteLineEdit(QLineEdit):
 
         self.autocomplete_list = AutocompleteList()
         # Popup flag keeps it on top of parent windows and auto-closes on outside clicks
-        self.autocomplete_list.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
+        self.autocomplete_list.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
         # Prevent the popup from stealing focus from the text field
         self.autocomplete_list.setAttribute(Qt.WA_ShowWithoutActivating)
         self.autocomplete_list.itemPressed.connect(self.on_autocomplete_selected)
@@ -118,16 +118,22 @@ class VndbAutocompleteLineEdit(QLineEdit):
 
         target_width = self.width()
 
-        target_max_height = 300 
-        if self.window():
-            target_max_height = self.window().height() // 2
+        win_height = self.window().height() if self.window() else 600
+        if win_height > 800:
+            # For sidebar
+            target_max_height = win_height // 3
+        else:
+            # For small dialogs
+            target_max_height = win_height // 1.8
 
         n = self.autocomplete_list.count()
         row_h = self.autocomplete_list.sizeHintForRow(0) if n > 0 else 80
-        content_height = n * row_h + 2 * self.autocomplete_list.frameWidth()
+        content_height = n * row_h + (self.autocomplete_list.frameWidth() * 2)
+        absolute_min = min(content_height, 164)
+        final_height = max(absolute_min, min(content_height, target_max_height))
         
         self.autocomplete_list.setFixedWidth(target_width)
-        self.autocomplete_list.setFixedHeight(min(content_height, target_max_height))
+        self.autocomplete_list.setFixedHeight(final_height)
 
         # Position below the LineEdit
         pos = self.mapToGlobal(self.rect().bottomLeft())
