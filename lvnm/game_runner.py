@@ -506,20 +506,21 @@ class GameRunner:
         """
         Executes a script in a fully detached state.
         """
-        if not script_path or not os.path.exists(script_path):
+        if not script_path or not os.path.exists(script_path.split()[0]):
             return
 
         logger.info(f"Executing external script: {script_path}")
         
         try:
             # Launch detached
+            cmd = ["bash"] + shlex.split(script_path)
             subprocess.Popen(
-                ["bash", script_path],
+                cmd,
                 env=self.env,
                 cwd=self.game_dir,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True 
+                start_new_session=True
             )
         except Exception as e:
             logger.error(f"Failed to launch script {script_path}: {e}")
