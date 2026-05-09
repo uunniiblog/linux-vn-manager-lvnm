@@ -5,6 +5,7 @@ import sys
 import platform
 import subprocess
 import shutil
+import filecmp
 import json
 import config
 import logging
@@ -334,11 +335,14 @@ class SystemUtils:
             logger.error(f"[Error] Path does not exist: {folder_path}")
 
     @staticmethod
-    def get_cover_path(vndb_id: str) -> str:
+    def get_cover_path(cover_path: str = "", vndb_id: str = "") -> str:
         """
-        Searches for a cover image matching the VNDB ID in the covers directory.
+        Searches for a cover image matching cover_path or the VNDB ID in the covers directory.
         Returns the absolute path as a string if found, otherwise an empty string.
         """
+        if cover_path and Path(cover_path).exists():
+            return cover_path
+
         if not vndb_id:
             return ""
 
@@ -348,13 +352,59 @@ class SystemUtils:
             return ""
 
         # Search for any file extension matching the VNDB ID
-        # glob is used to handle .jpg, .png, .webp, etc.
-        matches = list(covers_dir.glob(f"{vndb_id}.*"))
+        matches = list(covers_dir.glob(f"{vndb_id}_p.*"))
+        if not matches:
+            # fallback check for original naming without _p to not break current covers
+            matches = list(covers_dir.glob(f"{vndb_id}.*"))
         
         if matches:
             return str(matches[0].absolute())
         
         return ""
+
+    @staticmethod
+    def save_image_to_covers(temp_path: str, vndb_id: str, role: str) -> str:
+        """
+        Image saving for Vertical Covers and Horizontal Layouts.
+        - role "vertical" -> suffix '_p'
+        - role "horizontal" -> suffix '_horizontal'
+        Returns the final absolute path as a string.
+        """
+        if not temp_path or not vndb_id:
+            return ""
+
+        temp_file = Path(temp_path)
+        if not temp_file.exists():
+            logging.warning(f"Temp image not found at: {temp_path}")
+            return ""
+
+        # Avoid circular imports by importing VndbManager here
+        # from vndb_manager import VndbManager
+        # dest_dir = VndbManager.get_covers_dir()
+        dest_dir = Path(SettingsManager().get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Determine suffix based on role
+        suffix = "_p" if role == "vertical" else "_horizontal"
+        final_filename = f"{vndb_id}{suffix}{temp_file.suffix}"
+        final_path = dest_dir / final_filename
+
+        try:
+            shutil.copy2(temp_path, final_path)
+            return str(final_path)
+        except Exception as e:
+            logging.error(f"Failed to copy image to covers folder: {e}")
+            return ""
+
+    @staticmethod
+    def are_files_identical(path1: str, path2: str) -> bool:
+        """Checks if two files are bitwise identical."""
+        if not path1 or not path2:
+            return False
+        p1, p2 = Path(path1), Path(path2)
+        if not p1.exists() or not p2.exists():
+            return False
+        return filecmp.cmp(p1, p2, shallow=False)
 
     @staticmethod
     def get_default_terminal():
@@ -557,7 +607,7 @@ class SystemUtils:
     def add_to_steam(game_card):
         exe_cmd, launch_options = SystemUtils.get_launch_command(game_card.name, for_steam=True)
         
-        icon_path = SystemUtils.get_cover_path(game_card.vndb) or ""
+        icon_path = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb) or ""
         game_dir = os.path.dirname(game_card.path)
 
         success = SteamManager.add_non_steam_game(

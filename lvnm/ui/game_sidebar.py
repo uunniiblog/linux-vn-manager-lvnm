@@ -519,11 +519,17 @@ class GameSidebar(QFrame):
         original_name = self.current_game.name
         old_vndb = self.current_game.vndb
 
+        logger.debug(f"[save_data] Before update — cover_path='{self.current_game.cover_path}' vndb='{self.current_game.vndb}'")
+
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
+
+        if old_vndb and not self.current_game.vndb:
+            logger.info(f"VNDB ID removed for {self.current_game.name}. Clearing cover path.")
+            self.current_game.cover_path = ""
         
         # Env Vars
         env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
@@ -562,6 +568,9 @@ class GameSidebar(QFrame):
             self.fetch_vndb_async(self.current_game.name, new_vndb)
 
         # Finalize UI
+        logger.debug(f"[save_data] After update — cover_path='{self.current_game.cover_path}' vndb='{self.current_game.vndb}' old_vndb='{old_vndb}'")
+        logger.debug(f"[save_data] Will fetch VNDB: {bool(new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle))} (ogtitle='{self.current_game.ogtitle}')")
+
         self.update_game_cover()
         self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
@@ -694,19 +703,23 @@ class GameSidebar(QFrame):
 
     def fetch_vndb_async(self, game_name, vndb_id):
         # Create and start the thread
-        self.vndb_thread = VndbWorker(game_name, vndb_id)
+        self.vndb_thread = VndbWorker(game_name, vndb_id, self.current_game.cover_path)
         self.vndb_thread.finished.connect(self.on_vndb_finished)
         self.vndb_thread.start()
 
     def on_vndb_finished(self, game_name, results):
+        logger.debug(f"[on_vndb_finished] fired for '{game_name}', current_game='{self.current_game.name if self.current_game else None}'")
         if results:
             # Get the jp title
+            vn_id = results[0].get('id')
             og_title = VndbManager.get_original_title(results[0])
             
-            # Update the JSON with jp title
+            # Update the JSON with jp title and cover
             game_card = GameManager.get_game(game_name)
             if game_card:
+                logger.debug(f"[on_vndb_finished] overwriting cover_path '{game_card.cover_path}' -> '{SystemUtils.get_cover_path(vndb_id=results[0].get('id'))}'")
                 game_card.ogtitle = og_title
+                game_card.cover_path = SystemUtils.get_cover_path(vndb_id=vn_id)
                 GameManager.update_game(game_name, game_card.to_dict())
 
             self.on_metadata_updated(game_name)
@@ -714,25 +727,31 @@ class GameSidebar(QFrame):
             # If looking at this game, refresh the cover/links
             if self.current_game and self.current_game.name == game_name:
                 self.current_game.ogtitle = og_title
+                self.current_game.cover_path = game_card.cover_path
                 self.update_game_cover()
                 logger.info(f"Background metadata update complete for {game_name}")
 
     def update_game_cover(self):
-        """Updates only the cover and links based on the current VNDB ID."""
+        """Shows cover if it has, also show links if it has vndb id."""
         card = self.current_game
-        if card and card.vndb and card.vndb.strip():
+        has_vndb = card and card.vndb and card.vndb.strip()
+        has_cover = card and card.cover_path
+
+        if has_vndb or has_cover:
             self.media_container.show()
-            
-            display_path = SystemUtils.get_cover_path(card.vndb)
+
+            display_path = SystemUtils.get_cover_path(card.cover_path, card.vndb)
             self.lbl_cover.set_pixmap_from_path(display_path)
 
-            # Update Links
-            vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
-            self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
-            
-            jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
-            egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
-            self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+            if has_vndb:
+                vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
+                self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
+                jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
+                egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
+                self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+            else:
+                self.lbl_vndb_link.clear()
+                self.lbl_egs_link.clear()
         else:
             self.media_container.hide()
             self.lbl_cover.set_pixmap_from_path(None)

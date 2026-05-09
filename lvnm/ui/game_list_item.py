@@ -150,7 +150,7 @@ class GameListItem(QWidget):
             self.date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         # Update Cover
-        local_cover = SystemUtils.get_cover_path(game_card.vndb)
+        local_cover = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb)
         if local_cover:
             pix = QPixmap(local_cover)
             if not pix.isNull():
@@ -317,7 +317,7 @@ class GameListItem(QWidget):
         runner.open_terminal(self.game_card.prefix)
 
     def shortcut(self):
-        SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.vndb)
+        SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path)
 
     def prompt_add_new_label(self):
         """Opens a dialog to create a new label, saves it, and applies it."""
