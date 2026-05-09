@@ -33,7 +33,7 @@ class VndbAutocompleteLineEdit(QLineEdit):
 
         self.textEdited.connect(self.on_name_changed)
 
-        self.autocomplete_list = AutocompleteList()
+        self.autocomplete_list = AutocompleteList(self)
         # Popup flag keeps it on top of parent windows and auto-closes on outside clicks
         self.autocomplete_list.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
         # Prevent the popup from stealing focus from the text field
