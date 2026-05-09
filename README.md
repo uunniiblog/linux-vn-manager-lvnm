@@ -81,7 +81,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
                 <li>Name: Will show the name, with the prefix and path below. </li>
                 <li>Last played date and playtime count.</li>
             </ul>
-        - Steam/desktop shortcut: Right click an entry to add. The application will be run headless without GUI in this mode. Timetracking will still work in the background if enabled.
+        - Steam/desktop shortcut: Right click an entry to add. The application will be run headless without GUI in this mode. Timetracking will still work in the background if enabled. Do note that the exit script will only be executed if the game closes in a natural way when the application is running through shortcut. If you close it through steam interface it will forcefully close the launcher before the exit script is executed.
         - Label: Can right click a game to create labels (Playing, Finished, etc) to group games in sections. Sections can be expaned or collapsed to hide all the games in one section. Can right click over the header of a section to delete it.
         - Export and Import: from the sidebar or right clicking a game you can export the configuration of the game and prefix in a json file. It can be imported with the Import button at the botton next to add game.
 4. Statistics tab: If timetracking has been enabled when you run a game it will count your playtime. This tab shows some simple graphs by app or global based on your playtime.
