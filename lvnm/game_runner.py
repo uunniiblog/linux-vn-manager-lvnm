@@ -524,9 +524,14 @@ class GameRunner:
             logger.debug(f"run_external_script raw input : '{script_path}'")
             logger.debug(f"run_external_script shlex tokens: {shlex.split(script_path)}")
             logger.debug(f"run_external_script final cmd  : {cmd}")
+
+            # Remove LD_PRELOAD to avoid issues with steam. Should not be needed for scripts
+            env = self.env
+            env.pop("LD_PRELOAD", None)
+
             subprocess.Popen(
                 cmd,
-                env=self.env,
+                env=env,
                 cwd=self.game_dir,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

@@ -97,7 +97,7 @@ class ImportGameDialog(QDialog):
         content_layout.addWidget(editable_group)
 
         # Read-only Game Fields 
-        game_ro_group = QGroupBox(self.tr("Game Settings (read-only)"))
+        game_ro_group = QGroupBox(self.tr("Game Settings"))
         game_ro_form = QFormLayout(game_ro_group)
         game_ro_form.setLabelAlignment(Qt.AlignLeft)
 
@@ -135,7 +135,7 @@ class ImportGameDialog(QDialog):
         content_layout.addWidget(game_ro_group)
 
         #  Read-only Prefix Fields
-        prefix_ro_group = QGroupBox(self.tr("Prefix / Runner (read-only)"))
+        prefix_ro_group = QGroupBox(self.tr("Prefix Settings"))
         prefix_ro_form = QFormLayout(prefix_ro_group)
         prefix_ro_form.setLabelAlignment(Qt.AlignLeft)
 
