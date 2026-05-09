@@ -110,7 +110,7 @@ class SteamManager:
         return binascii.crc32(unique_id.encode('utf-8')) | 0x80000000
 
     @staticmethod
-    def set_game_cover(vdf_path, exe, name, icon_path):
+    def set_game_cover(vdf_path, exe, name, icon_path, layout_path):
         """Copies the icon_path to the Steam grid folder with the correct ID."""
         if not icon_path or not os.path.exists(icon_path):
             return
@@ -126,7 +126,6 @@ class SteamManager:
 
         # Add vertical cover
         target_vertical = grid_dir / f"{appid}p{ext}"
-        # target_horizontal = grid_dir / f"{appid}{ext}"
         
         try:
             shutil.copy2(icon_path, target_vertical)
@@ -134,8 +133,22 @@ class SteamManager:
         except Exception as e:
             logging.error(f"Failed to copy cover art: {e}")
 
+        # Add horizontal cover
+        if layout_path:
+            ext_h = os.path.splitext(layout_path)[1] or ".png"
+            # Normal Horizontal Grid used in recent games/lists
+            target_horizontal = grid_dir / f"{appid}{ext_h}" 
+            # Hero Background used as the banner
+            target_hero = grid_dir / f"{appid}_hero{ext_h}"
+            try:
+                shutil.copy2(layout_path, target_horizontal)
+                shutil.copy2(layout_path, target_hero)
+                logging.info(f"Horizontal layouts set for {name} Path: {target_horizontal} {target_hero}")
+            except Exception as e:
+                logging.error(f"Failed to copy horizontal layout art: {e}")
+
     @staticmethod
-    def add_non_steam_game(name, exe, start_dir, icon, options=""):
+    def add_non_steam_game(name, exe, start_dir, icon_path, layout_path, options=""):
         vdf_paths = SteamManager.get_shortcuts_paths()
         if not vdf_paths:
             return False
@@ -155,7 +168,7 @@ class SteamManager:
                 if s.get("AppName") == name:
                     s["Exe"] = vdf_exe
                     s["StartDir"] = vdf_start_dir
-                    s["icon"] = icon
+                    s["icon"] = icon_path
                     s["LaunchOptions"] = options
                     found = True
                     break
@@ -166,13 +179,13 @@ class SteamManager:
                     "AppName": name,
                     "Exe": vdf_exe,
                     "StartDir": vdf_start_dir,
-                    "icon": icon,
+                    "icon": icon_path,
                     "LaunchOptions": options
                 })
             
             # Write merged data back
             binary_data = SteamManager._to_binary_vdf(existing_shortcuts)
-            SteamManager.set_game_cover(path, exe, name, icon)
+            SteamManager.set_game_cover(path, exe, name, icon_path, layout_path)
             try:
                 with open(path, "wb") as f:
                     f.write(binary_data)

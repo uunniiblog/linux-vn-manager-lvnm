@@ -154,7 +154,6 @@ class AdvancedSettingsDialog(QDialog):
         self.main_scroll.setWidget(self.scroll_content)
         self.main_outer_layout.addWidget(self.main_scroll)
 
-
         # State tracking for image combo boxes
         self.image_combos = []
         self.active_image_worker = None
@@ -192,11 +191,11 @@ class AdvancedSettingsDialog(QDialog):
         
         # Only touch images if a search was actively performed
         if self.images_searched:            
-            # We reset paths here because if they are in "Search Mode", 
-            # any combo left as "None" means they want to remove that image.
+            # If user searched but left every combo empty then reset variables count as deleted images
             self.current_game.cover_path = ""
             self.current_game.layout_path = ""
 
+            # Save paths of combos selected
             if self.selected_vndb_id and hasattr(self, 'image_combos'):
                 for combo in self.image_combos:
                     role_index = combo.currentIndex()
@@ -217,7 +216,6 @@ class AdvancedSettingsDialog(QDialog):
                             temp_path, self.selected_vndb_id, "horizontal"
                         )
 
-        logger.debug(f"[AdvancedSettings.accept] cover_path='{self.current_game.cover_path}' layout_path='{self.current_game.layout_path}'")
         self.current_game.umu_store = self.edit_umu_store.text()
         self.current_game.umu_gameid = self.edit_umu_id.text()
         self.current_game.pre_launch_args = self.edit_pre_args.text()

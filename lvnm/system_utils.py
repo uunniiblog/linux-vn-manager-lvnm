@@ -378,9 +378,6 @@ class SystemUtils:
             logging.warning(f"Temp image not found at: {temp_path}")
             return ""
 
-        # Avoid circular imports by importing VndbManager here
-        # from vndb_manager import VndbManager
-        # dest_dir = VndbManager.get_covers_dir()
         dest_dir = Path(SettingsManager().get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
         dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -608,18 +605,20 @@ class SystemUtils:
         exe_cmd, launch_options = SystemUtils.get_launch_command(game_card.name, for_steam=True)
         
         icon_path = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb) or ""
+        layout_path = game_card.layout_path or ""
         game_dir = os.path.dirname(game_card.path)
 
         success = SteamManager.add_non_steam_game(
             name=f"LVNM: {game_card.name}",
             exe=exe_cmd,
             start_dir=game_dir,
-            icon=icon_path,
+            icon_path=icon_path,
+            layout_path=layout_path,
             options=launch_options
         )
         
         if success:
-            logging.info(f"Added {game_card.name} to Steam. Please RESTART Steam.")
+            logging.info(f"Added {game_card.name} to Steam. RESTART Steam to show up.")
 
     @staticmethod
     def contains_japanese(text):

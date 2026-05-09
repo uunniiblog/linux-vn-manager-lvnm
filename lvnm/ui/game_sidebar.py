@@ -519,8 +519,6 @@ class GameSidebar(QFrame):
         original_name = self.current_game.name
         old_vndb = self.current_game.vndb
 
-        logger.debug(f"[save_data] Before update — cover_path='{self.current_game.cover_path}' vndb='{self.current_game.vndb}'")
-
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
@@ -543,7 +541,6 @@ class GameSidebar(QFrame):
         # Gamescope
         self.current_game.gamescope.enabled = "true" if self.gs_enabled.isChecked() else "false"
         self.current_game.gamescope.parameters = self.gs_params.text()
-
 
         # Execute Save
         if is_new_game:
@@ -568,9 +565,6 @@ class GameSidebar(QFrame):
             self.fetch_vndb_async(self.current_game.name, new_vndb)
 
         # Finalize UI
-        logger.debug(f"[save_data] After update — cover_path='{self.current_game.cover_path}' vndb='{self.current_game.vndb}' old_vndb='{old_vndb}'")
-        logger.debug(f"[save_data] Will fetch VNDB: {bool(new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle))} (ogtitle='{self.current_game.ogtitle}')")
-
         self.update_game_cover()
         self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
