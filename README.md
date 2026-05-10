@@ -8,7 +8,7 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - Create and manage prefixes with video codecs and winetricks easily from interface.
  - Game management to test games easily in all diferent prefixes with useful environment variables for VNs.
  - Real time tracking support to have an accurate play count (Check Timetracking section for details).
- - VNDB api integration to get covers and links.
+ - VNDB and SteamgridDB api integration to get covers images, hero layouts and direct links.
  - Import and export game and prefixes configuration.
  - Easy texthooking.
  - Create Steam shortcuts with covers for the Steam Deck.
@@ -74,7 +74,7 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
             - Pre launch script: bash script to be executed before the game. There is a "Wait for game to open" checkbox that detects the game window is open (It uses DesktopUtils, so if the game is running with wayland in a different desktop than KDE it won't work correctly, in this case add a sleep to your script).
             - Post launch script: bash script to be executed when the game is detected to be closed. Do note that if the launcher is closed by this point it won't execute the script. In Gaming Mode this won't be executed if you force exit the game through Steam interface instead of closing the game naturally (Will try to fix at some point).
             - Vndb release images: Search for a game in the vndb database, it will pull all images found in the game cover and releases. Can choose a vertical cover and a horizontal layout to be used with Steam shortcuts.
-            - SteamGridDB images: Search for a game name in the SteamGrid database, will fetch all grids and heroes images so can also select a vertical cover and horizontal layout from here. Requires your own api key https://www.steamgriddb.com/profile/preferences/api to be added in the settings tab
+            - SteamGridDB images: Search for a game name in the SteamGrid database, will fetch all grids and heroes images so can also select a vertical cover and horizontal layout from here. Requires your own api key https://www.steamgriddb.com/profile/preferences/api to be added in the settings tab.
     - Edit game: Click one game from the list to show current data to edit. Same fields. Can also Start game from there.
     - Run in prefix: Run a game in a prefix without adding an entry, maybe useful to run some installers quickly. Environment variables will be gotten from global ones at settings.
     - Search: Filter games by name.
