@@ -67,7 +67,14 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
         - Gamescope: Enable/disable gamescope and launch parameters, example: -W 3840 -H 2160 -f -r 60. Can be configured in settings to be filled automatically.
         - Environment Variables: Enable/Disable them as they fit for your game. Mouse over them to show the exact command. Can be configured in settings to be filled automatically. There are a few common environment variables preloaded in the application, but can add more or remove them freely from settings tab.
         - Some variables are exclusive to proton/wine, won't show if they don't apply.
-        - Advanced settings: Opens a dialog with extra options that are rarely used: Umu store and Umu ID for proton runners, pre launch commands, arguments, pre launch and post exit script.
+        - Advanced settings: Opens a dialog with extra options that are rarely used:
+            - Umu store and Umu ID fields when using a prefix with a proton runner in the game.
+            - Pre launch command: For linux pre launch commands like mangohud, gamemoderun, obs-gamecapture, etc.
+            - Arguments: For window games/application that take a parameter, example notepad.exe C:\test.txt to open text.txt directly.
+            - Pre launch script: bash script to be executed before the game. There is a "Wait for game to open" checkbox that detects the game window is open (It uses DesktopUtils, so if the game is running with wayland in a different desktop than KDE it won't work correctly, in this case add a sleep to your script).
+            - Post launch script: bash script to be executed when the game is detected to be closed. Do note that if the launcher is closed by this point it won't execute the script. In Gaming Mode this won't be executed if you force exit the game through Steam interface instead of closing the game naturally (Will try to fix at some point).
+            - Vndb release images: Search for a game in the vndb database, it will pull all images found in the game cover and releases. Can choose a vertical cover and a horizontal layout to be used with Steam shortcuts.
+            - SteamGridDB images: Search for a game name in the SteamGrid database, will fetch all grids and heroes images so can also select a vertical cover and horizontal layout from here. Requires your own api key https://www.steamgriddb.com/profile/preferences/api to be added in the settings tab
     - Edit game: Click one game from the list to show current data to edit. Same fields. Can also Start game from there.
     - Run in prefix: Run a game in a prefix without adding an entry, maybe useful to run some installers quickly. Environment variables will be gotten from global ones at settings.
     - Search: Filter games by name.

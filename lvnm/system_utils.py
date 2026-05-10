@@ -274,6 +274,11 @@ class SystemUtils:
             return False
 
     @staticmethod
+    def get_extension(filename: str) -> str:
+        """Returns the extension (including dot) from a path or URL."""
+        return Path(filename).suffix
+
+    @staticmethod
     def get_runtime_type() -> str:
         """Returns the runtime environment type."""
         if os.environ.get("APPDIR"):

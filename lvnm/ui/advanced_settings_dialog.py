@@ -1,16 +1,19 @@
 import config
 import logging
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, 
+    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QLineEdit, QLabel, QPushButton, QFileDialog,
-    QCheckBox, QGroupBox, QScrollArea, QWidget, 
-    QGridLayout, QComboBox, QStackedWidget
+    QCheckBox, QGroupBox, QScrollArea, QWidget,
+    QGridLayout, QComboBox, QStackedWidget,
+    QFrame, QSplitter
 )
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtGui import QPixmap
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from vndb_manager import VndbReleaseImagesWorker
 from system_utils import SystemUtils
+from steamgrid_manager import SteamGridDbSearchWorker, SteamGridDbImagesWorker, SteamGridDbManager
+from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +26,32 @@ class AdvancedSettingsDialog(QDialog):
         self.setMinimumWidth(450)
         self.resize(550, 600)
 
+        # Load Stored UI settings
+        self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
+
         self.images_searched = False
         self.current_game = current_game
         self.selected_vndb_id = self.current_game.vndb
 
-        # Load Stored UI settings
-        self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
+        self.sgdb_api_key = SettingsManager().get(config.USER_CONF_SGDB_API_KEY, "")
+        self.sgdb_game_id = None
+        self.active_sgdb_search_worker = None
+        self._sgdb_valid_items = []
+        self._vndb_image_paths = []
 
+        # Debounce timer for SGDB grid resize
+        self._sgdb_resize_timer = QTimer(self)
+        self._sgdb_resize_timer.setSingleShot(True)
+        self._sgdb_resize_timer.setInterval(150)
+        self._sgdb_resize_timer.timeout.connect(self._sgdb_rebuild_grid)
+
+        # Debounce timer for the VNDB grid resize
+        self._vndb_resize_timer = QTimer(self)
+        self._vndb_resize_timer.setSingleShot(True)
+        self._vndb_resize_timer.setInterval(150)
+        self._vndb_resize_timer.timeout.connect(self._vndb_rebuild_grid)
+
+        # Main layout
         self.main_outer_layout = QVBoxLayout(self)
         self.main_scroll = QScrollArea()
         self.main_scroll.setWidgetResizable(True)
@@ -38,7 +60,6 @@ class AdvancedSettingsDialog(QDialog):
 
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignLeft)
-
 
         # UMU Fields
         self.edit_umu_store = QLineEdit(getattr(self.current_game, "umu_store", ""))
@@ -95,7 +116,7 @@ class AdvancedSettingsDialog(QDialog):
         # Space form from image section
         self.scroll_layout.addSpacing(10)
 
-        self.lbl_vndb_instructions = QLabel(self.tr("Note: You can only select 1 vertical cover and 1 horizontal layout image for Steam."))
+        self.lbl_vndb_instructions = QLabel(self.tr("Note: You can only select 1 vertical cover and 1 horizontal layout image to be used with the Steam shortcut."))
         self.lbl_vndb_instructions.setStyleSheet("font-style: italic;")
         self.lbl_vndb_instructions.setWordWrap(True)
         self.scroll_layout.addWidget(self.lbl_vndb_instructions)
@@ -131,7 +152,6 @@ class AdvancedSettingsDialog(QDialog):
         self.vndb_group = QGroupBox(self.tr("VNDB Release Images"))
         vndb_inner_layout = QVBoxLayout(self.vndb_group)
 
-        # Autocomplete Search Bar
         self.search_bar = VndbAutocompleteLineEdit(self)
         self.search_bar.setPlaceholderText(self.tr("Search VNDB to fetch release images..."))
         self.search_bar.vn_selected.connect(self.on_vn_selected)
@@ -143,19 +163,71 @@ class AdvancedSettingsDialog(QDialog):
         self.lbl_loading.setAlignment(Qt.AlignCenter)
         self.vndb_stack.addWidget(self.lbl_loading)
 
-        # Page 1: Scroll Area for Images
         self.gallery_container = QWidget()
         self.gallery_layout = QGridLayout(self.gallery_container)
         self.vndb_stack.addWidget(self.gallery_container)
 
         vndb_inner_layout.addWidget(self.vndb_stack)
-        self.scroll_layout.addWidget(self.vndb_group)
 
         self.main_scroll.setWidget(self.scroll_content)
         self.main_outer_layout.addWidget(self.main_scroll)
 
-        # State tracking for image combo boxes
-        self.image_combos = []
+        self.scroll_layout.addSpacing(10)
+
+        # SteamGridDB
+        self.sgdb_group = QGroupBox(self.tr("SteamGridDB Images"))
+        sgdb_main_layout = QVBoxLayout(self.sgdb_group)
+
+        sgdb_search_layout = QHBoxLayout()
+        self.sgdb_search_edit = QLineEdit(self.current_game.name)
+        self.sgdb_search_edit.setPlaceholderText(self.tr("Search SteamGridDB..."))
+        self.sgdb_search_edit.returnPressed.connect(self._sgdb_on_search)
+        
+        btn_sgdb_search = QPushButton(self.tr("Search SGDB"))
+        btn_sgdb_search.clicked.connect(self._sgdb_on_search)
+        
+        sgdb_search_layout.addWidget(self.sgdb_search_edit)
+        sgdb_search_layout.addWidget(btn_sgdb_search)
+        sgdb_main_layout.addLayout(sgdb_search_layout)
+
+        self.sgdb_results_layout = QVBoxLayout()
+        sgdb_main_layout.addLayout(self.sgdb_results_layout)
+
+        self.lbl_sgdb_status = QLabel("")
+        self.lbl_sgdb_status.setStyleSheet("color: #888;")
+        sgdb_main_layout.addWidget(self.lbl_sgdb_status)
+
+        self.sgdb_images_widget = QWidget()
+        self.sgdb_images_layout = QGridLayout(self.sgdb_images_widget)
+        self.sgdb_images_layout.setSpacing(10)
+        self.sgdb_images_layout.setContentsMargins(0, 0, 0, 0)
+        self.sgdb_images_layout.setAlignment(Qt.AlignTop)
+
+        sgdb_main_layout.addWidget(self.sgdb_images_widget)
+
+        # Qsplitter spacing
+        self.groups_splitter = QSplitter(Qt.Vertical)        
+        self.groups_splitter.addWidget(self.vndb_group)
+        self.groups_splitter.addWidget(self.sgdb_group)        
+        self.groups_splitter.setChildrenCollapsible(True)         
+        self.vndb_group.setMinimumHeight(0)
+        self.sgdb_group.setMinimumHeight(0)
+        self.groups_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #333;
+                height: 6px;
+                margin: 2px 0px;
+            }
+            QSplitter::handle:hover { background-color: #555; }
+        """)
+                
+        self.scroll_layout.addWidget(self.groups_splitter)
+
+        # State Tracking
+        self.main_scroll.setWidget(self.scroll_content)
+        self.main_outer_layout.addWidget(self.main_scroll)
+        self.vndb_image_combos = []
+        self.sgdb_image_combos = []
         self.active_image_worker = None
 
         # Save / Cancel Buttons
@@ -189,24 +261,20 @@ class AdvancedSettingsDialog(QDialog):
     def accept(self):
         """Saves values directly back to the unsaved in-memory game card."""       
         
-        # Only touch images if a search was actively performed
+        # Process VNDB image selections
         if self.images_searched:            
-            # If user searched but left every combo empty then reset variables count as deleted images
+            # If user searched but left every combo empty, reset counts as deleted images
             self.current_game.cover_path = ""
             self.current_game.layout_path = ""
 
-            # Save paths of combos selected
-            if self.selected_vndb_id and hasattr(self, 'image_combos'):
-                for combo in self.image_combos:
+            if self.selected_vndb_id:
+                for combo in self.vndb_image_combos:
                     role_index = combo.currentIndex()
                     if role_index == 0: 
                         continue
-                    
-                    # Fetch the path directly from the combo box property
                     temp_path = combo.property("image_path")
                     if not temp_path:
                         continue
-                    
                     if role_index == 1:
                         self.current_game.cover_path = SystemUtils.save_image_to_covers(
                             temp_path, self.selected_vndb_id, "vertical"
@@ -215,6 +283,32 @@ class AdvancedSettingsDialog(QDialog):
                         self.current_game.layout_path = SystemUtils.save_image_to_covers(
                             temp_path, self.selected_vndb_id, "horizontal"
                         )
+
+        # SteamGridDB image selections
+        if self.sgdb_game_id and self.sgdb_api_key:
+            sgdb_id_str = f"sgdb{self.sgdb_game_id}"
+
+            for combo in self.sgdb_image_combos:
+                role_index = combo.currentIndex()
+                if role_index == 0:
+                    continue
+                parent_widget = combo.parentWidget()
+                if not hasattr(parent_widget, "item"):
+                    continue
+                item = parent_widget.item
+                if role_index == 1:
+                    saved = self._sgdb_save_full_image(item, sgdb_id_str, "vertical")
+                    if saved:
+                        self.current_game.cover_path = saved
+                elif role_index == 2:
+                    saved = self._sgdb_save_full_image(item, sgdb_id_str, "horizontal")
+                    if saved:
+                        self.current_game.layout_path = saved
+
+        logger.debug(
+            f"[AdvancedSettings.accept] cover_path='{self.current_game.cover_path}' "
+            f"layout_path='{self.current_game.layout_path}'"
+        )
 
         self.current_game.umu_store = self.edit_umu_store.text()
         self.current_game.umu_gameid = self.edit_umu_id.text()
@@ -226,12 +320,11 @@ class AdvancedSettingsDialog(QDialog):
         super().accept()
 
     def on_vn_selected(self, vn_data):
-        """Triggered when user clicks a game in the autocomplete popup."""
+        """Fetches release images for a selected VNDB entry."""
         self.selected_vndb_id = vn_data.get("id")
-
         self.images_searched = True
 
-        # Try to get the main cover url from the vn_data to ensure it's included
+        # Get the main cover url from the vn_data to ensure it's included
         main_cover_url = vn_data.get("image", {}).get("url") if vn_data.get("image") else None
 
         if not self.selected_vndb_id:
@@ -240,7 +333,7 @@ class AdvancedSettingsDialog(QDialog):
         # Clear existing images
         self.clear_image_gallery()
         
-        # Show loading state seamlessly
+        # Show loading state
         self.lbl_loading.setText(self.tr("Fetching images..."))
         self.vndb_stack.setCurrentIndex(0)
 
@@ -254,8 +347,10 @@ class AdvancedSettingsDialog(QDialog):
         self.active_image_worker.start()
 
     def clear_image_gallery(self):
-        """Removes all widgets from the scroll grid layout."""
-        self.image_combos.clear()
+        """Removes all widgets from the VNDB scroll grid layout."""
+        self._vndb_image_paths = []
+        self._vndb_resize_timer.stop()
+        self.vndb_image_combos.clear()
         while self.gallery_layout.count():
             item = self.gallery_layout.takeAt(0)
             widget = item.widget()
@@ -263,7 +358,7 @@ class AdvancedSettingsDialog(QDialog):
                 widget.deleteLater()
 
     def populate_image_gallery(self, image_paths):
-        """Renders the downloaded images into the grid with combo boxes."""
+        """Initializes the gallery view with fetched images."""
         self.clear_image_gallery()
 
         if not image_paths:
@@ -271,51 +366,88 @@ class AdvancedSettingsDialog(QDialog):
             self.vndb_stack.setCurrentIndex(0)
             return
 
-        # Switch view to the scroll area
         self.vndb_stack.setCurrentIndex(1)
+        self._vndb_image_paths = list(image_paths)
+        self._vndb_rebuild_grid()
 
-        # 3 columns
-        columns = 3
+    def _vndb_rebuild_grid(self):
+        """Recalculates VNDB grid layout based on current dialog width."""
+        if not self._vndb_image_paths:
+            return
+
+        MAX_HEIGHT = 200
+
+        # Snapshot current combo selections before clearing
+        previous_selections: dict[str, int] = {}
+        for combo in self.vndb_image_combos:
+            path = combo.property("image_path")
+            if path:
+                previous_selections[path] = combo.currentIndex()
+
+        # Clear the grid and combo tracking list
+        self.vndb_image_combos.clear()
+        while self.gallery_layout.count():
+            item = self.gallery_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        # Measure scaled widths for all valid paths
+        valid_paths = []  # list of (path, scaled_width)
+        for path in self._vndb_image_paths:
+            pixmap = QPixmap(path)
+            if pixmap.isNull():
+                continue
+            ph = pixmap.height()
+            scaled_w = int(pixmap.width() * MAX_HEIGHT / ph) if ph > 0 else MAX_HEIGHT
+            valid_paths.append((path, scaled_w))
+
+        if not valid_paths:
+            return
+
+        # Determine available width
+        spacing = self.gallery_layout.spacing()
+        available_w = self.main_scroll.viewport().width() - 36
+        if available_w <= 0:
+            available_w = self.width() - 36
+
+        # Compute column count
+        max_img_w = max(scaled_w for _, scaled_w in valid_paths)
+        columns = max(1, (available_w + spacing) // (max_img_w + spacing))
+
+        # Build grid
         row, col = 0, 0
-
-        # Max image size
-        MAX_HEIGHT = 200 
-
-        for path in image_paths:
+        for path, _ in valid_paths:
             container = QWidget()
             cont_layout = QVBoxLayout(container)
             cont_layout.setContentsMargins(5, 5, 5, 5)
 
-            # Image Label
             lbl_img = QLabel()
             lbl_img.setAlignment(Qt.AlignCenter)
-            lbl_img.setFixedHeight(MAX_HEIGHT) # Keep row heights uniform
-            
+            lbl_img.setFixedHeight(MAX_HEIGHT)
+
             pixmap = QPixmap(path)
             if not pixmap.isNull():
-                # Scaling to height to maintain aspect ratio as requested previously
-                scaled_pixmap = pixmap.scaledToHeight(MAX_HEIGHT, Qt.SmoothTransformation)
-                lbl_img.setPixmap(scaled_pixmap)
+                lbl_img.setPixmap(pixmap.scaledToHeight(MAX_HEIGHT, Qt.SmoothTransformation))
             else:
                 lbl_img.setText(self.tr("Invalid Image"))
-            
-            # Combo Box
+
             combo = QComboBox()
             combo.addItems([self.tr("None"), self.tr("Vertical Cover"), self.tr("Horizontal Layout")])
             combo.setProperty("image_path", path)
-
-            # Block signals to prevent "mutually exclusive" logic from firing during setup
             combo.blockSignals(True)
 
-            # Check both cover_path and layout_path for pre-selection
-            if self.current_game.cover_path and SystemUtils.are_files_identical(path, self.current_game.cover_path):
+            if path in previous_selections:
+                # Restore user's in-session selection
+                combo.setCurrentIndex(previous_selections[path])
+            elif self.current_game.cover_path and SystemUtils.are_files_identical(path, self.current_game.cover_path):
                 combo.setCurrentIndex(1)
             elif self.current_game.layout_path and SystemUtils.are_files_identical(path, self.current_game.layout_path):
                 combo.setCurrentIndex(2)
-            combo.blockSignals(False)
 
+            combo.blockSignals(False)
             combo.currentIndexChanged.connect(lambda idx, c=combo: self.on_image_role_changed(idx, c))
-            self.image_combos.append(combo)
+            self.vndb_image_combos.append(combo)
 
             cont_layout.addWidget(lbl_img)
             cont_layout.addWidget(combo)
@@ -328,58 +460,246 @@ class AdvancedSettingsDialog(QDialog):
                 row += 1
 
     def on_image_role_changed(self, index, changed_combo):
-        """Ensures mutual exclusivity for 'Vertical Cover' (index 1) and 'Horizontal Layout' (index 2)."""
-        if index == 0:  # "None" selected
+        """
+        Ensures mutual exclusivity for 'Vertical Cover' (index 1) and 'Horizontal Layout'
+        (index 2) across both the VNDB and SGDB sections: only one of each role can be
+        selected at any time in the entire dialog.
+        """
+        if index == 0:
             return
 
-        # Temporarily block signals to avoid recursive triggers
-        for combo in self.image_combos:
+        all_combos = self.vndb_image_combos + self.sgdb_image_combos
+
+        # Block signals on all combos to avoid recursive triggers
+        for combo in all_combos:
             combo.blockSignals(True)
 
-        for combo in self.image_combos:
-            if combo != changed_combo:
-                # If another combo has the same role selected, reset it to "None"
-                if combo.currentIndex() == index:
-                    combo.setCurrentIndex(0)
+        for combo in all_combos:
+            if combo != changed_combo and combo.currentIndex() == index:
+                combo.setCurrentIndex(0)
 
-        for combo in self.image_combos:
+        for combo in all_combos:
             combo.blockSignals(False)
 
     def _update_current_asset_thumbnails(self):
-        """Updates the small previews of currently saved images."""
-        has_assets = False
-        MAX_HEIGHT = 160
-
-        import os
-
-        def set_preview(label, path, placeholder_text, default_width):
-            if path and os.path.exists(path):
-                pix = QPixmap(path)
-                if not pix.isNull():
-                    # Scale based on height while keeping the original aspect ratio
-                    scaled_pix = pix.scaledToHeight(MAX_HEIGHT, Qt.SmoothTransformation)
-                    label.setPixmap(scaled_pix)
-                    # Adjust label width so it perfectly fits the image
-                    label.setFixedWidth(scaled_pix.width())
-                    return True
-            
-            # Fallback if image doesn't exist
-            label.clear()
-            label.setText(self.tr(placeholder_text))
-            label.setFixedWidth(default_width)
-            return False
-
-
-        v_exists = set_preview(self.curr_v_label, self.current_game.cover_path, "No Cover", 112)
-        h_exists = set_preview(self.curr_h_label, self.current_game.layout_path, "No Layout", 200)
-            
+        """Refreshes the thumbnail previews of saved assets."""
+        v_exists = self._set_thumbnail_preview(self.curr_v_label, self.current_game.cover_path, self.tr("No Cover"), 112)
+        h_exists = self._set_thumbnail_preview(self.curr_h_label, self.current_game.layout_path, self.tr("No Layout"), 200)
         self.current_assets_box.setVisible(v_exists or h_exists)
+
+    def _set_thumbnail_preview(self, label, path, placeholder_text, default_width):
+        """Sets a scaled pixmap to a label or displays placeholder text."""
+        MAX_HEIGHT = 160
+        pix = QPixmap(path)
+        if not pix.isNull():
+            scaled_pix = pix.scaledToHeight(MAX_HEIGHT, Qt.SmoothTransformation)
+            label.setPixmap(scaled_pix)
+            label.setFixedWidth(scaled_pix.width())
+            return True
+        
+        label.clear()
+        label.setText(placeholder_text)
+        label.setFixedWidth(default_width)
+        return False
+
+    def _sgdb_save_full_image(self, item: dict, game_id_str: str, role: str) -> str:
+        """Downloads full SGDB image or falls back to local thumbnail."""
+        full_url = item.get("full_url", "")
+        
+        if full_url:
+            saved_path = SteamGridDbManager.download_full_image(full_url, game_id_str, role)
+            if saved_path:
+                return saved_path
+
+        # Fall back to already downloaded thumb, should never happen tho
+        return SystemUtils.save_image_to_covers(item["local_path"], game_id_str, role)
+
+    def _sgdb_on_search(self):
+        """Initiates a search on SteamGridDB."""
+        if not self.sgdb_api_key:
+            self.lbl_sgdb_status.setText(self.tr("API Key missing in settings!"))
+            self.lbl_sgdb_status.show()
+            return
+
+        term = self.sgdb_search_edit.text().strip()
+        if not term:
+            return
+
+        self.lbl_sgdb_status.setText(self.tr("Searching..."))
+        self.lbl_sgdb_status.show()
+        
+        # Clear previous search results
+        while self.sgdb_results_layout.count():
+            child = self.sgdb_results_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        # Clear the image grid as well for a fresh search
+        while self.sgdb_images_layout.count():
+            child = self.sgdb_images_layout.takeAt(0)
+            if child.widget():
+                widget = child.widget()
+                # Clean up combo box tracking
+                if hasattr(widget, "combo") and widget.combo in self.sgdb_image_combos:
+                    self.sgdb_image_combos.remove(widget.combo)
+                widget.deleteLater()
+
+        # Handle worker logic
+        if self.active_sgdb_search_worker:
+            self.active_sgdb_search_worker.cancel()
+
+        self.active_sgdb_search_worker = SteamGridDbSearchWorker(term, self.sgdb_api_key)
+        self.active_sgdb_search_worker.results_ready.connect(self._on_sgdb_search_results)
+        self.active_sgdb_search_worker.start()
+
+    def _on_sgdb_search_results(self, results):
+        """Displays list of games found on SGDB."""
+        self.lbl_sgdb_status.hide()
+        while self.sgdb_results_layout.count():
+            child = self.sgdb_results_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+                
+        if not results:
+            lbl = QLabel(self.tr("No games found."))
+            self.sgdb_results_layout.addWidget(lbl)
+            return
+
+        for game in results:
+            item_widget = QWidget()
+            item_layout = QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(0, 0, 0, 0)
+            
+            btn = QPushButton(game["name"])
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, gid=game["id"]: self._fetch_sgdb_images(gid))
+            
+            link = QLabel(f'<a href="https://www.steamgriddb.com/game/{game["id"]}" style="color: #66b2ff;">Page: https://www.steamgriddb.com/game/{game["id"]}</a>')
+            link.setOpenExternalLinks(True)
+            
+            item_layout.addWidget(btn)
+            item_layout.addWidget(link)
+            
+            self.sgdb_results_layout.addWidget(item_widget)
+
+    def _fetch_sgdb_images(self, game_id: int):
+        """Triggers image fetching for a specific SGDB game ID."""
+        self.sgdb_game_id = game_id
+        self.lbl_sgdb_status.setText(self.tr("Fetching images..."))
+
+        while self.sgdb_results_layout.count():
+            child = self.sgdb_results_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        if self.active_image_worker:
+            self.active_image_worker.cancel()
+
+        self.active_image_worker = SteamGridDbImagesWorker(game_id, self.sgdb_api_key)
+        self.active_image_worker.images_ready.connect(self._on_sgdb_images_ready)
+        self.active_image_worker.start()
+
+    def _on_sgdb_images_ready(self, grids, heroes):
+        """Caches valid SGDB items and builds the grid."""
+        self.lbl_sgdb_status.hide()
+
+        # Clear existing SGDB images and remove their comboboxes from the tracking list
+        while self.sgdb_images_layout.count():
+            item = self.sgdb_images_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        all_images = grids + heroes
+
+        MAX_HEIGHT = 200
+
+        # Preload pixmaps to measure actual scaled widths, then cache
+        valid_items = []
+        for item in all_images:
+            local_path = item.get("local_path", "")
+            if not local_path:
+                continue
+            pixmap = QPixmap(local_path)
+            if pixmap.isNull():
+                continue
+            # Compute the width this image will occupy once scaled to MAX_HEIGHT
+            ph = pixmap.height()
+            scaled_w = int(pixmap.width() * MAX_HEIGHT / ph) if ph > 0 else MAX_HEIGHT
+            valid_items.append((item, local_path, scaled_w))
+
+        # Store for later reflow triggered by resizeEvent
+        self._sgdb_valid_items = valid_items
+        self._sgdb_rebuild_grid()
+
+    def _sgdb_rebuild_grid(self):
+        """Reconstructs the SGDB image grid based on current dialog width."""
+        if not self._sgdb_valid_items:
+            return
+
+        MAX_HEIGHT = 200
+
+        # Snapshot current combo selections before clearing
+        previous_selections: dict[str, int] = {}
+        for combo in self.sgdb_image_combos:
+            path = combo.property("image_path")
+            if path:
+                previous_selections[path] = combo.currentIndex()
+
+        # Clear the grid and combo tracking list
+        self.sgdb_image_combos.clear()
+        while self.sgdb_images_layout.count():
+            item = self.sgdb_images_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        # Determine available width
+        # Subtract group-box left+right margins (~18 px per side).
+        spacing = self.sgdb_images_layout.spacing()
+        available_w = self.main_scroll.viewport().width() - 36
+        if available_w <= 0:
+            available_w = self.width() - 36
+
+        # Compute column count
+        # Use the widest image so no image is clipped in its column.
+        max_img_w = max(scaled_w for _, _, scaled_w in self._sgdb_valid_items)
+        max_cols = max(1, (available_w + spacing) // (max_img_w + spacing))
+
+        # Build grid
+        row, col = 0, 0
+        for item, local_path, _ in self._sgdb_valid_items:
+            widget = SelectableImageWidget(local_path, item, max_height=MAX_HEIGHT)
+
+            if local_path in previous_selections:
+                widget.combo.blockSignals(True)
+                widget.combo.setCurrentIndex(previous_selections[local_path])
+                widget.combo.blockSignals(False)
+
+            self.sgdb_image_combos.append(widget.combo)
+            widget.combo.currentIndexChanged.connect(
+                lambda idx, cb=widget.combo: self.on_image_role_changed(idx, cb)
+            )
+
+            self.sgdb_images_layout.addWidget(widget, row, col, Qt.AlignCenter)
+
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
         geometry = self.settings.value("AdvancedSettingsDialog/geometry")
         if geometry:
             self.restoreGeometry(geometry)
+
+    def resizeEvent(self, event):
+        """Kick off debounced grid reflows for both sections whenever the dialog is resized."""
+        super().resizeEvent(event)
+        if self._sgdb_valid_items:
+            self._sgdb_resize_timer.start()  # restarts the timer on each call
+        if self._vndb_image_paths:
+            self._vndb_resize_timer.start()
 
     def closeEvent(self, event):
         """Overrides the default close event to save geometry before closing."""
@@ -392,3 +712,44 @@ class AdvancedSettingsDialog(QDialog):
         """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
         self.settings.setValue("AdvancedSettingsDialog/geometry", self.saveGeometry())
         super().hideEvent(event)
+
+class SelectableImageWidget(QFrame):
+    def __init__(self, local_path: str, item: dict, max_height: int, parent=None):
+        super().__init__(parent)
+        self.item = item
+        self.local_path = local_path
+        self.setStyleSheet("QFrame { background: transparent; border: none; }")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        # The Image
+        self.lbl_img = QLabel()
+        self.lbl_img.setAlignment(Qt.AlignCenter)
+        self.lbl_img.setFixedHeight(max_height) # Forced height consistency
+        
+        pixmap = QPixmap(local_path)
+        if not pixmap.isNull():
+            # Scale to height; width adjusts automatically based on aspect ratio
+            self.lbl_img.setPixmap(pixmap.scaledToHeight(max_height, Qt.SmoothTransformation))
+        else:
+            self.lbl_img.setText("Invalid Image")
+
+        # Metadata (Style/Author)
+        author = item.get("author", "Unknown")
+        style  = item.get("style", "Default")
+        lbl_meta = QLabel(f"{style} • {author}")
+        lbl_meta.setStyleSheet("font-size: 10px; color: #888;")
+        lbl_meta.setAlignment(Qt.AlignCenter)
+        lbl_meta.setWordWrap(True)
+
+        # The Combo Box
+        self.combo = QComboBox()
+        self.combo.addItems(["None", "Vertical Cover", "Horizontal Layout"])
+        self.combo.setProperty("image_path", local_path)
+        self.combo.setFixedWidth(160)
+
+        layout.addWidget(self.lbl_img, 0, Qt.AlignCenter)
+        layout.addWidget(lbl_meta)
+        layout.addWidget(self.combo, 0, Qt.AlignCenter)

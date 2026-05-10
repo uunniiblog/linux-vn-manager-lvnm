@@ -30,6 +30,7 @@ KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
 PROTONGE_API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
 DXVK_API_URL = "https://api.github.com/repos/doitsujin/dxvk/releases/latest"
 VNDB_API_URL = "https://api.vndb.org/kana"
+SGDB_API_URL = "https://www.steamgriddb.com/api/v2"
 VNDB_SITE_URL = "https://vndb.org/{vndbid}"
 EGS_SITE_URL = "https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/kensaku.php?category=game&word_category=name&word={jpname}"
 WINEPREFIX_URL = "https://www.vnwiki.xyz/linux/wineprefixes.html"
@@ -176,6 +177,7 @@ USER_CONF_WINE_RUNNERS_PATH = "wine_runners_dir"
 USER_CONF_PROTON_RUNNERS_PATH = "proton_runners_dir"
 USER_CONF_PREFIXES_PATH = "prefixes_dir"
 USER_CONF_LOGS_PATH = "logs_dir"
+USER_CONF_SGDB_API_KEY = "sgdb_api_key"
 
 # User config
 GAMESCOPE_INSTALLED = False
