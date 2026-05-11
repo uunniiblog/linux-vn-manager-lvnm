@@ -400,6 +400,19 @@ class SystemUtils:
             return ""
 
     @staticmethod
+    def delete_covers_in_folder(folder_path: str, extensions: dict):
+        """Delete all files in folder"""
+        deleted = 0
+        for pattern in extensions:
+            for file_path in glob.glob(os.path.join(folder_path, pattern)):
+                try:
+                    os.remove(file_path)
+                    deleted += 1
+                    logger.debug("Deleted cover: %s", file_path)
+                except OSError as exc:
+                    logger.error("Failed to delete cover %s: %s", file_path, exc)
+
+    @staticmethod
     def are_files_identical(path1: str, path2: str) -> bool:
         """Checks if two files are bitwise identical."""
         if not path1 or not path2:

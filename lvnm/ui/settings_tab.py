@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QGroupBox, QFormLayout,
     QHBoxLayout, QLineEdit, QPushButton,
     QCheckBox, QFileDialog, QScrollArea, QFrame,
-    QGridLayout, QMessageBox
+    QGridLayout, QMessageBox, QStyle, QSizePolicy
 )
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from PySide6.QtCore import Qt
@@ -414,23 +414,49 @@ class SettingsTab(QWidget):
             (self.tr("Covers Dir:"), config.USER_CONF_COVERS_PATH, config.COVERS_DIR),
             (self.tr("Timetrack Logs Dir:"), config.USER_CONF_LOGS_PATH, config.LOG_DIR),
         ]
+
+        BROWSE_WIDTH = 120
+        TRASH_WIDTH = 36
+        LAYOUT_SPACING = 6
         
         for label_text, key, default_val in folder_settings:
             layout = QHBoxLayout()
+            layout.setSpacing(LAYOUT_SPACING)
             
-            # Use settings if modified, otherwise fallback to config default
             current_val = self.user_settings.get(key, str(default_val))
             
             edit = QLineEdit(current_val)
             edit.setPlaceholderText(self.tr("Select folder..."))
+            edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
             btn = QPushButton(self.tr("Browse..."))
 
             # Disable if a game is already running
             edit.setEnabled(not is_game_running)
             btn.setEnabled(not is_game_running)
             
-            layout.addWidget(edit)
-            layout.addWidget(btn)
+            layout.addWidget(edit, stretch=1)
+
+            # Add a trash button exclusively for the Covers directory row
+            if key == config.USER_CONF_COVERS_PATH:
+                self.covers_edit = edit
+
+                btn.setFixedWidth(BROWSE_WIDTH)
+                layout.addWidget(btn)
+
+                self.covers_delete_btn = QPushButton()
+                self.covers_delete_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+                self.covers_delete_btn.setToolTip(self.tr("Delete all covers in this folder"))
+                self.covers_delete_btn.setEnabled(not is_game_running)
+                self.covers_delete_btn.setFixedSize(TRASH_WIDTH, TRASH_WIDTH)
+
+                layout.addWidget(self.covers_delete_btn)
+                self.folder_widgets.append(self.covers_delete_btn)
+
+            else:
+                btn.setFixedWidth(BROWSE_WIDTH + LAYOUT_SPACING + TRASH_WIDTH)
+                layout.addWidget(btn)
+
             directories_layout.addRow(QLabel(label_text), layout)
             
             # Store references so we can connect their signals later
@@ -505,6 +531,8 @@ class SettingsTab(QWidget):
         for key, edit_widget, btn_widget in self.folder_inputs:
             self._connect_folder_signal(key, edit_widget, btn_widget)
 
+        self.covers_delete_btn.clicked.connect(self._on_delete_covers_clicked)
+
         gp_manager = GameProcessManager.get_instance()
         gp_manager.game_started.connect(lambda: self._set_folders_enabled(False))
         gp_manager.game_stopped.connect(lambda: self._check_should_re_enable_folders())
@@ -514,6 +542,27 @@ class SettingsTab(QWidget):
         btn_widget.clicked.connect(lambda: self.browse_directory_for_widget(edit_widget, key))
         edit_widget.textChanged.connect(lambda t: self.save_setting(key, t))
         
+    def _on_delete_covers_clicked(self):
+        """Show confirmation dialog then delete all cover images in the selected folder."""
+        folder_path = self.covers_edit.text().strip()
+        if not folder_path:
+            QMessageBox.warning(self, self.tr("No Folder"), self.tr("No covers folder is currently set."))
+            return
+
+        reply = QMessageBox.question(
+            self,
+            self.tr("Delete Covers"),
+            self.tr(
+                f"This will permanently delete all .jpg and .png files in:\n{folder_path}\n\n"
+                "This action cannot be undone. Continue?"
+            ),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            cover_extensions = ["*.jpg", "*.png", "*.JPG", "*.PNG"]
+            SystemUtils.delete_covers_in_folder(folder_path, cover_extensions)
+    
     def browse_directory_for_widget(self, edit_widget, key):
         """Browse directory for folders, ask confirm and move files"""
         old_path = edit_widget.text()        
