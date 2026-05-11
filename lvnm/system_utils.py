@@ -357,7 +357,7 @@ class SystemUtils:
             return ""
 
         # Search for any file extension matching the VNDB ID
-        matches = list(covers_dir.glob(f"{vndb_id}_p.*"))
+        matches = list(covers_dir.glob(f"{vndb_id}*_p.*"))
         if not matches:
             # fallback check for original naming without _p to not break current covers
             matches = list(covers_dir.glob(f"{vndb_id}.*"))
@@ -388,7 +388,8 @@ class SystemUtils:
 
         # Determine suffix based on role
         suffix = "_p" if role == "vertical" else "_horizontal"
-        final_filename = f"{vndb_id}{suffix}{temp_file.suffix}"
+        image_name = Path(temp_path).stem
+        final_filename = f"{vndb_id}-{image_name}{suffix}{temp_file.suffix}"
         final_path = dest_dir / final_filename
 
         try:

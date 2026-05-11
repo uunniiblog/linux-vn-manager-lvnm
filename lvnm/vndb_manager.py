@@ -23,8 +23,9 @@ class VndbManager:
         Queries VNDB for one or more visual novels.
         Downloads covers for all results returned by the API.
         """
-
+        logger.debug(f"fetch_and_store_vn {current_cover_path} {vndb_id}")
         existing_path = SystemUtils.get_cover_path(cover_path=current_cover_path, vndb_id=vndb_id)
+        logger.debug(f"existing_path {existing_path}")
 
         skip_download = bool(existing_path)
 
@@ -64,9 +65,11 @@ class VndbManager:
 
                 # Download cover if URL exists and image doesn't
                 if vn.get("image") and vn["image"].get("url") and not skip_download:
-                    VndbManager._download_cover(vn["id"], vn["image"]["url"])
+                    target_path = VndbManager._download_cover(vn["id"], vn["image"]["url"])
+                    vn["target_path"] = str(target_path)
                 else:
                     logger.debug(f"[VNDB] cover already exists, not downloading")
+                    vn["target_path"] = existing_path
             
             return results
 
@@ -81,7 +84,8 @@ class VndbManager:
             VndbManager.get_covers_dir().mkdir(parents=True, exist_ok=True)
 
             ext = os.path.splitext(url)[1] or ".jpg"
-            target_path = VndbManager.get_covers_dir() / f"{vn_id}_p{ext}"
+            image_name = Path(url).stem
+            target_path = VndbManager.get_covers_dir() / f"{vn_id}-{image_name}_p{ext}"
 
             if target_path.exists():
                 logger.info(f"Cover already exists: {target_path.name}")
@@ -100,8 +104,10 @@ class VndbManager:
             with open(target_path, 'wb') as handler:
                 handler.write(response.content)
             logger.info(f"Saved downloaded cover: {target_path.name}")
+            return target_path
         except Exception as e:
             logger.error(f"[Error] Could not download {url}: {e}")
+            return ""
 
     @staticmethod
     def search_vn_temp(name: str, is_cancelled: callable = None):

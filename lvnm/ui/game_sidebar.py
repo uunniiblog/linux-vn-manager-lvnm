@@ -707,13 +707,15 @@ class GameSidebar(QFrame):
             # Get the jp title
             vn_id = results[0].get('id')
             og_title = VndbManager.get_original_title(results[0])
+            target_path = results[0].get("target_path")
             
             # Update the JSON with jp title and cover
             game_card = GameManager.get_game(game_name)
             if game_card:
-                logger.debug(f"[on_vndb_finished] overwriting cover_path '{game_card.cover_path}' -> '{SystemUtils.get_cover_path(vndb_id=results[0].get('id'))}'")
+                cover_path = SystemUtils.get_cover_path(cover_path=target_path, vndb_id=vn_id)
+                logger.debug(f"[on_vndb_finished] overwriting cover_path '{game_card.cover_path}' -> '{cover_path}'")
                 game_card.ogtitle = og_title
-                game_card.cover_path = SystemUtils.get_cover_path(vndb_id=vn_id)
+                game_card.cover_path = cover_path
                 GameManager.update_game(game_name, game_card.to_dict())
 
             self.on_metadata_updated(game_name)
