@@ -26,6 +26,7 @@ AFK_FILE = Path(tempfile.gettempdir()) / "lvnm" / "lvnm_afk_detection_file"
 TEMP_COVERS = Path(tempfile.gettempdir()) / "lvnm" / "search"
 
 # URLS
+LVNM_API_URL = "https://api.github.com/repos/uunniiblog/linux-vn-manager-lvnm/releases"
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
 PROTONGE_API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"
 DXVK_API_URL = "https://api.github.com/repos/doitsujin/dxvk/releases/latest"

@@ -9,6 +9,7 @@ import filecmp
 import json
 import config
 import logging
+import urllib.request
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
@@ -222,6 +223,22 @@ class SystemUtils:
             status = "✅" if installed else "❌"
             logger.debug(f"{status} {pkg}")
         logger.debug("="*50)
+
+    @staticmethod
+    def get_latest_release_info() -> tuple[str, str]:
+        """Fetches the latest official release tag and URL from GitHub."""
+        try:
+            # The /latest endpoint automatically filters out pre-releases like 'Continuous Build'
+            api_url = config.LVNM_API_URL + "/latest"
+            req = urllib.request.Request(api_url)
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                logger.debug(f"Newest LVNM version {data.get("tag_name")}")
+                return data.get("tag_name"), data.get("html_url")
+        except Exception as e:
+            logger.error(f"Update check failed: {e}")
+            return None, None
 
     @staticmethod
     def move_directory_contents(old_path, new_path):

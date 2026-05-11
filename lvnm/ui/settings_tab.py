@@ -5,8 +5,9 @@ from PySide6.QtWidgets import (
     QCheckBox, QFileDialog, QScrollArea, QFrame,
     QGridLayout, QMessageBox, QStyle, QSizePolicy
 )
+import threading
 from ui.env_var_manager_dialog import EnvVarManagerDialog
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
 import config
@@ -22,8 +23,12 @@ logger = logging.getLogger(__name__)
 class SettingsTab(QWidget):
     CONFIG_FILE = config.USER_SETTINGS
 
+    update_available_signal = Signal(str, str)
+
     def __init__(self, theme_manager):
         super().__init__()
+        self.update_available_signal.connect(self._on_update_found)
+
         self.theme_manager = theme_manager
         self.user_settings = SettingsManager()
         self.global_env_checkboxes = {}
@@ -499,15 +504,24 @@ class SettingsTab(QWidget):
     def _build_about_group(self):
         about_group = QGroupBox(self.tr("About"))
         about_layout = QFormLayout(about_group)
-        about_layout.addRow(QLabel(self.tr("LVNM version:")), QLabel(config.VERSION))
         about_layout.setLabelAlignment(Qt.AlignLeft)
 
+        self.version_label_val = QLabel(config.VERSION)
+        self.version_label_val.setOpenExternalLinks(True)
+
+        about_layout.addRow(QLabel(self.tr("LVNM version:")), self.version_label_val)
+        
         github_label = QLabel(f'<a href="{config.GIT_URL}">{config.GIT_URL}</a>')
         github_label.setOpenExternalLinks(True)
         about_layout.addRow(QLabel(self.tr("Github:")), github_label)
+
         wineprefixes_label = QLabel(f'<a href="{config.WINEPREFIX_URL}">{config.WINEPREFIX_URL}</a>')
         wineprefixes_label.setOpenExternalLinks(True)
+
         about_layout.addRow(QLabel(self.tr("Wineprefixes guide:")), wineprefixes_label)
+
+        threading.Thread(target=self._check_for_updates, daemon=True).start()
+
         return about_group
 
     # ==========================================
@@ -662,6 +676,20 @@ class SettingsTab(QWidget):
         )
         if file_path:
             self.texthooker_edit.setText(file_path)
+
+    def _check_for_updates(self):
+        """Background thread search update"""
+        tag, url = SystemUtils.get_latest_release_info()
+        if tag and url:
+            current = config.VERSION.lstrip('v')
+            latest = tag.lstrip('v')
+            if latest != current:
+                self.update_available_signal.emit(tag, url)
+
+    def _on_update_found(self, tag, url):
+        """Updates the UI label with the link to the new release"""
+        new_text = f'{config.VERSION} <a href="{url}" font-weight: bold;"> Newest version available: {tag} </a>'
+        self.version_label_val.setText(new_text)
 
     def save_setting(self, key, value):
         self.user_settings.set(key, value)
