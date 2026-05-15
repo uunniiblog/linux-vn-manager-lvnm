@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtGui import QPixmap
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
+from ui.sgdb_autocomplete import SgdbAutocompleteLineEdit
 from vndb_manager import VndbReleaseImagesWorker
 from system_utils import SystemUtils
 from steamgrid_manager import SteamGridDbSearchWorker, SteamGridDbImagesWorker, SteamGridDbManager
@@ -35,7 +36,6 @@ class AdvancedSettingsDialog(QDialog):
 
         self.sgdb_api_key = SettingsManager().get(config.USER_CONF_SGDB_API_KEY, "")
         self.sgdb_game_id = None
-        self.active_sgdb_search_worker = None
         self._sgdb_valid_items = []
         self._vndb_image_paths = []
 
@@ -153,7 +153,7 @@ class AdvancedSettingsDialog(QDialog):
         vndb_inner_layout = QVBoxLayout(self.vndb_group)
 
         self.search_bar = VndbAutocompleteLineEdit(self)
-        self.search_bar.setPlaceholderText(self.tr("Search VNDB to fetch release images..."))
+        self.search_bar.setPlaceholderText(self.tr("Game name or vndb id..."))
         self.search_bar.vn_selected.connect(self.on_vn_selected)
         vndb_inner_layout.addWidget(self.search_bar)
 
@@ -174,28 +174,26 @@ class AdvancedSettingsDialog(QDialog):
 
         self.scroll_layout.addSpacing(10)
 
-        # SteamGridDB
+       # SteamGridDB
         self.sgdb_group = QGroupBox(self.tr("SteamGridDB Images"))
         sgdb_main_layout = QVBoxLayout(self.sgdb_group)
 
-        sgdb_search_layout = QHBoxLayout()
-        self.sgdb_search_edit = QLineEdit(self.current_game.name)
-        self.sgdb_search_edit.setPlaceholderText(self.tr("Search SteamGridDB..."))
-        self.sgdb_search_edit.returnPressed.connect(self._sgdb_on_search)
-        
-        btn_sgdb_search = QPushButton(self.tr("Search SGDB"))
-        btn_sgdb_search.clicked.connect(self._sgdb_on_search)
-        
-        sgdb_search_layout.addWidget(self.sgdb_search_edit)
-        sgdb_search_layout.addWidget(btn_sgdb_search)
-        sgdb_main_layout.addLayout(sgdb_search_layout)
-
-        self.sgdb_results_layout = QVBoxLayout()
-        sgdb_main_layout.addLayout(self.sgdb_results_layout)
-
         self.lbl_sgdb_status = QLabel("")
         self.lbl_sgdb_status.setStyleSheet("color: #888;")
+
+        self.lbl_sgdb_loading = QLabel(self.tr("Search for a game to load images."))
+        self.lbl_sgdb_loading.setAlignment(Qt.AlignCenter)
+
+        # Initialize the new Autocomplete Search Bar
+        self.sgdb_search_edit = SgdbAutocompleteLineEdit(self)
+        self.sgdb_search_edit.setPlaceholderText(self.tr("Game name..."))
+        self.sgdb_search_edit.assets_ready.connect(self._on_sgdb_images_ready)
+        self.sgdb_search_edit.status_changed.connect(self.lbl_sgdb_status.setText)
+        self.sgdb_search_edit.game_selected.connect(self._on_sgdb_game_selected)
+        
+        sgdb_main_layout.addWidget(self.sgdb_search_edit)
         sgdb_main_layout.addWidget(self.lbl_sgdb_status)
+        sgdb_main_layout.addWidget(self.lbl_sgdb_loading)
 
         self.sgdb_images_widget = QWidget()
         self.sgdb_images_layout = QGridLayout(self.sgdb_images_widget)
@@ -234,7 +232,11 @@ class AdvancedSettingsDialog(QDialog):
         btn_layout = QHBoxLayout()
         save_btn = QPushButton(self.tr("Save"))
         save_btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
+        save_btn.setAutoDefault(False)
+        save_btn.setDefault(False)
+
         cancel_btn = QPushButton(self.tr("Cancel"))
+        cancel_btn.setAutoDefault(False)
         
         save_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
@@ -514,106 +516,29 @@ class AdvancedSettingsDialog(QDialog):
         # Fall back to already downloaded thumb, should never happen tho
         return SystemUtils.save_image_to_covers(item["local_path"], game_id_str, role)
 
-    def _sgdb_on_search(self):
-        """Initiates a search on SteamGridDB."""
-        if not self.sgdb_api_key:
-            self.lbl_sgdb_status.setText(self.tr("API Key missing in settings!"))
-            self.lbl_sgdb_status.show()
-            return
-
-        term = self.sgdb_search_edit.text().strip()
-        if not term:
-            return
-
-        self.lbl_sgdb_status.setText(self.tr("Searching..."))
-        self.lbl_sgdb_status.show()
-        
-        # Clear previous search results
-        while self.sgdb_results_layout.count():
-            child = self.sgdb_results_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        
-        # Clear the image grid as well for a fresh search
-        while self.sgdb_images_layout.count():
-            child = self.sgdb_images_layout.takeAt(0)
-            if child.widget():
-                widget = child.widget()
-                # Clean up combo box tracking
-                if hasattr(widget, "combo") and widget.combo in self.sgdb_image_combos:
-                    self.sgdb_image_combos.remove(widget.combo)
-                widget.deleteLater()
-
-        # Handle worker logic
-        if self.active_sgdb_search_worker:
-            self.active_sgdb_search_worker.cancel()
-
-        self.active_sgdb_search_worker = SteamGridDbSearchWorker(term, self.sgdb_api_key)
-        self.active_sgdb_search_worker.results_ready.connect(self._on_sgdb_search_results)
-        self.active_sgdb_search_worker.start()
-
-    def _on_sgdb_search_results(self, results):
-        """Displays list of games found on SGDB."""
-        self.lbl_sgdb_status.hide()
-        while self.sgdb_results_layout.count():
-            child = self.sgdb_results_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-                
-        if not results:
-            lbl = QLabel(self.tr("No games found."))
-            self.sgdb_results_layout.addWidget(lbl)
-            return
-
-        for game in results:
-            item_widget = QWidget()
-            item_layout = QHBoxLayout(item_widget)
-            item_layout.setContentsMargins(0, 0, 0, 0)
-            
-            btn = QPushButton(game["name"])
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda checked=False, gid=game["id"]: self._fetch_sgdb_images(gid))
-            
-            link = QLabel(f'<a href="https://www.steamgriddb.com/game/{game["id"]}" style="color: #66b2ff;">Page: https://www.steamgriddb.com/game/{game["id"]}</a>')
-            link.setOpenExternalLinks(True)
-            
-            item_layout.addWidget(btn)
-            item_layout.addWidget(link)
-            
-            self.sgdb_results_layout.addWidget(item_widget)
-
-    def _fetch_sgdb_images(self, game_id: int):
-        """Triggers image fetching for a specific SGDB game ID."""
-        self.sgdb_game_id = game_id
-        self.lbl_sgdb_status.setText(self.tr("Fetching images..."))
-
-        while self.sgdb_results_layout.count():
-            child = self.sgdb_results_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-        if self.active_image_worker:
-            self.active_image_worker.cancel()
-
-        self.active_image_worker = SteamGridDbImagesWorker(game_id, self.sgdb_api_key)
-        self.active_image_worker.images_ready.connect(self._on_sgdb_images_ready)
-        self.active_image_worker.start()
+    def _on_sgdb_game_selected(self, game_data):
+        """Update game ID when an item is chosen from autocomplete."""
+        self.sgdb_game_id = game_data.get("id")
 
     def _on_sgdb_images_ready(self, grids, heroes):
         """Caches valid SGDB items and builds the grid."""
         self.lbl_sgdb_status.hide()
+        self.lbl_sgdb_loading.hide()
 
-        # Clear existing SGDB images and remove their comboboxes from the tracking list
+        # Clear existing SGDB images
         while self.sgdb_images_layout.count():
             item = self.sgdb_images_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        all_images = grids + heroes
+        if not grids and not heroes:
+            self.lbl_sgdb_status.setText(self.tr("No images found."))
+            self.lbl_sgdb_status.show()
+            return
 
+        all_images = grids + heroes
         MAX_HEIGHT = 200
 
-        # Preload pixmaps to measure actual scaled widths, then cache
         valid_items = []
         for item in all_images:
             local_path = item.get("local_path", "")
@@ -622,12 +547,10 @@ class AdvancedSettingsDialog(QDialog):
             pixmap = QPixmap(local_path)
             if pixmap.isNull():
                 continue
-            # Compute the width this image will occupy once scaled to MAX_HEIGHT
             ph = pixmap.height()
             scaled_w = int(pixmap.width() * MAX_HEIGHT / ph) if ph > 0 else MAX_HEIGHT
             valid_items.append((item, local_path, scaled_w))
 
-        # Store for later reflow triggered by resizeEvent
         self._sgdb_valid_items = valid_items
         self._sgdb_rebuild_grid()
 
@@ -654,14 +577,11 @@ class AdvancedSettingsDialog(QDialog):
                 w.deleteLater()
 
         # Determine available width
-        # Subtract group-box left+right margins (~18 px per side).
         spacing = self.sgdb_images_layout.spacing()
         available_w = self.main_scroll.viewport().width() - 36
         if available_w <= 0:
             available_w = self.width() - 36
 
-        # Compute column count
-        # Use the widest image so no image is clipped in its column.
         max_img_w = max(scaled_w for _, _, scaled_w in self._sgdb_valid_items)
         max_cols = max(1, (available_w + spacing) // (max_img_w + spacing))
 
@@ -686,6 +606,15 @@ class AdvancedSettingsDialog(QDialog):
             if col >= max_cols:
                 col = 0
                 row += 1
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Prevents the dialog from closing when 'Enter' or 'Return' is pressed."""
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            # If the focus is on a LineEdit that isn't the autocomplete, just ignore it.
+            # Autocomplete line edits handle their own key events.
+            event.ignore()
+            return
+        super().keyPressEvent(event)
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
