@@ -607,7 +607,7 @@ class AdvancedSettingsDialog(QDialog):
                 col = 0
                 row += 1
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event):
         """Prevents the dialog from closing when 'Enter' or 'Return' is pressed."""
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             # If the focus is on a LineEdit that isn't the autocomplete, just ignore it.
