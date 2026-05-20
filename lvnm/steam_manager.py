@@ -6,6 +6,8 @@ import shutil
 import binascii
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 class SteamManager:
     @staticmethod
     def get_shortcuts_paths():
@@ -100,7 +102,7 @@ class SteamManager:
             data += b'\x08' 
 
         # End of file
-        data += b'\x08\x08' 
+        data += b'\x08\x08'
         return data
 
     @staticmethod
@@ -159,6 +161,7 @@ class SteamManager:
         for path in vdf_paths:
             existing_shortcuts = []
             if path.exists():
+                logger.debug(f"Processing VDF file: {path}")
                 with open(path, "rb") as f:
                     existing_shortcuts = SteamManager._parse_binary_vdf(f.read())
 
@@ -166,6 +169,7 @@ class SteamManager:
             found = False
             for s in existing_shortcuts:
                 if s.get("AppName") == name:
+                    logger.debug(f"Game '{name}' already exists. Updating existing entry attributes.")
                     s["Exe"] = vdf_exe
                     s["StartDir"] = vdf_start_dir
                     s["icon"] = icon_path
@@ -175,6 +179,7 @@ class SteamManager:
             
             if not found:
                 # Add new entry
+                logger.debug(f"Appending new non-Steam game '{name}' to library list.")
                 existing_shortcuts.append({
                     "AppName": name,
                     "Exe": vdf_exe,
