@@ -556,6 +556,12 @@ class GameSidebar(QFrame):
             self.launch_btn.setVisible(True)
         else:
             logger.debug(f"Updating game: {original_name}")
+            latest_json_card = GameManager.get_game(original_name)
+            if latest_json_card:
+                # Retain properties changed outside of this general sidebar form
+                self.current_game.label = latest_json_card.label
+                self.current_game.last_played = latest_json_card.last_played
+
             GameManager.update_game(original_name, self.current_game.to_dict())
 
         # Check if we need to fetch VNDB metadata
