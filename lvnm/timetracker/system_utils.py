@@ -15,9 +15,10 @@ class SystemUtils:
     @staticmethod
     def is_wine_or_proton(pid):
         try:
-            env_result = SystemUtils.get_process_environ(pid)
-            logger.debug(f"is_wine_or_proton env_result {env_result}")
-            return ".exe" in env_result
+            exe_path = os.readlink(f"/proc/{pid}/exe")
+            exe_name = os.path.basename(exe_path).lower()
+            if "wine" in exe_name:
+                return True
         except Exception as e:
             logger.error(f"[ERROR] is_wine_or_proton failed: {e}")
             return False
@@ -37,10 +38,9 @@ class SystemUtils:
                     if not title:
                         continue
                     
-                    logger.debug(f"get_window_list title {title}")
+                    #logger.debug(f"get_window_list title {title}")
                     if only_show_wine:
                         pid_str = utils.get_window_pid(wid)
-                        logger.debug(f"get_window_list pid_str {pid_str}")
                         if pid_str and pid_str.isdigit() and SystemUtils.is_wine_or_proton(int(pid_str)):
                             window_list.append((title, wid))
                     else:
