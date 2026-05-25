@@ -292,10 +292,16 @@ class ImportGameDialog(QDialog):
 
         self._import_env_vars()
 
+        self._import_success = False
+        console.finished_all.connect(lambda: setattr(self, '_import_success', True))
         console.finished_all.connect(self.import_finished.emit)
-        #console.finished_all.connect(self.accept)
+        
         console.start_queue()
         console.exec()
+
+        # Closes the Import Game dialog when closing the log dialog
+        if getattr(self, '_import_success', False):
+            self.accept()
 
     def _import_env_vars(self):
         """Registers missing env variables from the import"""
