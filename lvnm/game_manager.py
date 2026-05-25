@@ -215,6 +215,9 @@ class GameManager:
         game_data["path"] = ""
         game_data["last_played"] = ""
         game_data["label"] = ""
+        game_data["cover_path"] = ""
+        game_data["layout_path"] = ""
+
         if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":
             game_data["gamescope"]["parameters"] = ""
 
