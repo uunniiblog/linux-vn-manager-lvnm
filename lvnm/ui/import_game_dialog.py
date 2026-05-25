@@ -290,11 +290,48 @@ class ImportGameDialog(QDialog):
             {}, f"Registering game: {name}"
         )
 
+        self._import_env_vars()
+
         console.finished_all.connect(self.import_finished.emit)
         #console.finished_all.connect(self.accept)
         console.start_queue()
         console.exec()
 
+    def _import_env_vars(self):
+        """Registers missing env variables from the import"""
+
+        # Fetch env vars from the import
+        imported_envvars = self.game_data.get("envvar", {})
+        if not imported_envvars:
+            return
+
+        # Fetch currently registered variables
+        current_vars = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, [])
+
+        # Map existing keys
+        existing_keys = {var.get("key") for var in current_vars if "key" in var}
+        
+        runner_type = self.prefix_data.get("type", "")
+        has_new_vars = False
+
+        for key, value in imported_envvars.items():
+            if key not in existing_keys:
+                safe_id = key.lower().replace(" ", "_")
+                new_var = {
+                    "id": safe_id,
+                    "name": key,
+                    "key": key,
+                    "value": value
+                }
+
+                current_vars.append(new_var)
+                has_new_vars = True
+                logger.info(f"Registered global environment variable from import: {key}")
+
+        # Save
+        if has_new_vars:
+            self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, current_vars)
+    
     def _task_download_runner(self, console_logger, runner_type, runner_name, shared_data):
         last_percent = [-1]
 
