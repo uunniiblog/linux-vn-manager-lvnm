@@ -3,7 +3,7 @@ import config
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QMenu, QDialog, QPlainTextEdit, QPushButton,
-    QLineEdit
+    QLineEdit, QMessageBox
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
@@ -301,9 +301,21 @@ class GameListItem(QWidget):
             self.requestRefresh.emit(self.game_card)
 
     def delete_game(self, name):
-        if GameManager.delete_game(name):
-            self.requestRefresh.emit(self.game_card)
-            self.requestCloseSidebar.emit()
+
+        # Quick confirmation dialog
+        reply = QMessageBox.question(
+            self, 
+            self.tr("Confirm Deletion"),
+            self.tr(f"Are you sure you want to delete '{name}'?"),
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            if GameManager.delete_game(name):
+                self.requestRefresh.emit(self.game_card)
+                self.requestCloseSidebar.emit()
+        
 
     def browse_game(self, path):
         SystemUtils.browse_files(path)
