@@ -1,7 +1,7 @@
 from pathlib import Path
 import tempfile
 
-VERSION = 'v0.4.0'
+VERSION = 'v0.4.1'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
