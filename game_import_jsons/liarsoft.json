@@ -1,0 +1,33 @@
+{
+    "game": {
+        "name": "Liarsoft",
+        "path": "",
+        "prefix": "protonge913",
+        "vndb": "",
+        "coverpath": "",
+        "last_played": "",
+        "ogtitle": "",
+        "envvar": {
+            "LANG": "ja_JP.UTF-8"
+        },
+        "dlloverride": {},
+        "gamescope": {
+            "enabled": "false",
+            "parameters": ""
+        },
+        "update_date": "2026-04-26 12:49:38",
+        "label": "",
+        "umu-gameid": "umu-default",
+        "umu-store": "none"
+    },
+    "prefix": {
+        "name": "protonge913",
+        "path": "",
+        "runner": "GE-Proton9-13",
+        "type": "proton",
+        "codecs": "",
+        "winetricks": "",
+        "fonts": true,
+        "update_date": "2026-03-28 08:40:41"
+    }
+}

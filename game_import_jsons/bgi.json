@@ -1,0 +1,33 @@
+{
+    "game": {
+        "name": "BGI",
+        "path": "",
+        "prefix": "wine10.4wow64",
+        "vndb": "",
+        "coverpath": "",
+        "last_played": "",
+        "ogtitle": "",
+        "envvar": {
+            "LANG": "ja_JP.UTF-8"
+        },
+        "dlloverride": {},
+        "gamescope": {
+            "enabled": "false",
+            "parameters": ""
+        },
+        "update_date": "2026-04-24 10:44:13",
+        "label": "",
+        "umu-gameid": "umu-default",
+        "umu-store": "none"
+    },
+    "prefix": {
+        "name": "wine10.4wow64",
+        "path": "",
+        "runner": "wine-10.4-amd64-wow64",
+        "type": "wine",
+        "codecs": "",
+        "winetricks": "",
+        "fonts": true,
+        "update_date": "2026-04-04 11:18:59"
+    }
+}

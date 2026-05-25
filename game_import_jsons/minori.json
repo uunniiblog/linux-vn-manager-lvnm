@@ -1,0 +1,44 @@
+{
+    "game": {
+        "name": "Minori",
+        "path": "",
+        "prefix": "protonge1034",
+        "vndb": "",
+        "cover_path": "",
+        "layout_path": "",
+        "last_played": "",
+        "ogtitle": "",
+        "envvar": {
+            "LANG": "ja_JP.UTF-8",
+            "TZ": "Asia/Tokyo",
+            "PROTON_USE_WINED3D": "1"
+        },
+        "dlloverride": {},
+        "gamescope": {
+            "enabled": "false",
+            "parameters": ""
+        },
+        "update_date": "2026-05-24 18:19:26",
+        "label": "",
+        "pre_launch_args": "",
+        "pre_launch_script": "",
+        "pre_launch_script_wait": false,
+        "exit_script": "",
+        "arguments": "",
+        "umu-gameid": "umu-default",
+        "umu-store": "none"
+    },
+    "prefix": {
+        "name": "protonge1034",
+        "path": "",
+        "runner": "GE-Proton10-34",
+        "type": "proton",
+        "codecs": "",
+        "winetricks": "",
+        "fonts": true,
+        "update_date": "2026-05-02 14:33:38",
+        "wayland": false,
+        "dpi": false,
+        "threetwop": false
+    }
+}

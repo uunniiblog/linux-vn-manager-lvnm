@@ -1,0 +1,35 @@
+{
+    "game": {
+        "name": "Kirikiri",
+        "path": "",
+        "prefix": "proton1034wmp11quartz2",
+        "vndb": "",
+        "coverpath": "",
+        "last_played": "",
+        "ogtitle": "",
+        "envvar": {
+            "LANG": "ja_JP.UTF-8"
+        },
+        "dlloverride": {},
+        "gamescope": {
+            "enabled": "false",
+            "parameters": ""
+        },
+        "update_date": "2026-04-24 10:31:19",
+        "label": "",
+        "umu-gameid": "umu-default",
+        "umu-store": "none"
+    },
+    "prefix": {
+        "name": "proton1034wmp11quartz2",
+        "path": "",
+        "runner": "GE-Proton10-34",
+        "type": "proton",
+        "codecs": "quartz2 wmp11",
+        "winetricks": "",
+        "fonts": true,
+        "update_date": "2026-04-24 10:04:02",
+        "wayland": false,
+        "dpi": false
+    }
+}

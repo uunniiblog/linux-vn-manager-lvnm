@@ -1,0 +1,36 @@
+{
+    "game": {
+        "name": "Nitroplus",
+        "path": "",
+        "prefix": "NitroplusPrefix",
+        "vndb": "",
+        "coverpath": "",
+        "last_played": "",
+        "ogtitle": "",
+        "envvar": {
+            "LANG": "ja_JP.UTF-8",
+            "PROTON_MEDIA_USE_GST": "1"
+        },
+        "dlloverride": {},
+        "gamescope": {
+            "enabled": "false",
+            "parameters": ""
+        },
+        "update_date": "2026-04-24 10:55:28",
+        "label": "",
+        "umu-gameid": "umu-default",
+        "umu-store": "none"
+    },
+    "prefix": {
+        "name": "NitroplusPrefix",
+        "path": "",
+        "runner": "GE-Proton10-25",
+        "type": "proton",
+        "codecs": "",
+        "winetricks": "",
+        "fonts": false,
+        "update_date": "2026-04-24 10:04:02",
+        "wayland": false,
+        "dpi": false
+    }
+}

@@ -114,6 +114,13 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
 
 Config and data stored at: ~/.local/share/lvnm/
 
+## Import games
+You can import games with their runner and prefix configuration.
+In the game tab at the bottom there is a button to import. 
+In the sidebar for a game, or right clicking you can also export the game with the current configuration.
+
+I have included some import configurations for popular engines at the [game import jsons folder](game_import_jsons/) should work for most titles for the engine or developer. You only need to import the json and fill the name and path info.
+
 ## Timetracking
 Can be enabled in settings.
 
