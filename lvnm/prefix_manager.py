@@ -137,7 +137,7 @@ class PrefixManager:
             # Clean up if it's a 'zombie' prefix (dir exists but no drive_c)
             if self.prefix_path.exists() and not (self.prefix_path / "drive_c").exists():
                 shutil.rmtree(self.prefix_path)
-            return False
+            raise RuntimeError(f"Creation failed: {e}")
 
     def install_codecs(self, codecs_list: str, executor=None):
         """Installs or updates codecs in an existing prefix."""
@@ -241,45 +241,55 @@ class PrefixManager:
 
     def _save_metadata(self):
         """Writes current state to the json file."""
-        self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
-        json_file = {}
-        
-        if self.PREFIXES_FILE.exists():
-            with open(self.PREFIXES_FILE, "r") as f:
-                try:
-                    json_file = json.load(f)
-                except json.JSONDecodeError: pass
+        try:
+            self.DATA_ROOT.mkdir(parents=True, exist_ok=True)
+            json_file = {}
+            
+            if self.PREFIXES_FILE.exists():
+                with open(self.PREFIXES_FILE, "r") as f:
+                    try:
+                        json_file = json.load(f)
+                    except json.JSONDecodeError: pass
 
-        card = Prefix(
-            name=self.name,
-            path=str(self.prefix_path),
-            runner=str(self.runner_path),
-            type=self.type,
-            codecs=self.codecs,
-            winetricks=self.winetricks,
-            fonts=self.fonts,
-            dpi=self.dpi,
-            wayland=self.wayland_driver,
-            threetwop=self.threetwop
-        )
-        json_file[self.name] = card.to_dict()
+            card = Prefix(
+                name=self.name,
+                path=str(self.prefix_path),
+                runner=str(self.runner_path),
+                type=self.type,
+                codecs=self.codecs,
+                winetricks=self.winetricks,
+                fonts=self.fonts,
+                dpi=self.dpi,
+                wayland=self.wayland_driver,
+                threetwop=self.threetwop
+            )
+            json_file[self.name] = card.to_dict()
 
-        with open(self.PREFIXES_FILE, "w") as f:
-            json.dump(json_file, f, indent=4)
+            with open(self.PREFIXES_FILE, "w") as f:
+                json.dump(json_file, f, indent=4)
+            logger.info(f"Prefix {self.name} updated successfully.")
+        except Exception as e:
+            logging.error(f"Prefix saving failed: {e}")
+            raise RuntimeError(f"Prefix saving failed: {e}")
 
     def delete_prefix(self):
         """Wipes the folder and removes from json."""
-        if self.prefix_path.exists():
-            shutil.rmtree(self.prefix_path)
-            
-        if self.PREFIXES_FILE.exists():
-            with open(self.PREFIXES_FILE, "r") as f:
-                json_file = json.load(f)
-            if self.name in json_file:
-                del json_file[self.name]
-                with open(self.PREFIXES_FILE, "w") as f:
-                    json.dump(json_file, f, indent=4)
-        return True
+        try:
+            if self.prefix_path.exists():
+                shutil.rmtree(self.prefix_path)
+                
+            if self.PREFIXES_FILE.exists():
+                with open(self.PREFIXES_FILE, "r") as f:
+                    json_file = json.load(f)
+                if self.name in json_file:
+                    del json_file[self.name]
+                    with open(self.PREFIXES_FILE, "w") as f:
+                        json.dump(json_file, f, indent=4)
+            logger.info(f"Prefix {self.name} deleted successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Prefix deletion failed: {e}")
+            raise RuntimeError(f"Prefix deletion failed: {e}")
 
     def rename_prefix(self, new_name: str):
         """Renames the prefix folder and updates the json entry."""

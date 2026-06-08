@@ -121,8 +121,15 @@ class PrefixTab(QWidget):
                                      f"{self.tr('Delete Prefix')} {prefix_str}?")
         
         if confirm == QMessageBox.Yes:
-            prefix.delete_prefix()
-            self.refresh_list()
+            try:
+                prefix.delete_prefix()
+                self.refresh_list()
+            except RuntimeError as e:
+                QMessageBox.critical(
+                    self,
+                    self.tr("Error"),
+                    self.tr(str(e))
+                )
 
     def on_edit(self):
         prefix_str = self.get_selected_prefix()
@@ -189,11 +196,19 @@ class PrefixTab(QWidget):
                 console.start_queue()
                 console.exec()
             else:
-                logger.debug("No changes in prefix")
+                logger.debug("No task changes in prefix.")
 
             # Update the date and metadata one last time
             prefix.card.update_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            prefix._save_metadata()
+
+            try:
+                prefix._save_metadata()
+            except RuntimeError as e:
+                QMessageBox.critical(
+                    self,
+                    self.tr("Error"),
+                    self.tr(str(e))
+                )
             
             self.refresh_list()
 
@@ -228,15 +243,23 @@ class PrefixTab(QWidget):
             console.setWindowTitle(self.tr(f"Creating Prefix: {name}"))
             
             # Add tasks to queue
-            success = prefix.create_prefix(
-                runner_path=data["runner_path"], 
-                codecs=data["codecs"], 
-                winetricks=data["winetricks"],
-                dpi=dpi,
-                wayland=wayland,
-                threetwop=threetwop,
-                executor=console
-            )
+            try:
+                success = prefix.create_prefix(
+                    runner_path=data["runner_path"], 
+                    codecs=data["codecs"], 
+                    winetricks=data["winetricks"],
+                    dpi=dpi,
+                    wayland=wayland,
+                    threetwop=threetwop,
+                    executor=console
+                )
+            except RuntimeError as e:
+                QMessageBox.critical(
+                    self,
+                    self.tr("Error"),
+                    self.tr(str(e))
+                )
+                return None
             
             if success:
                 if fonts_path:
@@ -450,7 +473,7 @@ class EditPrefixDialog(QDialog):
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton(self.tr("Save"))
         self.cancel_btn = QPushButton(self.tr("Cancel"))
-        self.save_btn.clicked.connect(self.accept)
+        self.save_btn.clicked.connect(self.validate_and_accept)
         self.cancel_btn.clicked.connect(self.reject)
         
         btn_layout.addStretch()
@@ -459,6 +482,16 @@ class EditPrefixDialog(QDialog):
         self.layout.addLayout(btn_layout)
 
         self._restore_state()
+
+    def validate_and_accept(self):
+        """Ensures obligatory fields are filled"""
+        if not self.name_edit.text().strip():
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Prefix Name is required."))
+            return
+        if not self.path_edit.text().strip():
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Invalid runner"))
+            return
+        self.accept()
 
     def create_check_group(self, title, data_list, installed_list, storage_dict):
         """Helper to create the scrollable checkbox groups"""
@@ -705,10 +738,10 @@ class CreatePrefixDialog(QDialog):
     def validate_and_accept(self):
         """Ensures obligatory fields are filled"""
         if not self.name_edit.text().strip():
-            QMessageBox.warning(self, self.tr("Error"), self.tr("Prefix Name is required."))
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Prefix Name is required."))
             return
         if not self.runner_combo.currentText():
-            QMessageBox.warning(self, self.tr("Error"), self.tr("A Runner must be selected."))
+            QMessageBox.critical(self, self.tr("Error"), self.tr("A Runner must be selected."))
             return
         self.accept()
 
