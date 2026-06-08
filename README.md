@@ -121,6 +121,62 @@ In the sidebar for a game, or right clicking you can also export the game with t
 
 I have included some import configurations for popular engines at the [game import jsons folder](game_import_jsons/) should work for most titles for the engine or developer. You only need to import the json and fill the name and path info.
 
+## CLI Options
+
+There are some cli options in the launcher, to get a full list:
+```bash
+# From source
+python /path/to/linux-vn-manager-lvnm/lvnm/launcher.py -h
+
+# From appimage
+/path/to/LVNM-x86_64.appimage -h
+```
+
+The two main options are:
+
+### Headless game run:
+Run the game without gui, already used within the application for steam and desktop shortcuts
+```bash
+# From source
+python /path/to/linux-vn-manager-lvnm/lvnm/launcher.py -r game_name
+
+# From appimage
+/path/to/LVNM-x86_64.appimage -r game_name
+```
+
+Use the same name game as you have the entry named in the application. It will still use the timetracking, pre and post exit script setup, etc.
+
+### Headless timetracker 
+Run the timetracker only without running the game through the application. Useful for games running through Steam so you can still get your timetracking data within lvnm, but get achievements, steam input, etc from steam.
+
+Before using the background tracker via Steam launch options, ensure the following is set up inside the manager:
+
+1. **Add the Game to the Application:** The game must already be added to the LVNM interface so it has an entry to record playtime to.
+2. **Configure the Correct Executable Path:** The tracker watches processes based on their exact filename. The game's entry must point directly to the main game executable.
+   * **How to find it on Steam:** Right-click the game in your Steam Library, select **Manage** and **Browse local files**. 
+   * Locate the primary game `.exe` file, copy its full path, and paste it into the Path field inside the game sidebar in LVNM.
+
+#### Launch from terminal:
+```bash
+# From source
+python /path/to/linux-vn-manager-lvnm/lvnm/launcher.py -t game_name
+
+# From appimage
+/path/to/LVNM-x86_64.appimage -t game_name
+```
+
+#### Configuration for Steam
+
+To launch the tracker alongside the game automatically, copy your command and paste it into the **Launch Options** section in the game's Steam properties:
+
+```bash
+# From source
+python /path/to/linux-vn-manager-lvnm/lvnm/launcher.py -t game_name & %command%
+
+# From appimage
+/path/to/LVNM-x86_64.appimage -t game_name & %command%
+```
+
 ## Timetracking
 Can be enabled in settings.
 

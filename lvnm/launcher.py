@@ -54,7 +54,7 @@ def main():
     SystemUtils.apply_ui_zoom(zoom)
 
     # Launch UI
-    if not args.run:
+    if len(sys.argv) == 1:
         SystemUtils.print_diagnostic_report()
         window = MainWindow()
         window.show()

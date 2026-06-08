@@ -5,7 +5,7 @@ class CliHandler:
     def __init__(self):
         self.parser = argparse.ArgumentParser(
             description="",
-            formatter_class=argparse.RawDescriptionHelpFormatter
+            formatter_class=argparse.RawTextHelpFormatter
         )
         self._setup_args()
 
@@ -22,7 +22,24 @@ class CliHandler:
         self.parser.add_argument(
             "-r", "--run",
             metavar="gamename",
-            help="The name of the game to launch in background mode."
+            help=(
+                "The name of the game to launch in background mode.\n"
+                "Example:\n"
+                "  /path/to/LVNM-x86_64.appimage Gamename"
+            )
+        )
+
+        # Only run the timetracker headless
+        self.parser.add_argument(
+            "-t", "--timetrack",
+            metavar="gamename",
+            help=(
+                "Run the timetracker in the background over the name of the game selected.\n"
+                "The application is launched from elsewhere like Steam.\n"
+                "The game must exist in the application.\n"
+                "Example:\n"
+                "  /path/to/LVNM-x86_64.appimage --timetrack %%command%%"
+            )
         )
 
         # Steam mode flag

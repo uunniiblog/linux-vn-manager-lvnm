@@ -22,7 +22,12 @@ class CliController(QObject):
     def handle_args(self, args):
         if args.run:
             self.headless_run(args.run, args.steam)
-            return
+            
+        elif args.timetrack:
+            self.headless_timetracker(args.timetrack)
+        
+        logging.shutdown()
+        sys.exit(0)
 
     def headless_run(self, game, is_steam=False):
         runner = GameRunner(game, is_steam=is_steam)
@@ -67,9 +72,6 @@ class CliController(QObject):
             logger.info(f"{game} exited with code {runner.process.returncode}")
         else:
             logger.info(f"{game} is already running")
-        
-        logging.shutdown()
-        sys.exit(0)
 
     def update_game(self, game):
         game_to_update = GameManager.get_game(game) 
@@ -90,3 +92,65 @@ class CliController(QObject):
         if runner.game.exit_script.strip():
             runner.run_external_script(runner.game.exit_script.strip())
             
+    def headless_timetracker(self, game_name):
+        game_card = GameManager.get_game(game_name)
+        
+        if not game_card:
+            logger.error(f"{game_name} Not found. It must be added to the application first.")
+            return
+
+        runner = GameRunner(game_card)
+        runner.game = game_card
+
+        def kill_handler(signum, frame):
+            logger.info(f"Received Signal {signum}. Forcing shutdown!")
+            if self.tracking:
+                self.tracking.stop_tracking()
+                
+            self.update_game(game_name)
+            sys.exit(0)
+
+        app = QCoreApplication.instance() or QCoreApplication(sys.argv)
+        signal.signal(signal.SIGINT, kill_handler)  # Ctrl+C
+        signal.signal(signal.SIGTERM, kill_handler) # Standard kill / app close
+
+
+        logger.debug(f"{game_name} found. Starting tracking")
+
+        # Start tracking, 
+        # Save automatically every minute unless specified otherwise in the application
+        save_interval = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 1)
+        afk_timer = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)
+        logger.debug(f"calling tracking controller with process {game_card.path}")
+        self.tracking = TrackingController(self, game_card.path, save_interval=save_interval, afk_timer=afk_timer)
+        self.tracking.start_auto_tracking()
+
+        self.game_has_started = False
+        self.timeout_counter = 0
+
+        def check_game_status():
+            is_running = runner.is_running()
+            if is_running:
+                if not self.game_has_started:
+                    logger.info(f"Game process '{game_card.path}' detected! Tracking initialized.")
+                    self.game_has_started = True
+            else:
+                if self.game_has_started:
+                    logger.info("Game exited, stopping event loop.")
+                    app.quit()
+                else:
+                    # The game hasn't started yet. give it 45 seconds
+                    self.timeout_counter += 1
+                    if self.timeout_counter > 45:
+                        logger.error(f"Timed out waiting for '{game_card.path}' to launch. Exiting.")
+                        app.quit()
+
+
+        self.monitor_timer = QTimer()
+        self.monitor_timer.timeout.connect(check_game_status)
+        self.monitor_timer.start(1000)
+
+        app.exec()
+
+        self.tracking.stop_tracking()
+        self.update_game(game_name)

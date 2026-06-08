@@ -156,6 +156,7 @@ class KdeUtils(DesktopUtilsInterface):
         candidates = [
             (wid, info) for wid, info in self._window_cache.items()
             if info.get('class', '').lower() in trusted_classes 
+            or info.get('class', '').lower().startswith('steam_app_')
             or info.get('class', '').lower().endswith('.exe')
         ]
 
