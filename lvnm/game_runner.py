@@ -50,7 +50,9 @@ class GameRunner:
 
         self.prefix_info = self._get_prefix_info(self.game.prefix)
         if not self.prefix_info:
-            raise ValueError(f"Prefix '{self.game.prefix}' (required for {self.name}) not found.")
+            raise ValueError(f"Prefix for {self.name} not found.")
+        if not self.game.path or not os.path.isfile(self.game.path):
+            raise ValueError(f"Path for {self.name} not found.")
 
     def prepare_environment(self):
         """Builds the environment and the final command list."""
@@ -271,7 +273,7 @@ class GameRunner:
                 self.prepare_environment()
         except Exception as e:
             logging.error(f"Preparation failed: {e}")
-            return False
+            raise RuntimeError(f"Preparation failed: {e}")
 
         if self.game.pre_launch_script_wait and self.game.pre_launch_script.strip():
             self._wait_for_game_then_run_script(self.game.pre_launch_script.strip())

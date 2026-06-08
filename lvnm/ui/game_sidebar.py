@@ -487,7 +487,14 @@ class GameSidebar(QFrame):
 
     def start_game(self, name):
         """Call process manager to initialize the runner and starts the process."""
-        self.process_manager.start_game(name, self.timetracker_settings)
+        try:
+            self.process_manager.start_game(name, self.timetracker_settings)
+        except RuntimeError as e:
+            QMessageBox.critical(
+                self,
+                self.tr("Error"),
+                self.tr(str(e))
+            )
 
     def browse_path(self):
         """File system browser"""
@@ -524,6 +531,28 @@ class GameSidebar(QFrame):
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
+
+        if not self.current_game.name:
+            logger.warning("Error: game created without name.")
+            QMessageBox.critical(
+                self,
+                self.tr("Error"),
+                self.tr(f"A name for the game is needed.")
+            )
+            return
+
+        if not self.current_game.path or not self.current_game.prefix:
+            logger.debug("Trying to edit game without necessary data.")
+            reply = QMessageBox.question(
+                self, 
+                self.tr("Warning"),
+                self.tr(self.tr("Prefix or Path data are missing, it can be added later.\n\n Are you sure you want to continue?")),
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No
+            )
+
+            if reply == QMessageBox.No:
+                return
 
         if old_vndb and not self.current_game.vndb:
             logger.info(f"VNDB ID removed for {self.current_game.name}. Clearing cover path.")

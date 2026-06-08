@@ -44,7 +44,7 @@ class GameProcessManager(QObject):
         """Initializes the runner and starts the process."""
         if name in self.active_runners:
             logger.info(f"{name} is already running. Ignoring launch request.")
-            return False
+            raise RuntimeError("Game is already running.")
 
         try:
             game_card = GameManager.get_game(name)
@@ -60,12 +60,11 @@ class GameProcessManager(QObject):
                 # Notify the UI
                 self.game_started.emit(name)
                 return True
-                
         except Exception as e:
             logger.error(f"Failed to start {name}: {e}")
-            return False
+            raise RuntimeError(f"Could not start {name}: {str(e)}")
             
-        return False
+        raise RuntimeError("The game runner failed to execute.")
 
     def stop_game(self, name: str):
         runner = self.active_runners.get(name)

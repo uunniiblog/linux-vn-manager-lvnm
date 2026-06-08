@@ -20,18 +20,6 @@ class GameManager:
         """ Adds a new game entry to the JSON data file. """
         logging.debug(f"add_game exe: {exe} name: {name} prefix: {prefix} vndb: {vndb}")
 
-        # Validate Prefix Existence
-        prefix_data = PrefixManager.get_prefix_info(prefix)
-        if not prefix_data:
-            logging.error(f"Prefix '{prefix}' does not exist in registry.")
-            return False
-
-        # Validate Runner Existence
-        runner_path = prefix_data.get("runner")
-        if not RunnerManagerInterface.is_runner_valid(runner_path):
-            logging.error(f"Runner for prefix '{prefix}' is missing at: {runner_path}")
-            return False
-
         games_dict = GameManager._load_data()
 
         new_card = GameCard(
