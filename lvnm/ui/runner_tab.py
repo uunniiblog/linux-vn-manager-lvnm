@@ -158,23 +158,30 @@ class RunnerSubTab(QWidget):
         if dialog.exec():
             rel_data, arch = dialog.get_selection()
             if rel_data:
-                console = ConsoleDialog(self)
-                console.setWindowTitle(self.tr(f"Installing {self.runner_type.capitalize()}: {rel_data['tag']}"))
+                try:
+                    console = ConsoleDialog(self)
+                    console.setWindowTitle(self.tr(f"Installing {self.runner_type.capitalize()}: {rel_data['tag']}"))
 
-                shared_data = {"downloaded_path": None}
-                # Create Download Task
-                download_task = lambda logger: self._task_download(logger, rel_data, arch, shared_data)
-                # Create Extract Task
-                extract_task = lambda logger: self._task_extract(logger, rel_data, shared_data)
+                    shared_data = {"downloaded_path": None}
+                    # Create Download Task
+                    download_task = lambda logger: self._task_download(logger, rel_data, arch, shared_data)
+                    # Create Extract Task
+                    extract_task = lambda logger: self._task_extract(logger, rel_data, shared_data)
 
-                # Add the task to the queue
-                console.add_task(download_task, {}, f"Downloading Version {rel_data['tag']}")
-                console.add_task(extract_task, {}, "Extracting runner")
-                
-                # Connect refresh to finish and start queue
-                console.finished_all.connect(self.refresh_list)
-                console.start_queue()
-                console.exec()
+                    # Add the task to the queue
+                    console.add_task(download_task, {}, f"Downloading Version {rel_data['tag']}")
+                    console.add_task(extract_task, {}, "Extracting runner")
+                    
+                    # Connect refresh to finish and start queue
+                    console.finished_all.connect(self.refresh_list)
+                    console.start_queue()
+                    console.exec()
+                except RuntimeError as e:
+                    QMessageBox.critical(
+                        self,
+                        self.tr("Error"),
+                        self.tr(str(e))
+                    )
 
     def _task_download(self, console_logger, rel_data, arch, shared_data):
         """Handles the download runner logic."""
@@ -210,7 +217,7 @@ class RunnerSubTab(QWidget):
         except Exception as e:
             console_logger(f"\nFATAL ERROR {str(e)}")
             logger.error(f"Installation error: {e}", exc_info=True)
-            raise e
+            raise RuntimeError(f"Installation failed: {e}")
 
     def _task_extract(self, console_logger, rel_data, shared_data):
         path = shared_data.get("downloaded_path")
@@ -249,8 +256,15 @@ class RunnerSubTab(QWidget):
                                      f"{self.tr('Delete runner')} {folder}?")
         
         if confirm == QMessageBox.Yes:
-            RunnerManagerInterface.delete_runner(self.base_dir, folder)
-            self.refresh_list()
+            try:
+                RunnerManagerInterface.delete_runner(self.base_dir, folder)
+                self.refresh_list()
+            except RuntimeError as e:
+                QMessageBox.critical(
+                    self,
+                    self.tr("Error"),
+                    self.tr(str(e))
+                )
 
 class RunnerTab(QWidget):
     def __init__(self):

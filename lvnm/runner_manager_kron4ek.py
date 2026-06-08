@@ -27,7 +27,9 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
         logger.info(f"Fetching page {page} of Kron4ek releases...")
         data = self.fetch_json(query_url)
         
-        if not data: return []
+        if not data:
+            logger.error(f"No data found for {query_url}")
+            return []
 
         filtered_releases = []
         for release in data:
@@ -52,12 +54,13 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
         key = "has_amd64" if arch == "amd64" else "has_wow64"
         if not release_data.get(key):
             logger.error(f"Architecture '{arch}' not available for {tag}.")
-            return
+            raise ValueError(f"Architecture '{arch}' not available for {tag}.")
 
         # Fetch asset details
         url = f"{self.API_URL}/tags/{tag}"
         data = self.fetch_json(url)
-        if not data: return
+        if not data:
+            raise ValueError(f"No data found in {url}")
 
         suffix = "amd64-wow64" if arch == "wow64" else "amd64"
         # Only search for vanilla builds
@@ -66,14 +69,17 @@ class RunnerManagerKron4ek(RunnerManagerInterface):
 
         if target_name not in assets:
             logger.error(f"Could not find {target_name} in release assets.")
-            return
+            raise ValueError(f"Could not find {target_name} in release assets.")
 
         target_asset = assets[target_name]
         dest_path = self.WINE_RUNNERS_PATH / target_name
         
         if self.download_file(target_asset["browser_download_url"], dest_path, progress_callback=progress_callback):
+            logger.info(f"Runner {dest_path} downloaded sucessfully.")
             return dest_path
-        return None
+
+        logger.error("Error downloading kron4ek runner.")
+        raise RuntimeError("Error downloading kron4ek runner.")
 
     def get_release_info(self, release_data):
         """ Lists all assets for a specific Kron4ek release """

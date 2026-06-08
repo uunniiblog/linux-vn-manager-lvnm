@@ -28,7 +28,7 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
         data = RunnerManagerInterface.fetch_json(query_url)
         
         if not data:
-            logger.info("No releases found or API error.")
+            logger.error(f"No data found for {query_url}")
             return []
 
         filtered_releases = []
@@ -47,7 +47,7 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
         url = f"{self.API_URL}/tags/{tag}"
         data = RunnerManagerInterface.fetch_json(url)
         if not data:
-            return
+            raise ValueError(f"No data found in {url}")
 
         # GE asset is simply {tag}.tar.gz
         target_name = f"{tag}.tar.gz"
@@ -55,15 +55,18 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
 
         if target_name not in assets:
             logger.error(f"Could not find {target_name} in release assets.")
-            return
+            raise ValueError(f"Could not find {target_name} in release assets.")
 
         target_asset = assets[target_name]
         download_url = target_asset["browser_download_url"]
         dest_path = self.PROTON_RUNNER_DIR / target_name
         
         if RunnerManagerInterface.download_file(download_url, dest_path, progress_callback=progress_callback):
+            logger.info(f"Runner {dest_path} downloaded sucessfully.")
             return dest_path
-        return None
+        
+        logger.error("Error downloading protonge runner.")
+        raise RuntimeError("Error downloading protonge runner.")
 
     def get_release_info(self, release_data):
         """ Lists assets for the specific Proton-GE release """

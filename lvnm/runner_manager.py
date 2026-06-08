@@ -1,4 +1,5 @@
 import os
+import shutil
 import json
 import tarfile
 import urllib.request
@@ -65,7 +66,7 @@ class RunnerManagerInterface:
             logger.error(f"Download failed: {e}")
             if dest_path.exists():
                 os.remove(dest_path)
-            return False
+            raise RuntimeError(f"Download failed: {e}")
 
     @staticmethod
     def extract_tar(tar_path, dest_dir, tag, compression="gz"):
@@ -134,12 +135,17 @@ class RunnerManagerInterface:
     @staticmethod
     def delete_runner(runner_dir, folder_name):
         """Deletes a runner folder from disk"""
-        import shutil
-        target = runner_dir / folder_name
-        if target.exists() and target.is_dir():
-            shutil.rmtree(target)
-            return True
-        return False
+        try:
+            target = runner_dir / folder_name
+            if target.exists() and target.is_dir():
+                shutil.rmtree(target)
+                logger.info(f"Runner {target} deleted sucessfully.")
+                return True
+            logger.warning(f"Runner {target} not found")
+            return False
+        except Exception as e:
+            logging.error(f"Runner deletion failed: {e}")
+            raise RuntimeError(f"Prefix deletion failed: {e}")
 
     @staticmethod
     def get_all_installed_runners():
