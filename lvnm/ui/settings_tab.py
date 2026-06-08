@@ -574,9 +574,16 @@ class SettingsTab(QWidget):
             QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            cover_extensions = ["*.jpg", "*.png", "*.JPG", "*.PNG"]
-            SystemUtils.delete_covers_in_folder(folder_path, cover_extensions)
-    
+            try:
+                cover_extensions = ["*.jpg", "*.png", "*.JPG", "*.PNG"]
+                SystemUtils.delete_covers_in_folder(folder_path, cover_extensions)
+            except RuntimeError as e:
+                QMessageBox.critical(
+                    self,
+                    self.tr("Error"),
+                    self.tr(str(e))
+                )
+        
     def browse_directory_for_widget(self, edit_widget, key):
         """Browse directory for folders, ask confirm and move files"""
         old_path = edit_widget.text()        
@@ -590,7 +597,7 @@ class SettingsTab(QWidget):
             reply = QMessageBox.question(
                 self,
                 self.tr("Move files?"),
-                self.tr(f"Do you want to move your data from:\n{old_path}\n\nto:\n{new_path}?"),
+                self.tr(f"Do you want to move your data from:\n{old_path}\n\nto:\n\n{new_path}? \n\nNot moving the data will reset all the data for the new folder."),
                 QMessageBox.Yes | QMessageBox.No
             )
 
@@ -692,11 +699,25 @@ class SettingsTab(QWidget):
         self.version_label_val.setText(new_text)
 
     def save_setting(self, key, value):
-        self.user_settings.set(key, value)
+        try:
+            self.user_settings.set(key, value)
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                self.tr("Error"),
+                self.tr(str(e))
+            )
 
     def save_nested_setting(self, parent_key, child_key, value):
-        parent_dict = self.user_settings.get(parent_key, {})
-        if not isinstance(parent_dict, dict):
-            parent_dict = {}
-        parent_dict[child_key] = value
-        self.user_settings.set(parent_key, parent_dict)
+        try:
+            parent_dict = self.user_settings.get(parent_key, {})
+            if not isinstance(parent_dict, dict):
+                parent_dict = {}
+            parent_dict[child_key] = value
+            self.user_settings.set(parent_key, parent_dict)
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                self.tr("Error"),
+                self.tr(str(e))
+            )

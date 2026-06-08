@@ -425,9 +425,10 @@ class SystemUtils:
                 try:
                     os.remove(file_path)
                     deleted += 1
-                    logger.debug("Deleted cover: %s", file_path)
-                except OSError as exc:
-                    logger.error("Failed to delete cover %s: %s", file_path, exc)
+                    logger.debug(f"Deleted cover: {file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete cover {file_path}: {e}")
+                    raise RuntimeError(f"Failed to delete cover {file_path}: {e}")
 
     @staticmethod
     def are_files_identical(path1: str, path2: str) -> bool:
