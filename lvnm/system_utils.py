@@ -334,8 +334,8 @@ class SystemUtils:
     @staticmethod
     def browse_files(path: str):
         if not path:
-            logger.error("[Error] Path does not exist.")
-            return
+            logger.error(f"Path does not exist: {path}")
+            raise ValueError(f"Path does not exist: {path}")
 
         # Get the directory containing the file
         if os.path.isdir(path):
@@ -354,7 +354,8 @@ class SystemUtils:
             else:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
         else:
-            logger.error(f"[Error] Path does not exist: {folder_path}")
+            logger.error(f"Path does not exist: {folder_path}")
+            raise ValueError(f"Path does not exist: {folder_path}")
 
     @staticmethod
     def get_cover_path(cover_path: str = "", vndb_id: str = "") -> str:
@@ -635,27 +636,32 @@ class SystemUtils:
             
             logging.info(f"Shortcut created at: {shortcut_file}")
         except Exception as e:
-            logging.error(f"Failed to create shortcut: {e}")
+            logging.error(f"Failed to create desktop shortcut: {e}")
+            raise RuntimeError(f"Failed to create desktop shortcut: {e}")
 
     @staticmethod
     def add_to_steam(game_card):
-        exe_cmd, launch_options = SystemUtils.get_launch_command(game_card.name, for_steam=True)
-        
-        icon_path = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb) or ""
-        layout_path = game_card.layout_path or ""
-        game_dir = os.path.dirname(game_card.path)
+        try:
+            exe_cmd, launch_options = SystemUtils.get_launch_command(game_card.name, for_steam=True)
+            
+            icon_path = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb) or ""
+            layout_path = game_card.layout_path or ""
+            game_dir = os.path.dirname(game_card.path)
 
-        success = SteamManager.add_non_steam_game(
-            name=f"LVNM: {game_card.name}",
-            exe=exe_cmd,
-            start_dir=game_dir,
-            icon_path=icon_path,
-            layout_path=layout_path,
-            options=launch_options
-        )
-        
-        if success:
-            logging.info(f"Added {game_card.name} to Steam. RESTART Steam to show up.")
+            success = SteamManager.add_non_steam_game(
+                name=f"LVNM: {game_card.name}",
+                exe=exe_cmd,
+                start_dir=game_dir,
+                icon_path=icon_path,
+                layout_path=layout_path,
+                options=launch_options
+            )
+            
+            if success:
+                logging.info(f"Added {game_card.name} to Steam. RESTART Steam to show up.")
+        except Exception as e:
+            logging.error(f"Failed to add to Steam: {e}")
+            raise RuntimeError(f"Failed to add to Steam:: {e}")
 
     @staticmethod
     def contains_japanese(text):

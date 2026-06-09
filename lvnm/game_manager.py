@@ -63,14 +63,18 @@ class GameManager:
         """
         games_dict = GameManager._load_data()
 
-        if name in games_dict:
-            del games_dict[name]
-            GameManager._save_data(games_dict)
-            logging.info(f"Game '{name}' has been removed from the library.")
-            return True
-        else:
-            logging.debug(f"Game '{name}' not found. Nothing to delete.")
-            return False
+        try:
+            if name in games_dict:
+                del games_dict[name]
+                GameManager._save_data(games_dict)
+                logging.info(f"Game '{name}' has been removed from the library.")
+                return True
+            else:
+                logging.error(f"Game '{name}' not found. Nothing to delete.")
+                raise ValueError(f"Game '{name}' not found. Nothing to delete.")
+        except Exception as e:
+            logging.error(f"Failed to delete game: {e}")
+            raise RuntimeError(f"Failed to delete game: {e}")
 
     @staticmethod
     def update_game(original_name: str, updates: dict):
@@ -125,6 +129,7 @@ class GameManager:
                 json.dump(data, f, indent=4, ensure_ascii=False)
         except Exception as e:
             logging.error(f"Failed to save to {GameManager.GAME_FILE}: {e}")
+            raise RuntimeError(f"Failed to save json data: {e}")
 
     @staticmethod
     def get_game(name: str) -> Optional[GameCard]:
@@ -164,35 +169,39 @@ class GameManager:
         """
         Creates a copy of an existing game with a unique name.
         """
-        source_card = GameManager.get_game(name)
-        if not source_card:
-            logging.error(f"Cannot duplicate. Game '{name}' not found.")
-            return False
+        try:
+            source_card = GameManager.get_game(name)
+            if not source_card:
+                logging.error(f"Cannot duplicate. Game '{name}' not found.")
+                raise ValueError(f"Cannot duplicate. Game '{name}' not found.")
 
-        games_dict = GameManager._load_data()
-        
-        # Generate a unique name
-        base_name = f"{name} (Copy)"
-        new_name = base_name
-        counter = 1
-        
-        while new_name in games_dict:
-            counter += 1
-            new_name = f"{base_name} {counter}"
+            games_dict = GameManager._load_data()
+            
+            # Generate a unique name
+            base_name = f"{name} (Copy)"
+            new_name = base_name
+            counter = 1
+            
+            while new_name in games_dict:
+                counter += 1
+                new_name = f"{base_name} {counter}"
 
-        # Create the copy
-        new_data = source_card.to_dict()
-        
-        # Update the metadata for the copy
-        new_data['name'] = new_name
-        new_data['update_date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-        new_data['last_played'] = "" # Reset play time for the copy
+            # Create the copy
+            new_data = source_card.to_dict()
+            
+            # Update the metadata for the copy
+            new_data['name'] = new_name
+            new_data['update_date'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+            new_data['last_played'] = "" # Reset play time for the copy
 
-        games_dict[new_name] = new_data
-        GameManager._save_data(games_dict)
-        
-        logging.info(f"Successfully duplicated '{name}' as '{new_name}'")
-        return True
+            games_dict[new_name] = new_data
+            GameManager._save_data(games_dict)
+            
+            logging.info(f"Successfully duplicated '{name}' as '{new_name}'")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to duplicate game: {e}")
+            raise RuntimeError(f"Failed to duplicate game: {e}")
 
     @staticmethod
     def export_game(name: str):

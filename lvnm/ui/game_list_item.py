@@ -278,17 +278,21 @@ class GameListItem(QWidget):
             self.delete_game(self.game_card.name)
 
         elif action == act_shortcut:
-            self.shortcut()
+            self.add_desktop_shortcut()
 
         elif action == act_steam:
-            SystemUtils.add_to_steam(self.game_card)
+            self.add_to_steam()
 
     def open_texthooker(self, texthooker_path):
         runner = GameRunner("texthook")
         if texthooker_path:
-            runner.run_texthooker(texthooker_path, self.game_card.prefix, gamescope=self.game_card.gamescope, target_exe_path=self.game_card.path)
+            try:
+                runner.run_texthooker(texthooker_path, self.game_card.prefix, gamescope=self.game_card.gamescope, target_exe_path=self.game_card.path)
+            except RuntimeError as e:
+                QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
         else:
             logger.error("Texthooker path missing")
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Texthooker path missing. Set it up in settings."))
 
     def show_log(self, name):
         self.log_dialog = LogViewerDialog(name)
@@ -297,11 +301,13 @@ class GameListItem(QWidget):
         self.log_dialog.activateWindow()
 
     def duplicate_game(self, name):
-        if GameManager.duplicate_game(name):
-            self.requestRefresh.emit(self.game_card)
+        try:
+            if GameManager.duplicate_game(name):
+                self.requestRefresh.emit(self.game_card)
+        except RuntimeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def delete_game(self, name):
-
         # Quick confirmation dialog
         reply = QMessageBox.question(
             self, 
@@ -312,24 +318,45 @@ class GameListItem(QWidget):
         )
 
         if reply == QMessageBox.Yes:
-            if GameManager.delete_game(name):
-                self.requestRefresh.emit(self.game_card)
-                self.requestCloseSidebar.emit()
+            try:
+                if GameManager.delete_game(name):
+                    self.requestRefresh.emit(self.game_card)
+                    self.requestCloseSidebar.emit()
+            except RuntimeError as e:
+                QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
         
 
     def browse_game(self, path):
-        SystemUtils.browse_files(path)
+        try:
+            SystemUtils.browse_files(path)
+        except ValueError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_in_prefix(self, command: str):
         runner = GameRunner("UtilityMode")
-        runner.run_in_prefix(command, self.game_card.prefix)
+        try:
+            runner.run_in_prefix(command, self.game_card.prefix)
+        except RuntimeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_bash(self):
         runner = GameRunner("UtilityMode")
-        runner.open_terminal(self.game_card.prefix)
+        try:
+            runner.open_terminal(self.game_card.prefix)
+        except RuntimeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
-    def shortcut(self):
-        SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path)
+    def add_to_steam(self):
+        try:
+            SystemUtils.add_to_steam(self.game_card)
+        except RuntimeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
+
+    def add_desktop_shortcut(self):
+        try:
+            SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path)
+        except RuntimeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def prompt_add_new_label(self):
         """Opens a dialog to create a new label, saves it, and applies it."""

@@ -158,7 +158,7 @@ class GameRunner:
             
         except Exception as e:
             logging.error(f"Run in prefix failed: {e}")
-            return False
+            raise RuntimeError(f"Run in prefix failed: {e}")
 
     def run_texthooker(self, text_hooker_path: str, prefix_name: str, gamescope: GameScope, target_exe_path: str):
         """
@@ -215,7 +215,7 @@ class GameRunner:
             
         except Exception as e:
             logging.error(f"run_texthooker failed: {e}")
-            return False
+            raise RuntimeError(f"Error running texthooker: {e}")
 
     def get_windows_pid(self, exe_name: str) -> str:
         """
@@ -509,7 +509,7 @@ class GameRunner:
 
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
-            return False
+            raise RuntimeError(f"Failed to open terminal: {e}")
     
     def run_external_script(self, script_path: str):
         """
