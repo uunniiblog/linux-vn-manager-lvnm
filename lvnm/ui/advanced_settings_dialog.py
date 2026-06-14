@@ -51,6 +51,9 @@ class AdvancedSettingsDialog(QDialog):
         self._vndb_resize_timer.setInterval(150)
         self._vndb_resize_timer.timeout.connect(self._vndb_rebuild_grid)
 
+        # Tracks combos the user explicitly changed
+        self._user_modified_combos = set()  
+
         # Main layout
         self.main_outer_layout = QVBoxLayout(self)
         self.main_scroll = QScrollArea()
@@ -288,51 +291,68 @@ class AdvancedSettingsDialog(QDialog):
             target_line_edit.setText(path)
 
     def accept(self):
-        """Saves values directly back to the unsaved in-memory game card."""       
-        
-        # Process VNDB image selections
-        if self.images_searched:            
-            # If user searched but left every combo empty, reset counts as deleted images
-            self.current_game.cover_path = ""
-            self.current_game.layout_path = ""
+        """Saves values directly back to the unsaved in-memory game card."""
 
-            if self.selected_vndb_id:
-                for combo in self.vndb_image_combos:
-                    role_index = combo.currentIndex()
-                    if role_index == 0: 
-                        continue
-                    temp_path = combo.property("image_path")
-                    if not temp_path:
-                        continue
-                    if role_index == 1:
-                        self.current_game.cover_path = SystemUtils.save_image_to_covers(
-                            temp_path, self.selected_vndb_id, "vertical"
-                        )
-                    elif role_index == 2:
-                        self.current_game.layout_path = SystemUtils.save_image_to_covers(
-                            temp_path, self.selected_vndb_id, "horizontal"
-                        )
+        # Process VNDB image selections
+        if self.images_searched and self.selected_vndb_id:
+            for combo in self.vndb_image_combos:
+                if id(combo) not in self._user_modified_combos:
+                    # Not modified, dont change
+                    continue
+
+                role_index = combo.currentIndex()
+                temp_path = combo.property("image_path")
+                if role_index == 0:
+                    # Explicitly set to None, delete target image
+                    if temp_path and SystemUtils.are_files_identical(temp_path, self.current_game.cover_path):
+                        self.current_game.cover_path = ""
+                        self.current_game.cover_source_url = ""
+                    elif temp_path and SystemUtils.are_files_identical(temp_path, self.current_game.layout_path):
+                        self.current_game.layout_path = ""
+                        self.current_game.layout_source_url = ""
+                elif role_index == 1 and temp_path:
+                    saved = SystemUtils.save_image_to_covers(temp_path, self.selected_vndb_id, "vertical")
+                    if saved:
+                        self.current_game.cover_path = saved
+                        self.current_game.cover_source_url = ""
+                elif role_index == 2 and temp_path:
+                    saved = SystemUtils.save_image_to_covers(temp_path, self.selected_vndb_id, "horizontal")
+                    if saved:
+                        self.current_game.layout_path = saved
+                        self.current_game.layout_source_url = ""
 
         # SteamGridDB image selections
         if self.sgdb_game_id and self.sgdb_api_key:
             sgdb_id_str = f"sgdb{self.sgdb_game_id}"
-
             for combo in self.sgdb_image_combos:
-                role_index = combo.currentIndex()
-                if role_index == 0:
+                if id(combo) not in self._user_modified_combos:
+                    # Not modified, dont change
                     continue
+
+                role_index = combo.currentIndex()
                 parent_widget = combo.parentWidget()
                 if not hasattr(parent_widget, "item"):
                     continue
                 item = parent_widget.item
-                if role_index == 1:
+                item_url = item.get("full_url", "")
+                if role_index == 0:
+                    # Explicitly set to None, delete target image
+                    if item_url and item_url == self.current_game.cover_source_url:
+                        self.current_game.cover_path = ""
+                        self.current_game.cover_source_url = ""
+                    elif item_url and item_url == self.current_game.layout_source_url:
+                        self.current_game.layout_path = ""
+                        self.current_game.layout_source_url = ""
+                elif role_index == 1:
                     saved = self._sgdb_save_full_image(item, sgdb_id_str, "vertical")
                     if saved:
                         self.current_game.cover_path = saved
+                        self.current_game.cover_source_url = item_url
                 elif role_index == 2:
                     saved = self._sgdb_save_full_image(item, sgdb_id_str, "horizontal")
                     if saved:
                         self.current_game.layout_path = saved
+                        self.current_game.layout_source_url = item_url
 
         logger.debug(
             f"[AdvancedSettings.accept] cover_path='{self.current_game.cover_path}' "
@@ -494,6 +514,8 @@ class AdvancedSettingsDialog(QDialog):
         (index 2) across both the VNDB and SGDB sections: only one of each role can be
         selected at any time in the entire dialog.
         """
+        self._user_modified_combos.add(id(changed_combo))
+
         if index == 0:
             return
 
@@ -620,6 +642,20 @@ class AdvancedSettingsDialog(QDialog):
                 widget.combo.blockSignals(True)
                 widget.combo.setCurrentIndex(previous_selections[local_path])
                 widget.combo.blockSignals(False)
+            else:
+                item_url = item.get("full_url", "")
+                cover_url = getattr(self.current_game, "cover_source_url", "")
+                layout_url = getattr(self.current_game, "layout_source_url", "")
+                # logger.debug(f"[SGDB Preselect] item_url='{item_url}'")
+                # logger.debug(f"[SGDB Preselect] cover_source_url='{cover_url}'")
+                # logger.debug(f"[SGDB Preselect] layout_source_url='{layout_url}'")
+                # logger.debug(f"[SGDB Preselect] match_cover={item_url == cover_url}, match_layout={item_url == layout_url}")
+                widget.combo.blockSignals(True)
+                if item_url and item_url == cover_url:
+                    widget.combo.setCurrentIndex(1)
+                elif item_url and item_url == layout_url:
+                    widget.combo.setCurrentIndex(2)
+                widget.combo.blockSignals(False)
 
             self.sgdb_image_combos.append(widget.combo)
             widget.combo.currentIndexChanged.connect(
@@ -637,6 +673,8 @@ class AdvancedSettingsDialog(QDialog):
         """Clears both cover and layout paths from the game and refreshes the UI."""
         self.current_game.cover_path = ""
         self.current_game.layout_path = ""
+        self.current_game.cover_source_url = ""
+        self.current_game.layout_source_url = ""
         self._update_current_asset_thumbnails()
 
     def _update_current_asset_thumbnails(self):

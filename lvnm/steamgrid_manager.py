@@ -242,10 +242,10 @@ class SteamGridDbManager:
                 response.raise_for_status()
                 data = response.json()
                 items = data.get("items", [])
-                logger.debug(f"[SGDB] Steam search '{term}' → {len(items)} results")
+                logger.debug(f"[SGDB] Steam search '{term}' -> {len(items)} results")
                 if items:
                     app_id = str(items[0]["id"])
-                    logger.info(f"[SGDB] Matched '{term}' → Steam App ID {app_id}")
+                    logger.info(f"[SGDB] Matched '{term}' -> Steam App ID {app_id}")
                     return app_id
             except Exception as e:
                 logger.error(f"[SGDB] Steam store search failed for '{game_name}': {e}")

@@ -22,6 +22,8 @@ class GameCard:
     umu_store: str = "none"
     cover_path: str = ""
     layout_path: str = ""
+    cover_source_url: str = ""
+    layout_source_url: str = ""
     last_played: str = ""
     ogtitle: str = ""
     envvar: Dict[str, str] = field(default_factory=dict)
