@@ -5,10 +5,10 @@ from PySide6.QtWidgets import (
     QLineEdit, QLabel, QPushButton, QFileDialog,
     QCheckBox, QGroupBox, QScrollArea, QWidget,
     QGridLayout, QComboBox, QStackedWidget,
-    QFrame, QSplitter
+    QFrame, QSplitter, QStyle, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSettings, QTimer
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QSettings, QTimer, QSize
+from PySide6.QtGui import QPixmap, QIcon, QPainter, QPalette
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.sgdb_autocomplete import SgdbAutocompleteLineEdit
 from vndb_manager import VndbReleaseImagesWorker
@@ -123,27 +123,54 @@ class AdvancedSettingsDialog(QDialog):
 
         # Current images Display
         self.current_assets_box = QGroupBox(self.tr("Current Images"))
+        assets_outer_layout = QVBoxLayout()
+        assets_outer_layout.setContentsMargins(0, 0, 0, 0)
+        assets_outer_layout.setSpacing(6)
+
         self.current_assets_layout = QHBoxLayout()
         self.current_assets_layout.setAlignment(Qt.AlignLeft)
-        
+
         self.curr_v_label = QLabel()
         self.curr_v_label.setFixedHeight(160)
-        self.curr_v_label.setMinimumWidth(40) # Minimum to show some background
+        self.curr_v_label.setMinimumWidth(40)
         self.curr_v_label.setStyleSheet("border: 1px solid #444; background: #222;")
         self.curr_v_label.setAlignment(Qt.AlignCenter)
-        
+
         self.curr_h_label = QLabel()
         self.curr_h_label.setFixedHeight(160)
         self.curr_h_label.setMinimumWidth(40)
         self.curr_h_label.setStyleSheet("border: 1px solid #444; background: #222;")
-        
+
         self.current_assets_layout.addWidget(self.curr_v_label)
         self.current_assets_layout.addSpacing(20)
         self.current_assets_layout.addWidget(self.curr_h_label)
         self.current_assets_layout.addStretch()
-        
-        self.current_assets_box.setLayout(self.current_assets_layout)
+
+        self.btn_clear_assets = QPushButton("🗑")
+        self.btn_clear_assets.setToolTip(self.tr("Remove current cover images"))
+        self.btn_clear_assets.setFixedSize(64, 64)
+        self.btn_clear_assets.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border-radius: 4px;
+                border: none;
+                outline: none;
+            }
+            QPushButton:hover {
+                background: palette(button);
+            }
+            QPushButton:pressed {
+                background: palette(dark);
+            }
+        """)
+        self.btn_clear_assets.clicked.connect(self._clear_current_assets)
+
+        assets_outer_layout.addLayout(self.current_assets_layout)
+        assets_outer_layout.addWidget(self.btn_clear_assets, 0, Qt.AlignLeft)
+
+        self.current_assets_box.setLayout(assets_outer_layout)
         self.scroll_layout.addWidget(self.current_assets_box)
+        self.current_assets_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         
         # Initially update the thumbnails
         self._update_current_asset_thumbnails()
@@ -497,11 +524,10 @@ class AdvancedSettingsDialog(QDialog):
             scaled_pix = pix.scaledToHeight(MAX_HEIGHT, Qt.SmoothTransformation)
             label.setPixmap(scaled_pix)
             label.setFixedWidth(scaled_pix.width())
+            label.show()
             return True
         
-        label.clear()
-        label.setText(placeholder_text)
-        label.setFixedWidth(default_width)
+        label.hide()
         return False
 
     def _sgdb_save_full_image(self, item: dict, game_id_str: str, role: str) -> str:
@@ -606,6 +632,20 @@ class AdvancedSettingsDialog(QDialog):
             if col >= max_cols:
                 col = 0
                 row += 1
+
+    def _clear_current_assets(self):
+        """Clears both cover and layout paths from the game and refreshes the UI."""
+        self.current_game.cover_path = ""
+        self.current_game.layout_path = ""
+        self._update_current_asset_thumbnails()
+
+    def _update_current_asset_thumbnails(self):
+        """Refreshes the thumbnail previews of saved assets."""
+        v_exists = self._set_thumbnail_preview(self.curr_v_label, self.current_game.cover_path, self.tr("No Cover"), 112)
+        h_exists = self._set_thumbnail_preview(self.curr_h_label, self.current_game.layout_path, self.tr("No Layout"), 200)
+        any_exists = v_exists or h_exists
+        self.current_assets_box.setVisible(any_exists)
+        self.btn_clear_assets.setVisible(any_exists)
 
     def keyPressEvent(self, event):
         """Prevents the dialog from closing when 'Enter' or 'Return' is pressed."""
