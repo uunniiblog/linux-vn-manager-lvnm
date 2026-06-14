@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 class SteamGridDbManager:
     SGDB_API_URL = config.SGDB_API_URL
+    STEAM_STORE_API_URL = config.STEAM_STORE_API_URL
+    STEAM_CDN = config.STEAM_CDN
 
     @staticmethod
     def _get_api_key() -> str:
@@ -67,6 +69,62 @@ class SteamGridDbManager:
         return SteamGridDbManager._fetch_and_download(
             url, {}, api_key, prefix="sgdb_hero", is_cancelled=is_cancelled
         )
+
+    @staticmethod
+    def fetch_steam_assets_temp(game_id: int, game_name: str, api_key: str = "", is_cancelled: callable = None) -> list:
+        """
+        Fetches original Steam store assets by pulling them from Steam's CDN.
+        Requires the SGDB game to have a linked Steam App ID.
+        Returns list of dicts:
+        [{local_path, full_url, thumb_url, style, author}, ...]
+        """
+        steam_app_id = SteamGridDbManager.get_steam_app_id(game_name)
+        if not steam_app_id:
+            logger.info(f"[SGDB] No Steam App ID found for '{game_name}', skipping Steam assets.")
+            return []
+
+        BASE = f"{SteamGridDbManager.STEAM_CDN}/{steam_app_id}"
+        ASSETS = [
+            ("header",  f"{BASE}/header.jpg",             "Steam Header"),
+            ("capsule", f"{BASE}/library_600x900.jpg",    "Steam Capsule"),
+            ("hero",    f"{BASE}/library_hero.jpg",       "Steam Hero"),
+            ("logo",    f"{BASE}/logo.png",               "Steam Logo"),
+        ]
+
+        temp_dir = config.TEMP_COVERS
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        session = requests.Session()
+
+        results = []
+        for asset_type, url, style_label in ASSETS:
+            if is_cancelled and is_cancelled():
+                break
+
+            ext = os.path.splitext(url)[1] or ".jpg"
+            filename = f"steam_{steam_app_id}_{asset_type}{ext}"
+            target = temp_dir / filename
+
+            if not target.exists():
+                try:
+                    img_res = session.get(url, timeout=10)
+                    img_res.raise_for_status()
+                    with open(target, "wb") as f:
+                        f.write(img_res.content)
+                except Exception as e:
+                    logger.warning(f"[SGDB] Steam asset '{asset_type}' not available: {e}")
+                    continue  # Some games won't have all asset types
+
+            results.append({
+                "local_path": str(target),
+                "full_url": url,
+                "thumb_url": url,
+                "width": 0,
+                "height": 0,
+                "style": style_label,
+                "author": "Steam (original)",
+            })
+
+        return results
 
     @staticmethod
     def _fetch_and_download(url: str, params: dict, api_key: str, prefix: str, is_cancelled: callable = None) -> list:
@@ -162,6 +220,37 @@ class SteamGridDbManager:
             logger.error(f"[SGDB] Failed to download full image {full_url}: {e}")
             return ""
 
+    @staticmethod
+    def get_steam_app_id(game_name: str) -> str | None:
+        """
+        Searches the Steam store by name and returns the first matching App ID.
+        Uses Steam's public search API, no key required.
+        """
+        # Split on ' / ' and try each part, shortest/simplest first
+        candidates = [part.strip() for part in game_name.split(" / ") if part.strip()]
+        # Also try the full name as a fallback
+        if game_name not in candidates:
+            candidates.append(game_name)
+
+        for term in candidates:
+            try:
+                response = requests.get(
+                    SteamGridDbManager.STEAM_STORE_API_URL,
+                    params={"term": term, "l": "english", "cc": "US"},
+                    timeout=5,
+                )
+                response.raise_for_status()
+                data = response.json()
+                items = data.get("items", [])
+                logger.debug(f"[SGDB] Steam search '{term}' → {len(items)} results")
+                if items:
+                    app_id = str(items[0]["id"])
+                    logger.info(f"[SGDB] Matched '{term}' → Steam App ID {app_id}")
+                    return app_id
+            except Exception as e:
+                logger.error(f"[SGDB] Steam store search failed for '{game_name}': {e}")
+                return None
+
 
 # Workers
 class SteamGridDbSearchWorker(QThread):
@@ -191,9 +280,10 @@ class SteamGridDbImagesWorker(QThread):
     """
     images_ready = Signal(list, list)
 
-    def __init__(self, game_id: int, api_key: str = ""):
+    def __init__(self, game_id: int, game_name: str, api_key: str = ""):
         super().__init__()
         self.game_id = game_id
+        self.game_name = game_name  
         self.api_key = api_key
         self._cancelled = False
 
@@ -207,5 +297,8 @@ class SteamGridDbImagesWorker(QThread):
         heroes = SteamGridDbManager.fetch_heroes_temp(
             self.game_id, self.api_key, is_cancelled=lambda: self._cancelled
         )
+        steam = SteamGridDbManager.fetch_steam_assets_temp(
+            self.game_id, self.game_name, self.api_key, is_cancelled=lambda: self._cancelled
+        )
         if not self._cancelled:
-            self.images_ready.emit(grids, heroes)
+            self.images_ready.emit(grids, heroes + steam)

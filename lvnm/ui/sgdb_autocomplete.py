@@ -161,16 +161,16 @@ class SgdbAutocompleteLineEdit(QLineEdit):
         self.game_selected.emit(game_data)
 
         # start fetching grids/heroes
-        self.fetch_game_assets(game_data['id'])
+        self.fetch_game_assets(game_data['id'], game_data['name'])
 
-    def fetch_game_assets(self, game_id):
+    def fetch_game_assets(self, game_id, game_name: str = ""):
         self.status_changed.emit("Fetching images...")
         
         if self.active_asset_worker:
             self.active_asset_worker.cancel()
 
         api_key = SteamGridDbManager._get_api_key()
-        self.active_asset_worker = SteamGridDbImagesWorker(game_id, api_key)
+        self.active_asset_worker = SteamGridDbImagesWorker(game_id, game_name, api_key)
         self.active_asset_worker.images_ready.connect(self._on_assets_received)
         self.active_asset_worker.start()
 
