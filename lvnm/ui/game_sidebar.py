@@ -664,7 +664,10 @@ class GameSidebar(QFrame):
 
         if reply == QMessageBox.Yes:
             # Call the manager to remove from JSON
-            GameManager.delete_game(self.current_game.name)
+            try:
+                GameManager.delete_game(self.current_game.name)
+            except RuntimeError as e:
+                QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
             
             # Notify the parent tab to refresh the list
             self.on_saved()
@@ -698,6 +701,7 @@ class GameSidebar(QFrame):
                         json.dump(json_data, f, indent=4, ensure_ascii=False)
                     logging.info(f"Game '{self.current_game.name}' exported to '{save_path}'")
                 except Exception as e:
+                    QMessageBox.critical(self, self.tr("Failed to export"), self.tr(str(e)))
                     logging.error(f"Failed to export game: {e}")
 
     def open_create_prefix_dialog(self):        

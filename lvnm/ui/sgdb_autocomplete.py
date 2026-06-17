@@ -5,7 +5,8 @@ import logging
 import concurrent.futures
 from PySide6.QtWidgets import (
     QLineEdit, QListWidget, QListWidgetItem, QWidget, 
-    QVBoxLayout, QHBoxLayout, QLabel, QApplication, QStyle
+    QVBoxLayout, QHBoxLayout, QLabel, QApplication, QStyle,
+    QMessageBox
 )
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent, Signal, QThread
 from PySide6.QtGui import QPixmap
@@ -91,6 +92,14 @@ class SgdbAutocompleteLineEdit(QLineEdit):
         # Recheck cache again
         if filtered is not None:
             self.update_autocomplete_popup(filtered)
+            return
+
+        if not SteamGridDbManager._get_api_key():
+            QMessageBox.critical(
+                self.window(),
+                "No API Key",
+                "No SteamGridDB API key is set.\n\nPlease add your key in Settings."
+            )
             return
 
         # Cancel mid way without crashing
