@@ -106,7 +106,9 @@ class GameRunner:
 
         # Apply pre launch arguments
         if self.game.pre_launch_args.strip():
-            self.cmd = [self.game.pre_launch_args.strip()] + self.cmd
+            # self.cmd = [self.game.pre_launch_args.strip()] + self.cmd
+            pre_args = shlex.split(self.game.pre_launch_args.strip())
+            self.cmd = pre_args + self.cmd
 
         # Apply Gamescope Wrapper
         if self.game.gamescope.enabled.lower() == "true":
