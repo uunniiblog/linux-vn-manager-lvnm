@@ -177,12 +177,19 @@ class PrefixManager:
         desc = f"Installing winetricks: {winetricks_list}"
         cmd = [winetricks_bin, "-q", "--unattended"] + winetricks_list.split()
 
-        logging.debug("Environment Variables:")
+        # Isolate the internal AppImage libraries strictly to the winetricks environment scope
+        winetricks_env = self.env.copy()
+        appdir = os.environ.get("APPDIR")
+        if appdir:
+            bundled_libs = str(Path(appdir) / "usr" / "lib")
+            winetricks_env["LD_LIBRARY_PATH"] = f"{bundled_libs}:{winetricks_env.get('LD_LIBRARY_PATH', '')}"
+
+        logging.debug("Environment Variables Winetricks:")
         for var in self.env:
             logging.debug(f"   {var:<18}: {self.env[var]}")
 
         def finalize():
-            valid_verbs = [v for v in winetricks_list.split() if self.winetrick_exists(v, winetricks_bin, self.env)]
+            valid_verbs = [v for v in winetricks_list.split() if self.winetrick_exists(v, winetricks_bin, winetricks_env)]
             invalid_verbs = [v for v in winetricks_list.split() if v not in valid_verbs]
             if invalid_verbs:
                 logger.warning(f"Unknown winetricks: {invalid_verbs}")
@@ -193,9 +200,9 @@ class PrefixManager:
                 self._save_metadata()
 
         if executor:
-            executor.add_task(cmd, self.env, desc, on_finished_callback=finalize)
+            executor.add_task(cmd, winetricks_env, desc, on_finished_callback=finalize)
         else:
-            ExecutionManager.run(cmd, self.env, wait=True)
+            ExecutionManager.run(cmd, winetricks_env, wait=True)
             finalize()
 
         return True

@@ -33,23 +33,78 @@ class SystemUtils:
         "gst-libav"
     ]
 
+    # @staticmethod
+    # def get_clean_env():
+    #     clean_env = os.environ.copy()
+
+    #     # Restore original LD_LIBRARY_PATH if saved, otherwise strip _MEI and .mount_ AppImage paths
+    #     if "LD_LIBRARY_PATH_ORIG" in clean_env:
+    #         clean_env["LD_LIBRARY_PATH"] = clean_env.pop("LD_LIBRARY_PATH_ORIG")
+    #     elif "LD_LIBRARY_PATH" in clean_env:
+    #         paths = clean_env["LD_LIBRARY_PATH"].split(":")
+    #         clean_paths = [p for p in paths if not any(
+    #             seg in p for seg in ("/tmp/_MEI", "/tmp/.mount_")
+    #         )]
+    #         if clean_paths:
+    #             clean_env["LD_LIBRARY_PATH"] = ":".join(clean_paths)
+    #         else:
+    #             clean_env.pop("LD_LIBRARY_PATH", None)
+
+    #     clean_env.pop("PYTHONHOME", None)
+    #     clean_env.pop("PYTHONPATH", None)
+    #     clean_env.pop("_PYI_ARCHIVE_FILE", None)
+
+    #     appdir = os.environ.get("APPDIR")
+    #     if appdir:
+    #         bundled_tools = str(Path(appdir) / "usr" / "bin" / "tools")
+    #         bundled_libs = str(Path(appdir) / "usr" / "lib")
+            
+    #         # Add tools to PATH so winetricks finds cabextract
+    #         clean_env["PATH"] = f"{bundled_tools}:{clean_env.get('PATH', '')}"
+            
+    #         # Add libs to LD_LIBRARY_PATH so cabextract finds libmspack
+    #         clean_env["LD_LIBRARY_PATH"] = f"{bundled_libs}:{clean_env.get('LD_LIBRARY_PATH', '')}"
+
+    #         # Clear LD_PRELOAD for X11 testing
+    #         logger.debug("Clear LD_PRELOAD for X11 testing")
+    #         preload = clean_env.get("LD_PRELOAD", "")
+    #         if preload:
+    #             safe_preloads = [p for p in preload.split(":") if not any(
+    #                 seg in p for seg in ("gameoverlayrenderer", "libgamemodeauto", "steam", "/tmp/.mount_")
+    #             )]
+    #             if safe_preloads:
+    #                 clean_env["LD_PRELOAD"] = ":".join(safe_preloads)
+    #             else:
+    #                 clean_env.pop("LD_PRELOAD", None)
+
+    #     return clean_env
+
     @staticmethod
     def get_clean_env():
         clean_env = os.environ.copy()
 
-        # Restore original LD_LIBRARY_PATH if saved, otherwise strip _MEI and .mount_ AppImage paths
+        # Restore original LD_LIBRARY_PATH 
         if "LD_LIBRARY_PATH_ORIG" in clean_env:
-            clean_env["LD_LIBRARY_PATH"] = clean_env.pop("LD_LIBRARY_PATH_ORIG")
-        elif "LD_LIBRARY_PATH" in clean_env:
-            paths = clean_env["LD_LIBRARY_PATH"].split(":")
+            base_ld_path = clean_env.get("LD_LIBRARY_PATH_ORIG", "")
+        else:
+            base_ld_path = clean_env.get("LD_LIBRARY_PATH", "")
+
+        # Aggressively strip out any accidental bundle leaks globally
+        if base_ld_path:
+            paths = base_ld_path.split(":")
             clean_paths = [p for p in paths if not any(
-                seg in p for seg in ("/tmp/_MEI", "/tmp/.mount_")
+                seg in p for seg in ("/tmp/_MEI", "/tmp/.mount_", "_internal")
             )]
             if clean_paths:
                 clean_env["LD_LIBRARY_PATH"] = ":".join(clean_paths)
             else:
                 clean_env.pop("LD_LIBRARY_PATH", None)
+        else:
+            clean_env.pop("LD_LIBRARY_PATH", None)
 
+        # Clear development/bootstrap tracking contexts completely
+        clean_env.pop("LD_LIBRARY_PATH_ORIG", None)
+        clean_env.pop("OLD_LD_LIBRARY_PATH", None)
         clean_env.pop("PYTHONHOME", None)
         clean_env.pop("PYTHONPATH", None)
         clean_env.pop("_PYI_ARCHIVE_FILE", None)
@@ -57,18 +112,14 @@ class SystemUtils:
         appdir = os.environ.get("APPDIR")
         if appdir:
             bundled_tools = str(Path(appdir) / "usr" / "bin" / "tools")
-            bundled_libs = str(Path(appdir) / "usr" / "lib")
             
-            # Add tools to PATH so winetricks finds cabextract
+            # Add tools in PATH so utilities can easily discover bundled binaries
             clean_env["PATH"] = f"{bundled_tools}:{clean_env.get('PATH', '')}"
-            
-            # Add libs to LD_LIBRARY_PATH so cabextract finds libmspack
-            clean_env["LD_LIBRARY_PATH"] = f"{bundled_libs}:{clean_env.get('LD_LIBRARY_PATH', '')}"
 
             # Clear LD_PRELOAD for X11 testing
-            logger.debug("Clear LD_PRELOAD for X11 testing")
             preload = clean_env.get("LD_PRELOAD", "")
             if preload:
+                logger.debug("Clear LD_PRELOAD for X11 testing")
                 safe_preloads = [p for p in preload.split(":") if not any(
                     seg in p for seg in ("gameoverlayrenderer", "libgamemodeauto", "steam", "/tmp/.mount_")
                 )]
