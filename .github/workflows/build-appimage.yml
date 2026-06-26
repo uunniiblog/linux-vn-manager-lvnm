@@ -56,10 +56,11 @@ jobs:
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
           # Avoid library errors
-          rm -f LVNM.AppDir/usr/bin/libreadline.so*
-          rm -f LVNM.AppDir/usr/bin/libtinfo.so*
+          rm -f LVNM.AppDir/usr/bin/_internal/libreadline.so*
+          rm -f LVNM.AppDir/usr/bin/_internal/libtinfo.so*
           rm -f LVNM.AppDir/usr/bin/_internal/libcrypto.so.3
           rm -f LVNM.AppDir/usr/bin/_internal/libssl.so.3
+          rm -f LVNM.AppDir/usr/bin/_internal/libzstd.so*
 
       - name: Bundle umu-run (Latest Stable Zipapp)
         run: |
