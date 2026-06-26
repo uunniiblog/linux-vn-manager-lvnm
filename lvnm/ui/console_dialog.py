@@ -98,7 +98,7 @@ class ConsoleDialog(QDialog):
         if self._had_error:
             self._had_error = False
             return
-            
+
         # Run callback then move to next task
         logger.debug(f"Task finished")
         if self.current_callback:
@@ -109,8 +109,11 @@ class ConsoleDialog(QDialog):
         """Captures errors when the process fails to start or crashes."""
         self._had_error = True
         error_msg = self.process.errorString()
-        self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
-        logger.error(f"QProcess Error: {error_msg}")
+        exit_code = self.process.exitCode()
+        exit_status = self.process.exitStatus()
+        #self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
+        self.append_text_signal.emit(f"\n[FATAL ERROR] {error_msg} | exitCode={exit_code} | exitStatus={exit_status} | errorCode={error}")
+        logger.error(f"QProcess crash: error={error}, exitCode={exit_code}")
         self.console.append("\n Task queue aborted due to error")
         
         self.close_btn.setEnabled(True)

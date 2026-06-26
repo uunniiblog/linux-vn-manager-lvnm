@@ -65,6 +65,18 @@ class SystemUtils:
             # Add libs to LD_LIBRARY_PATH so cabextract finds libmspack
             clean_env["LD_LIBRARY_PATH"] = f"{bundled_libs}:{clean_env.get('LD_LIBRARY_PATH', '')}"
 
+            # Clear LD_PRELOAD for X11 testing
+            logger.debug("Clear LD_PRELOAD for X11 testing")
+            preload = clean_env.get("LD_PRELOAD", "")
+            if preload:
+                safe_preloads = [p for p in preload.split(":") if not any(
+                    seg in p for seg in ("gameoverlayrenderer", "libgamemodeauto", "steam", "/tmp/.mount_")
+                )]
+                if safe_preloads:
+                    clean_env["LD_PRELOAD"] = ":".join(safe_preloads)
+                else:
+                    clean_env.pop("LD_PRELOAD", None)
+
         return clean_env
 
     @staticmethod
