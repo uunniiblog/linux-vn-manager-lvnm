@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: write # Required to create releases
 
@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get install -y libfuse2 libxcb1 libxcb-icccm4 libxcb-keysyms1 libxcb-util1 libxcb-cursor0 libxcb-image0 libxkbcommon-x11-0 libxcb-xkb1
           pip install PySide6 setproctitle requests pyinstaller
           # Add any other requirements from your requirements.txt if needed
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
@@ -43,7 +43,16 @@ jobs:
             --paths . \
             --paths lvnm \
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-keysyms.so.1:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-util.so.1:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-cursor.so.0:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-image.so.0:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxkbcommon-x11.so.0:." \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-xkb.so.1:." \
             --name LVNM lvnm/launcher.py
+
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
           # Avoid library errors
@@ -89,9 +98,14 @@ jobs:
           Categories=Game;Utility;
           EOF
 
-          cd LVNM.AppDir
-          ln -s usr/bin/LVNM AppRun
-          cd ..
+          cat <<'APPRUN' > LVNM.AppDir/AppRun
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          # Force bundled xcb/xkb libs over whatever the system has
+          export LD_LIBRARY_PATH="${HERE}/usr/bin/_internal:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/LVNM" "$@"
+          APPRUN
+          chmod +x LVNM.AppDir/AppRun
 
       - name: Generate AppImage
         run: |
