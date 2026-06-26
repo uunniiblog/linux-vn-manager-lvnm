@@ -58,6 +58,8 @@ jobs:
           # Avoid library errors
           rm -f LVNM.AppDir/usr/bin/libreadline.so*
           rm -f LVNM.AppDir/usr/bin/libtinfo.so*
+          rm -f LVNM.AppDir/usr/bin/_internal/libcrypto.so.3
+          rm -f LVNM.AppDir/usr/bin/_internal/libssl.so.3
 
       - name: Bundle umu-run (Latest Stable Zipapp)
         run: |
@@ -102,6 +104,7 @@ jobs:
           #!/bin/bash
           HERE="$(dirname "$(readlink -f "${0}")")"
           # Force bundled xcb/xkb libs over whatever the system has
+          export LD_LIBRARY_PATH_ORIG="${LD_LIBRARY_PATH:-}"
           export LD_LIBRARY_PATH="${HERE}/usr/bin/_internal:${LD_LIBRARY_PATH}"
           exec "${HERE}/usr/bin/LVNM" "$@"
           APPRUN
