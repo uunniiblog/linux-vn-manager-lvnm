@@ -76,11 +76,11 @@ class GameSidebar(QFrame):
         links_col.setContentsMargins(15, 0, 0, 0)
         
         self.lbl_vndb_link = QLabel()
-        self.lbl_vndb_link.setOpenExternalLinks(True)
+        self.lbl_vndb_link.linkActivated.connect(SystemUtils.open_url)
         self.lbl_vndb_link.setStyleSheet("font-size: 14px;margin-top: 20px")
         
         self.lbl_egs_link = QLabel()
-        self.lbl_egs_link.setOpenExternalLinks(True)
+        self.lbl_egs_link.linkActivated.connect(SystemUtils.open_url)
         self.lbl_egs_link.setStyleSheet("font-size: 14px;")
         
         links_col.addWidget(self.lbl_vndb_link)

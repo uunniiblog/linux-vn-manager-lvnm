@@ -80,15 +80,7 @@ class PrefixManager:
             self.env["STORE"] = "none"
             wine_bin = self.runner_path / "files" / "bin" / "wine"
             self.env["WINE"] = str(wine_bin)
-
-            # TODO: debug testing
-            # self.runner_command = [SystemUtils.get_tool_path("umu-run")]
-            umu_path = SystemUtils.get_tool_path("umu-run")
-            self.runner_command = [
-                "bash", "-c",
-                f'PYTHONFAULTHANDLER=1 "{umu_path}" "$@"; echo "EXIT_SIGNAL:$?"',
-                "--"
-            ]
+            self.runner_command = [SystemUtils.get_tool_path("umu-run")]
         else:
             wine_bin = self.runner_path / "bin" / "wine"
             self.env["WINE"] = str(wine_bin)

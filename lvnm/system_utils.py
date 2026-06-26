@@ -65,22 +65,10 @@ class SystemUtils:
 
         appdir = os.environ.get("APPDIR")
         if appdir:
-            bundled_tools = str(Path(appdir) / "usr" / "bin" / "tools")
-            
             # Add tools in PATH so utilities can easily discover bundled binaries
+            bundled_tools = str(Path(appdir) / "usr" / "bin" / "tools")
             clean_env["PATH"] = f"{bundled_tools}:{clean_env.get('PATH', '')}"
 
-            # Clear LD_PRELOAD for X11 testing
-            # preload = clean_env.get("LD_PRELOAD", "")
-            # if preload:
-            #     logger.debug("Clear LD_PRELOAD for X11 testing")
-            #     safe_preloads = [p for p in preload.split(":") if not any(
-            #         seg in p for seg in ("gameoverlayrenderer", "libgamemodeauto", "steam", "/tmp/.mount_")
-            #     )]
-            #     if safe_preloads:
-            #         clean_env["LD_PRELOAD"] = ":".join(safe_preloads)
-            #     else:
-            #         clean_env.pop("LD_PRELOAD", None)
 
         return clean_env
 
@@ -373,6 +361,22 @@ class SystemUtils:
         else:
             logger.error(f"Path does not exist: {folder_path}")
             raise ValueError(f"Path does not exist: {folder_path}")
+
+    @staticmethod
+    def open_url(url: str):
+        """Open external URLs"""
+        runtime = SystemUtils.get_runtime_type()
+        if runtime == "appimage":
+            clean_env = SystemUtils.get_clean_env()
+            # Completely clear LD_LIBRARY_PATH so the host system opens the browser safely
+            clean_env.pop("LD_LIBRARY_PATH", None)
+            logger.debug(f"open_url using xdg-open for: {url}")
+            try:
+                subprocess.Popen(["xdg-open", url], env=clean_env)
+            except Exception as e:
+                logger.error(f"Failed to execute xdg-open: {e}")
+        else:
+            QDesktopServices.openUrl(QUrl(url))
 
     @staticmethod
     def get_cover_path(cover_path: str = "", vndb_id: str = "") -> str:

@@ -128,7 +128,7 @@ class SettingsTab(QWidget):
 
         sgdb_link = QLabel('<a href="https://www.steamgriddb.com/profile/preferences/api" style="color: #3498db; text-decoration: none;">🔗 Get Key</a>')
         sgdb_link = QLabel('Get Key: <a href="https://www.steamgriddb.com/profile/preferences/api"> https://www.steamgriddb.com/profile/preferences/api </a>')
-        sgdb_link.setOpenExternalLinks(True)
+        sgdb_link.linkActivated.connect(SystemUtils.open_url)
         sgdb_link.setToolTip(self.tr("Open SteamGridDB API settings in browser"))
 
         sgdb_container.addWidget(self.sgdb_key_edit, 1)
@@ -507,16 +507,14 @@ class SettingsTab(QWidget):
         about_layout.setLabelAlignment(Qt.AlignLeft)
 
         self.version_label_val = QLabel(config.VERSION)
-        self.version_label_val.setOpenExternalLinks(True)
-
         about_layout.addRow(QLabel(self.tr("LVNM version:")), self.version_label_val)
         
         github_label = QLabel(f'<a href="{config.GIT_URL}">{config.GIT_URL}</a>')
-        github_label.setOpenExternalLinks(True)
+        github_label.linkActivated.connect(SystemUtils.open_url)
         about_layout.addRow(QLabel(self.tr("Github:")), github_label)
 
         wineprefixes_label = QLabel(f'<a href="{config.WINEPREFIX_URL}">{config.WINEPREFIX_URL}</a>')
-        wineprefixes_label.setOpenExternalLinks(True)
+        wineprefixes_label.linkActivated.connect(SystemUtils.open_url)
 
         about_layout.addRow(QLabel(self.tr("Wineprefixes guide:")), wineprefixes_label)
 
