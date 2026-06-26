@@ -111,9 +111,8 @@ class ConsoleDialog(QDialog):
         error_msg = self.process.errorString()
         exit_code = self.process.exitCode()
         exit_status = self.process.exitStatus()
-        #self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
-        self.append_text_signal.emit(f"\n[FATAL ERROR] {error_msg} | exitCode={exit_code} | exitStatus={exit_status} | errorCode={error}")
-        logger.error(f"QProcess crash: error={error}, exitCode={exit_code}")
+        self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
+        logger.error(f"console tasks ERROR: {error_msg} | exitCode={exit_code} | exitStatus={exit_status} | errorCode={error}")
         self.console.append("\n Task queue aborted due to error")
         
         self.close_btn.setEnabled(True)
