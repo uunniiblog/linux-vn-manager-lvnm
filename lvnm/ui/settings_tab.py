@@ -335,7 +335,7 @@ class SettingsTab(QWidget):
         self.save_interval_edit = QLineEdit()
         self.save_interval_edit.setValidator(QIntValidator(1, 999))
         self.save_interval_edit.setFixedWidth(60)
-        self.save_interval_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)))
+        self.save_interval_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 3)))
         self.save_label_suffix = QLabel(self.tr("minutes"))
         save_interval_layout.addWidget(self.save_interval_edit)
         save_interval_layout.addWidget(self.save_label_suffix)
