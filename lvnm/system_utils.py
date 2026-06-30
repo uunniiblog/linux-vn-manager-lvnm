@@ -622,14 +622,25 @@ class SystemUtils:
         return exe_cmd, args
     
     @staticmethod
-    def create_desktop_shortcut(game, cover):
-        """Generates a .desktop file on the user's desktop."""
-        try:
-            # Define paths
-            desktop_path = Path(os.path.expanduser("~/Desktop"))
+    def create_desktop_shortcut(game, cover, target_path=None):
+        """
+        Generates a .desktop file on the user's desktop.
+        If can't find home Desktop folder ask where to save.
+        """
+        # Define paths
+        if target_path:
+            shortcut_file = Path(target_path)
+            if not shortcut_file.parent.is_dir():
+                raise RuntimeError(f"Selected folder does not exist: {shortcut_file.parent}")
+        else:
+            desktop_path = Path(os.path.expanduser("~/Desktop/"))
+            if not desktop_path.is_dir():
+                logger.warning(f"Could not find {desktop_path} folder. Prompting for manual saving.")
+                raise FileNotFoundError(str(desktop_path))
             shortcut_file = desktop_path / f"lvnm-{game}.desktop"
-            
-            # Get the path to your current executable/script
+
+        try:            
+            # Get the path according to current launch method
             exe_cmd, args = SystemUtils.get_launch_command(game)
             exec_cmd = f"{exe_cmd} {args}"
             
@@ -643,7 +654,7 @@ class SystemUtils:
                 f"Name=lvnm-{game}",
                 f"Exec={exec_cmd}",
                 f"Icon={icon_path}",
-                "Terminal=false",  # Set to true if you want to see the logs in a console
+                "Terminal=false",
                 "Categories=Game;",
                 f"Comment=Launch {game} via LVNM",
             ]
@@ -656,6 +667,8 @@ class SystemUtils:
             os.chmod(shortcut_file, 0o755)
             
             logging.info(f"Shortcut created at: {shortcut_file}")
+        except FileNotFoundError:
+            raise
         except Exception as e:
             logging.error(f"Failed to create desktop shortcut: {e}")
             raise RuntimeError(f"Failed to create desktop shortcut: {e}")

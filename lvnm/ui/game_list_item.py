@@ -3,10 +3,11 @@ import config
 from PySide6.QtWidgets import ( 
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QMenu, QDialog, QPlainTextEdit, QPushButton,
-    QLineEdit, QMessageBox
+    QLineEdit, QMessageBox, QFileDialog
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
+from pathlib import Path
 from game_manager import GameManager
 from system_utils import SystemUtils
 from game_process_manager import GameProcessManager
@@ -355,8 +356,27 @@ class GameListItem(QWidget):
     def add_desktop_shortcut(self):
         try:
             SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path)
+        except FileNotFoundError:
+            default_name = f"lvnm-{self.game_card.name}.desktop"
+            default_path = str(Path.home() / default_name)
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                self.tr("Save shortcut as"),
+                default_path,
+                self.tr("Desktop Entry (*.desktop)")
+            )
+            if not file_path:
+                return
+
+            if not file_path.endswith(".desktop"):
+                file_path += ".desktop"
+
+            try:
+                SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path, target_path=file_path)
+            except RuntimeError as e:
+                QMessageBox.critical(self, self.tr("Error"), str(e))
         except RuntimeError as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
+            QMessageBox.critical(self, self.tr("Error"), str(e))
 
     def prompt_add_new_label(self):
         """Opens a dialog to create a new label, saves it, and applies it."""
