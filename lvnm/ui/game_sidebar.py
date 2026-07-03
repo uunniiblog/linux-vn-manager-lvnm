@@ -129,8 +129,8 @@ class GameSidebar(QFrame):
         
         # General Info
         gen_group = QGroupBox(self.tr("Edit Game"))
-        gen_form = QFormLayout(gen_group)
-        gen_form.setLabelAlignment(Qt.AlignLeft)
+        self.gen_form = QFormLayout(gen_group)
+        self.gen_form.setLabelAlignment(Qt.AlignLeft)
         self.edit_name = VndbAutocompleteLineEdit()
         self.edit_name.vn_selected.connect(self.on_vndb_item_selected)
         self.edit_path = QLineEdit()
@@ -168,12 +168,24 @@ class GameSidebar(QFrame):
         self.edit_vndb = QLineEdit()
         self.edit_vndb.setPlaceholderText("v11")
 
-        gen_form.addRow(self.tr("Name:"), self.edit_name)
-        gen_form.addRow(self.tr("Path:"), path_row)
-        gen_form.addRow(self.tr("Prefix:"), prefix_row)
-        gen_form.addRow("", self.prefix_warning)
-        gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
+        # Save data folder (Only if enabled in settings)
+        self.edit_savedata = QLineEdit()
+        self.btn_savedata = QPushButton("...")
+        self.btn_savedata.clicked.connect(self.browse_savedata)
+        self.edit_savedata.setPlaceholderText("~/.local/share/lvnm/prefixes/protonge1034/drive_c/users/user/AppData/Roaming/Frontwing/GINKA/")
+        self.savedata_row = QHBoxLayout()  
+        self.savedata_row.addWidget(self.edit_savedata)
+        self.savedata_row.addWidget(self.btn_savedata)
+
+        self.gen_form.addRow(self.tr("Name:"), self.edit_name)
+        self.gen_form.addRow(self.tr("Path:"), path_row)
+        self.gen_form.addRow(self.tr("Prefix:"), prefix_row)
+        self.gen_form.addRow("", self.prefix_warning)
+        self.gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
+        self.gen_form.addRow(self.tr("Savedata:"), self.savedata_row)
         form.addWidget(gen_group)
+
+        self.update_savedata_visibility()
 
         # Gamescope
         gs_group = QGroupBox("Gamescope")
@@ -314,6 +326,8 @@ class GameSidebar(QFrame):
         self.edit_name.setText(card.name)
         self.edit_path.setText(card.path)
         self.edit_vndb.setText(card.vndb)
+        self.edit_savedata.setText(card.savedata_path)
+        self.update_savedata_visibility()
 
         # Filling Gamescope (using the nested dataclass)
         self.gs_enabled.setChecked(card.gamescope.enabled == "true")
@@ -436,6 +450,8 @@ class GameSidebar(QFrame):
         self.edit_name.clear()
         self.edit_path.clear()
         self.edit_vndb.clear()
+        self.edit_savedata.clear()
+        self.update_savedata_visibility()
         
         # Apply Gamescope Defaults from Settings or leave empty
         gs_default_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
@@ -514,6 +530,21 @@ class GameSidebar(QFrame):
             if selected_files:
                 self.edit_path.setText(selected_files[0])
 
+    def browse_savedata(self):
+        """File system browser"""
+        dialog = QFileDialog(self)
+        current_path = self.edit_path.text()
+        if current_path:
+            dialog.setDirectory(current_path.strip())
+        
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setViewMode(QFileDialog.Detail)
+
+        folder = dialog.getExistingDirectory(self, self.tr("Select Savedata Folder"), "")
+
+        if folder:
+            self.edit_savedata.setText(folder)
+
     def save_data(self):
         """
         Updates the GameCard object and sends it to the manager.
@@ -531,6 +562,7 @@ class GameSidebar(QFrame):
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
+        self.current_game.savedata_path = self.edit_savedata.text()
 
         if not self.current_game.name:
             logger.warning("Error: game created without name.")
@@ -830,6 +862,14 @@ class GameSidebar(QFrame):
         else:
             # If no controller (game not running), reset the UI
             self.reset_tracking_labels()
+
+    def update_savedata_visibility(self):
+        """Shows/hides the Savedata row based on the current setting."""
+        savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
+        enabled = savedata_settings.get("enabled", False)
+
+        row, _ = self.gen_form.getLayoutPosition(self.savedata_row)
+        self.gen_form.setRowVisible(row, enabled)
 
     def update_tracking_ui(self, stats):
         """Update the labels with data received from the worker."""

@@ -36,6 +36,7 @@ class GameCard:
     pre_launch_script_wait: bool = False
     exit_script: str = ""
     arguments: str = ""
+    savedata_path: str = ""
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

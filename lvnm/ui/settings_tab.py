@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 import threading
 from ui.env_var_manager_dialog import EnvVarManagerDialog
+from ui.savedata_management_dialog import SavedataManagementDialog
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
@@ -47,6 +48,7 @@ class SettingsTab(QWidget):
         main_layout.addWidget(self._build_settings_group())
         main_layout.addWidget(self._build_appearance_group())
         main_layout.addWidget(self._build_timetracking_group())
+        main_layout.addWidget(self._build_savedata_group())
         main_layout.addWidget(self._build_texthooking_group())
         main_layout.addWidget(self._build_directories_group())
         main_layout.addWidget(self._build_sysinfo_group())
@@ -175,14 +177,14 @@ class SettingsTab(QWidget):
         self.env_expand_btn.setCursor(Qt.PointingHandCursor)
         self.env_expand_btn.clicked.connect(self._toggle_env_extra)
         
-        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
-        self.manage_env_btn.setFlat(True)
-        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
-        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
-        self.manage_env_btn.clicked.connect(self._open_env_manager)
+        self.manage_savedata_btn = QPushButton(self.tr("Manage Environment Variables"))
+        self.manage_savedata_btn.setFlat(True)
+        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_savedata_btn.clicked.connect(self._open_env_manager)
 
         btn_layout.addWidget(self.env_expand_btn)
-        btn_layout.addWidget(self.manage_env_btn)
+        btn_layout.addWidget(self.manage_savedata_btn)
         btn_layout.addStretch()
         
         self.env_var_main_layout.addLayout(btn_layout)
@@ -370,6 +372,40 @@ class SettingsTab(QWidget):
 
         return timetracker_group
 
+    def _build_savedata_group(self):
+        savedata_group = QGroupBox(self.tr("Savedata Management"))
+        savedata_layout = QFormLayout(savedata_group)
+        savedata_layout.setLabelAlignment(Qt.AlignLeft)
+
+        # Retrieve current settings
+        savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
+
+        # Enable Checkbox
+        self.savedata_enable = QCheckBox(self.tr("Enable"))
+        self.savedata_enable.setChecked(savedata_settings.get("enabled", False))
+        savedata_layout.addRow(QLabel(self.tr("Savedata management:")), self.savedata_enable)
+
+        self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
+        self.manage_savedata_btn.setFlat(True)
+        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
+
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)
+        btn_row.addWidget(self.manage_savedata_btn)
+        btn_row.addStretch()
+        savedata_layout.addRow(btn_row)
+
+        return savedata_group
+
+    def _open_savedata_manager(self):
+        """Opens the dialog to manage savedata."""
+
+        dialog = SavedataManagementDialog(self)
+        if dialog.exec():
+            log.debug("Save data closed")
+
     def _build_texthooking_group(self):
         texthooker_group = QGroupBox(self.tr("Texthooker"))
         texthooker_layout = QFormLayout(texthooker_group)
@@ -538,6 +574,7 @@ class SettingsTab(QWidget):
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
+        self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, "enabled", bool(s)))
 
         # Connect signals for dynamic folder inputs
         for key, edit_widget, btn_widget in self.folder_inputs:
