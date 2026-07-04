@@ -18,6 +18,7 @@ class CliController(QObject):
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
         self.tracking = None
+        self._is_exiting = False
         super().__init__()
     
     def handle_args(self, args):
@@ -50,6 +51,11 @@ class CliController(QObject):
 
             def kill_handler(signum, frame):
                 logger.info(f"Received Signal {signum}. Forcing shutdown!")
+                if self._is_exiting:
+                    logger.info("Cleanup/Sync already in progress. Deferring termination to let cloud sync complete.")
+                    return
+                
+                self._is_exiting = True
                 self.cleanup_exit(game, runner)
                 sys.exit(0)
 
@@ -78,8 +84,11 @@ class CliController(QObject):
             
             app.exec()
 
-            # Stop stuff to properly end
-            self.cleanup_exit(game, runner)
+            # Normal termination path (if the game was closed cleanly via in-game menus)
+            if not self._is_exiting:
+                self._is_exiting = True
+                self.cleanup_exit(game, runner)
+
             logger.info(f"{game} exited with code {runner.process.returncode}")
         else:
             logger.info(f"{game} is already running")
@@ -94,7 +103,6 @@ class CliController(QObject):
             if game_to_update.gdrive:
                 logger.info(f"Syncing save data to Google Drive for '{game}' after closure...")
                 try:
-                    # Run synchronously to ensure execution finishes before CLI script exits
                     SavedataManager.sync_savedata_to_gdrive(game_to_update.to_dict())
                     logger.info(f"Google Drive post-game backup completed successfully for '{game}'.")
                 except Exception as e:
@@ -134,6 +142,11 @@ class CliController(QObject):
 
         def kill_handler(signum, frame):
             logger.info(f"Received Signal {signum}. Forcing shutdown!")
+            if self._is_exiting:
+                logger.info("Cleanup/Sync already in progress. Deferring termination to let cloud sync complete.")
+                return
+
+            self._is_exiting = True
             if self.tracking:
                 self.tracking.stop_tracking()
                 
@@ -182,5 +195,8 @@ class CliController(QObject):
 
         app.exec()
 
-        self.tracking.stop_tracking()
-        self.update_game(game_name)
+        # Normal termination path
+        if not self._is_exiting:
+            self._is_exiting = True
+            self.tracking.stop_tracking()
+            self.update_game(game_name)

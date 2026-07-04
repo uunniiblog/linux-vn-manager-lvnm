@@ -92,26 +92,6 @@ class SettingsTab(QWidget):
         gs_layout.addWidget(self.gs_params)
         settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
         
-        # Save Data Management TODO
-        # save_layout = QHBoxLayout()
-        # self.save_checkbox = QCheckBox(self.tr("Enable"))
-        # self.save_edit = QLineEdit(self.user_settings.get(config.USER_CONF_SAVE_DATA_FOLDER, ""))
-        # self.save_edit.setPlaceholderText(self.tr("Main folder for save files..."))
-        # self.save_btn = QPushButton(self.tr("Browse..."))
-        # save_layout.addWidget(self.save_checkbox)
-        # save_layout.addWidget(self.save_edit)
-        # save_layout.addWidget(self.save_btn)
-        # self.save_checkbox.setEnabled(False)
-        # self.save_edit.setEnabled(False)
-        # self.save_btn.setEnabled(False)
-        # settings_layout.addRow(QLabel(self.tr("Save Management:")), save_layout)
-        
-        # One Game One Prefix TODO
-        # self.ogop_checkbox = QCheckBox(self.tr("Enable"))
-        # self.ogop_checkbox.setChecked(self.user_settings.get(config.USER_CONF_ONE_GAME_PREFIX, False))
-        # self.ogop_checkbox.setEnabled(False)
-        # settings_layout.addRow(QLabel(self.tr("One Game One Prefix:")), self.ogop_checkbox)
-        
         # Global Env Variables
         env_label = QLabel(self.tr("Global Env variables:"))
         env_label.setToolTip(self.tr("These environment variables will be automatically selected when adding a new game.\n They will also be automatically applied from the 'Run in Prefix' dialog."))
@@ -140,15 +120,26 @@ class SettingsTab(QWidget):
         
         settings_layout.addRow(self.tr("SteamGridDB API Key:"), sgdb_container)
 
-        # Log Level
+        # Log Level + File Logging
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "ERROR"])
         self.log_level_combo.setFixedWidth(200)
         current_log = self.user_settings.get(config.USER_CONF_LOG_LEVEL, "INFO").upper()
         log_map = {"DEBUG": 0, "INFO": 1, "ERROR": 2}
         self.log_level_combo.setCurrentIndex(log_map.get(current_log, 1))
-        self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
-        settings_layout.addRow(QLabel(self.tr("Log Level:")), self.log_level_combo)
+
+        self.log_to_file_checkbox = QCheckBox(self.tr("Write logging to file"))
+        self.log_to_file_checkbox.setChecked(self.user_settings.get(config.USER_CONF_LOG_TO_FILE, False))
+        self.log_to_file_checkbox.setToolTip(
+            self.tr("Writes application logs to ~/.local/share/lvnm/timetracker_test.log\n"
+                    "Requires an app restart to take effect.")
+        )
+
+        log_row = QHBoxLayout()
+        log_row.addWidget(self.log_level_combo)
+        log_row.addWidget(self.log_to_file_checkbox)
+        log_row.addStretch()
+        settings_layout.addRow(QLabel(self.tr("Log Level:")), log_row)
 
         return settings_group
 
@@ -645,6 +636,8 @@ class SettingsTab(QWidget):
     def _connect_signals(self):
         self.font_btn.clicked.connect(self.browse_font_folder)
         self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
+        self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
+        self.log_to_file_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOG_TO_FILE, bool(s)))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         # self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))

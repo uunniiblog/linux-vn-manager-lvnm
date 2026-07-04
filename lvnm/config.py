@@ -192,6 +192,7 @@ USER_CONF_SAVEDATA_ENABLED = "enabled"
 USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID = "gdrive_client_id"
 USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET = "gdrive_client_secret"
 USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN = "gdrive_refresh_token"
+USER_CONF_LOG_TO_FILE = "log_to_file"
 
 # User config
 GAMESCOPE_INSTALLED = False
