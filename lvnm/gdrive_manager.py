@@ -164,8 +164,8 @@ class GdriveManager:
     def get_client_credentials() -> tuple[str, str]:
         """Reads the stored Google client id/secret from settings."""
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
-        client_id = savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, "")
-        client_secret = savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, "")
+        client_id = savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, "").strip()
+        client_secret = savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, "").strip()
         return client_id, client_secret
 
     @staticmethod

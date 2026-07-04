@@ -650,8 +650,8 @@ class SettingsTab(QWidget):
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
         self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_ENABLED, bool(s)))
         self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
-        self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t))
-        self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t))
+        self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t.strip()))
+        self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t.strip()))
 
         # Reset gdrive if credentials changed, maybe using new acc or something
         self.gdrive_client_id_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t),GdriveManager.reset_service_cache()))
