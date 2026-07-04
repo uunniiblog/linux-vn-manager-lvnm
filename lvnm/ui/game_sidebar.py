@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
-    QMessageBox, QDialog,
+    QMessageBox, QDialog, QProgressDialog
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent
@@ -18,6 +18,7 @@ from model.game_card import GameCard, GameScope
 from system_utils import SystemUtils
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
+from savedata_manager import SavedataManager
 from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
@@ -47,6 +48,12 @@ class GameSidebar(QFrame):
         self.process_manager.game_started.connect(self.on_game_started_signal)
         self.process_manager.game_stopped.connect(self.on_game_stopped_signal)
         self.process_manager.tracking_updated.connect(self.on_tracking_updated_signal)
+        SavedataManager.get_instance().gdrive_sync_failed.connect(self.on_gdrive_sync_failed)
+        SavedataManager.get_instance().gdrive_sync_succeeded.connect(self.on_gdrive_sync_succeeded)
+
+        # State tracking for pre-game cloud syncs
+        self.game_pending_launch = None
+        self.pregame_progress = None
         
         layout = QVBoxLayout(self)
         
@@ -305,6 +312,49 @@ class GameSidebar(QFrame):
             self.lbl_session_play.setText(stats.get("session_playtime", "00:00:00"))
             self.lbl_total_play.setText(stats.get("total_playtime", "00:00:00"))
 
+    def on_gdrive_sync_failed(self, name, error_message):
+        """Shown when Gdrive sync fails."""
+        if self.game_pending_launch == name:
+            self.game_pending_launch = None
+            if self.pregame_progress:
+                self.pregame_progress.close()
+                self.pregame_progress = None
+                
+            # Ask the user if they want to override the failure (e.g. they are playing offline)
+            reply = QMessageBox.question(
+                self,
+                self.tr("Sync Failed"),
+                self.tr(
+                    f"Google Drive sync failed:\n\n{error_message}\n\n"
+                    f"Do you want to launch the game anyway using local saves?"
+                ),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self._execute_game_launch(name)
+        else:
+            # Game close error uploading data notify
+            QMessageBox.warning(
+                self, 
+                self.tr("Backup Failed"), 
+                self.tr(f"Background save backup failed for '{name}':\n{error_message}.\nYou can sync the data manually from settings.")
+            )
+
+    def on_gdrive_sync_succeeded(self, name, result):
+        """Start game after successful sync or show log if closing game"""
+        if self.game_pending_launch == name:
+            self.game_pending_launch = None
+            if self.pregame_progress:
+                self.pregame_progress.close()
+                self.pregame_progress = None
+            
+            # Sync succeeded! Proceed to launch game
+            self._execute_game_launch(name)
+        else:
+            # This handles ordinary background/post-game sync finishes
+            logger.info(f"Post-game cloud backup finished for '{name}': {result}")
+
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
         self.edit_vndb.setText(vn_data.get('id', ''))
@@ -510,15 +560,29 @@ class GameSidebar(QFrame):
         self.process_manager.stop_game(name)
 
     def start_game(self, name):
+        """Pre-syncs saves with Google Drive if enabled, otherwise launches the game."""
+        try:
+            game_to_start = GameManager.get_game(name)
+            if game_to_start.gdrive:
+                self.game_pending_launch = name
+                self.pregame_progress = QProgressDialog(self.tr("Syncing save data with Google Drive before launch..."), None, 0, 0, self)
+                self.pregame_progress.setWindowModality(Qt.WindowModal)
+                self.pregame_progress.setWindowTitle(self.tr("Cloud Sync"))
+                self.pregame_progress.setWindowFlags(self.pregame_progress.windowFlags() & ~Qt.WindowCloseButtonHint)
+                self.pregame_progress.show()
+                SavedataManager.get_instance().start_gdrive_sync(name, game_to_start.to_dict())
+            else:
+                self._execute_game_launch(name)
+
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)), exc_info=True)
+
+    def _execute_game_launch(self, name):
         """Call process manager to initialize the runner and starts the process."""
         try:
             self.process_manager.start_game(name, self.timetracker_settings)
-        except RuntimeError as e:
-            QMessageBox.critical(
-                self,
-                self.tr("Error"),
-                self.tr(str(e))
-            )
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)), exc_info=True)
 
     def browse_path(self):
         """File system browser"""

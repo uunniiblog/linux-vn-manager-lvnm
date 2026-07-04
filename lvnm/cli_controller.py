@@ -36,6 +36,16 @@ class CliController(QObject):
         
         if not runner.is_running():
 
+            # Fetch gdrive
+            game_card = GameManager.get_game(game)
+            if game_card.gdrive:
+                logger.info(f"Checking Google Drive cloud saves for '{game}' before launch...")
+                try:
+                    SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
+                    logger.info(f"Google Drive pre-launch sync completed successfully for '{game}'.")
+                except Exception as e:
+                    logger.error(f"Google Drive pre-launch sync failed for '{game}': {e}. Proceeding with local saves.")
+
             app = QCoreApplication.instance() or QCoreApplication(sys.argv)
 
             def kill_handler(signum, frame):
@@ -75,11 +85,20 @@ class CliController(QObject):
             logger.info(f"{game} is already running")
 
     def update_game(self, game):
-        game_to_update = GameManager.get_game(game) 
+        game_to_update = GameManager.get_game(game)
         if game_to_update:
             SavedataManager.try_auto_detect_savedata(game, game_to_update)
             game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
             GameManager.update_game(game, game_to_update.to_dict())
+
+            if game_to_update.gdrive:
+                logger.info(f"Syncing save data to Google Drive for '{game}' after closure...")
+                try:
+                    # Run synchronously to ensure execution finishes before CLI script exits
+                    SavedataManager.sync_savedata_to_gdrive(game_to_update.to_dict())
+                    logger.info(f"Google Drive post-game backup completed successfully for '{game}'.")
+                except Exception as e:
+                    logger.error(f"Google Drive post-game backup failed for '{game}': {e}")
 
     def cleanup_exit(self, game, runner):
         logger.info(f"Closing {game}...")
@@ -100,6 +119,15 @@ class CliController(QObject):
         if not game_card:
             logger.error(f"{game_name} Not found. It must be added to the application first.")
             return
+
+        if game_card.gdrive:
+            logger.info(f"Checking Google Drive cloud saves for '{game_name}' before tracking...")
+            try:
+                # Run synchronously on the main thread
+                SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
+                logger.info(f"Google Drive pre-tracking sync completed successfully for '{game_name}'.")
+            except Exception as e:
+                logger.error(f"Google Drive pre-tracking sync failed for '{game_name}': {e}. Proceeding with local tracking.")
 
         runner = GameRunner(game_card)
         runner.game = game_card

@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import os
+from PySide6.QtCore import QThread, Signal, QObject
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timezone
@@ -14,7 +15,9 @@ from gdrive_manager import GdriveManager
 
 logger = logging.getLogger(__name__)
 
-class SavedataManager:
+class SavedataManager(QObject):
+    _instance = None
+
     SAVEDATA_FOLDER_NAMES = ["savedata", "UserData", "save"]
     PREFIX_SAVEDATA_SEARCH_DIRS = [
         "drive_c/users/*/Saved Games",
@@ -23,6 +26,42 @@ class SavedataManager:
         "drive_c/users/*/AppData/LocalLow",
         "drive_c/users/*/AppData/Local",
     ]
+
+    gdrive_sync_succeeded = Signal(str, dict)
+    gdrive_sync_failed = Signal(str, str)
+
+    @classmethod
+    def get_instance(cls):
+        """Singleton instance accessor"""
+        if cls._instance is None:
+            cls._instance = SavedataManager()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        self._gdrive_sync_workers = {}
+
+    def start_gdrive_sync(self, name: str, game_data: dict):
+        """Runs the Gdrive sync in a background thread so it doesn't block the UI."""
+        # Safety guard: Prevent launching duplicate threads for the same game
+        if name in self._gdrive_sync_workers:
+            logger.warning(f"Gdrive sync already in progress for '{name}'. Skipping duplicate request.")
+            return
+
+        worker = GdriveSyncWorker(game_data)
+        worker.sync_succeeded.connect(self._on_gdrive_sync_succeeded)
+        worker.sync_failed.connect(self._on_gdrive_sync_failed)
+        worker.finished.connect(lambda: self._gdrive_sync_workers.pop(name, None))
+
+        self._gdrive_sync_workers[name] = worker  # Retain reference against GC
+        worker.start()
+
+    def _on_gdrive_sync_succeeded(self, name: str, result: dict):
+        logger.info(f"Gdrive sync completed for '{name}': {result}")
+        self.gdrive_sync_succeeded.emit(name, result)
+
+    def _on_gdrive_sync_failed(self, name: str, error_message: str):
+        self.gdrive_sync_failed.emit(name, error_message)
 
     @staticmethod
     def copy_savedata_to_prefix(game_data: dict, prefix_name: str, overwrite: bool = False):
@@ -376,3 +415,23 @@ class SavedataManager:
         all_metadata = SavedataManager._load_gsync_metadata()
         all_metadata[game_name] = manifest
         SavedataManager._save_gsync_metadata(all_metadata)
+
+class GdriveSyncWorker(QThread):
+    """
+    Runs SavedataManager.sync_savedata_to_gdrive() in a background thread
+    """
+    sync_succeeded = Signal(str, dict)
+    sync_failed = Signal(str, str)
+
+    def __init__(self, game_data: dict):
+        super().__init__()
+        self.game_data = game_data
+
+    def run(self):
+        game_name = self.game_data.get("name", "")
+        try:
+            result = SavedataManager.sync_savedata_to_gdrive(self.game_data)
+            self.sync_succeeded.emit(game_name, result)
+        except Exception as e:
+            logger.error(f"Gdrive sync failed for '{game_name}': {e}", exc_info=True)
+            self.sync_failed.emit(game_name, str(e))

@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
 from game_runner import GameRunner
 from timetracker.tracking_controller import TrackingController
-from savedata_manager import SavedataManager
+from savedata_manager import SavedataManager, GdriveSyncWorker
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +139,8 @@ class GameProcessManager(QObject):
                 SavedataManager.try_auto_detect_savedata(name, game_to_update)
                 game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')      
                 GameManager.update_game(name, game_to_update.to_dict())
+                if game_to_update.gdrive:
+                    SavedataManager.get_instance().start_gdrive_sync(name, game_to_update.to_dict())
             
             # Notify UI
             self.game_stopped.emit(name)
