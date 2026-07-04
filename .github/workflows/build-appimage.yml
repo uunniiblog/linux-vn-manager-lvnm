@@ -43,6 +43,7 @@ jobs:
             --paths . \
             --paths lvnm \
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
+            --add-data "lvnm/assets:assets" \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-keysyms.so.1:." \
