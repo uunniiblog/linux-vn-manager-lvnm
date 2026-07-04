@@ -4,6 +4,7 @@ import config
 import logging
 import requests
 import threading
+import time
 import io
 import os
 import json
@@ -26,6 +27,11 @@ GDRIVE_FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
 class GdriveManager:
     _root_folder_id = None
     _thread_local = threading.local()
+
+    # access token cache
+    _cached_access_token = None
+    _cached_token_expiry = 0  # unix timestamp
+    _token_lock = threading.Lock()
 
     @staticmethod
     def request_device_code(client_id: str) -> dict:
@@ -62,7 +68,6 @@ class GdriveManager:
         if error in ("authorization_pending", "slow_down"):
             return None
 
-        # access_denied, expired_token, etc.
         raise RuntimeError(data.get("error_description", error or "Unknown error"))
 
     @staticmethod
@@ -105,8 +110,56 @@ class GdriveManager:
         savedata_settings.pop(config.USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN, None)
         settings.set(config.USER_CONF_SAVEDATA, savedata_settings)
         GdriveManager.reset_service_cache()
+        GdriveManager.invalidate_token_cache()
         logger.info("Logged out of Google Drive.")
 
+    @staticmethod
+    def _get_access_token() -> str:
+        """
+        Returns a cached access token if still valid, otherwise refreshes it once.
+        Thread-safe: if multiple threads call this concurrently while the token
+        is expired/missing, only ONE actually hits the network; the rest wait
+        on the lock and then reuse the result.
+        """
+        now = time.time()
+
+        # Token still valid, no lock needed for the common case
+        if GdriveManager._cached_access_token and now < GdriveManager._cached_token_expiry:
+            return GdriveManager._cached_access_token
+
+        with GdriveManager._token_lock:
+            # Re-check after acquiring the lock another thread may have already refreshed it while we were waiting.
+            now = time.time()
+            if GdriveManager._cached_access_token and now < GdriveManager._cached_token_expiry:
+                return GdriveManager._cached_access_token
+
+            client_id, client_secret = GdriveManager.get_client_credentials()
+            refresh_token = GdriveManager.get_refresh_token()
+            if not refresh_token:
+                raise RuntimeError("Not logged in to Google Drive.")
+
+            resp = requests.post(config.GDRIVE_TOKEN_URL, data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            })
+            resp.raise_for_status()
+            data = resp.json()
+
+            GdriveManager._cached_access_token = data["access_token"]
+            expires_in = data.get("expires_in", 3600)
+            GdriveManager._cached_token_expiry = time.time() + expires_in - 60  # refresh a bit early
+
+            logger.debug("Refreshed Google Drive access token.")
+            return GdriveManager._cached_access_token
+
+    @staticmethod
+    def invalidate_token_cache():
+        """Force a fresh refresh next call."""
+        GdriveManager._cached_access_token = None
+        GdriveManager._cached_token_expiry = 0
+    
     @staticmethod
     def get_client_credentials() -> tuple[str, str]:
         """Reads the stored Google client id/secret from settings."""
@@ -117,35 +170,38 @@ class GdriveManager:
 
     @staticmethod
     def _get_drive_service():
+        """
+        Returns a Drive service scoped to the current thread. The underlying
+        httplib2 transport isn't thread-safe, so each thread gets its own
+        service object - but they all share the SAME access token via
+        _get_access_token(), so only one network refresh happens across
+        however many threads are active.
+        """
+        access_token = GdriveManager._get_access_token()
+
+        cached_token = getattr(GdriveManager._thread_local, "token", None)
         service = getattr(GdriveManager._thread_local, "service", None)
-        if service is not None:
+
+        # Rebuild this thread's service only if it doesn't have one yet,
+        # or if the shared token has been refreshed since it built its own.
+        if service is not None and cached_token == access_token:
             return service
 
-        client_id, client_secret = GdriveManager.get_client_credentials()
-        refresh_token = GdriveManager.get_refresh_token()
-        if not refresh_token:
-            raise RuntimeError("Not logged in to Google Drive.")
-
-        creds = Credentials(
-            token=None,
-            refresh_token=refresh_token,
-            client_id=client_id,
-            client_secret=client_secret,
-            token_uri="https://oauth2.googleapis.com/token",
-        )
+        creds = Credentials(token=access_token)
 
         schema_path = Path(__file__).parent / "assets" / "drive_v3.json"
-
         with open(schema_path, "r", encoding="utf-8") as f:
             drive_schema = json.load(f)
 
         service = build_from_document(drive_schema, credentials=creds)
         GdriveManager._thread_local.service = service
+        GdriveManager._thread_local.token = access_token
         return service
 
     @staticmethod
     def reset_service_cache():
         GdriveManager._thread_local.service = None
+        GdriveManager._thread_local.token = None
 
     @staticmethod
     def find_folder(name: str, parent_id: str = None) -> str | None:
@@ -280,19 +336,23 @@ class GdriveManager:
     @staticmethod
     def download_file(file_id: str, local_path: Path, remote_mtime: float):
         """
-        Downloads a Drive file to local_path, then sets the local file's
-        mtime to match remote_mtime so future diffs compare correctly.
+        Downloads a Drive file to local_path atomically (via a temp file + rename),
+        then sets the local file's mtime to match remote_mtime so future diffs
+        compare correctly. Atomic so a kill mid-download can't leave a corrupted
+        save file at the real path.
         """
         service = GdriveManager._get_drive_service()
         local_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = local_path.with_name(local_path.name + ".part")
 
         request = service.files().get_media(fileId=file_id)
-        with io.FileIO(str(local_path), "wb") as fh:
+        with io.FileIO(str(tmp_path), "wb") as fh:
             downloader = MediaIoBaseDownload(fh, request)
             done = False
             while not done:
                 _, done = downloader.next_chunk()
 
+        os.replace(tmp_path, local_path)
         os.utime(local_path, (remote_mtime, remote_mtime))
         logger.debug(f"Downloaded '{local_path}' from Drive")
 
