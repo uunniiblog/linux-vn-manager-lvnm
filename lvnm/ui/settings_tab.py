@@ -102,20 +102,16 @@ class SettingsTab(QWidget):
 
         # --- Added SteamGridDB API Key Section ---
         sgdb_container = QHBoxLayout()
-        self.sgdb_key_edit = QLineEdit()
+        initial_key = self.user_settings.get(config.USER_CONF_SGDB_API_KEY, "")
+        self.sgdb_key_edit, secret_layout = self._create_secret_field(initial_key)
         self.sgdb_key_edit.setPlaceholderText(self.tr("Enter your API key..."))
-        self.sgdb_key_edit.setEchoMode(QLineEdit.Password) 
-        self.sgdb_key_edit.setText(self.user_settings.get(config.USER_CONF_SGDB_API_KEY, ""))
-        self.sgdb_key_edit.textChanged.connect(
-            lambda text: self.save_setting(config.USER_CONF_SGDB_API_KEY, text)
-        )
+        sgdb_container.addLayout(secret_layout, 1)
 
         sgdb_link = QLabel('<a href="https://www.steamgriddb.com/profile/preferences/api" style="color: #3498db; text-decoration: none;">🔗 Get Key</a>')
         sgdb_link = QLabel('Get Key: <a href="https://www.steamgriddb.com/profile/preferences/api"> https://www.steamgriddb.com/profile/preferences/api </a>')
         sgdb_link.linkActivated.connect(SystemUtils.open_url)
         sgdb_link.setToolTip(self.tr("Open SteamGridDB API settings in browser"))
 
-        sgdb_container.addWidget(self.sgdb_key_edit, 1)
         sgdb_container.addWidget(sgdb_link)
         
         settings_layout.addRow(self.tr("SteamGridDB API Key:"), sgdb_container)
@@ -636,6 +632,7 @@ class SettingsTab(QWidget):
     def _connect_signals(self):
         self.font_btn.clicked.connect(self.browse_font_folder)
         self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
+        self.sgdb_key_edit.textChanged.connect(lambda text: self.save_setting(config.USER_CONF_SGDB_API_KEY, text))
         self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
         self.log_to_file_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOG_TO_FILE, bool(s)))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
