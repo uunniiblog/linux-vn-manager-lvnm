@@ -396,7 +396,7 @@ class SystemUtils:
             return ""
 
         # Search for any file extension matching the VNDB ID
-        matches = list(covers_dir.glob(f"{vndb_id}*_p.*"))
+        matches = list(covers_dir.glob(f"{vndb_id}-*_p.*"))
         if not matches:
             # fallback check for original naming without _p to not break current covers
             matches = list(covers_dir.glob(f"{vndb_id}.*"))
