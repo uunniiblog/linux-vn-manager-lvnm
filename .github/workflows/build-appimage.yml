@@ -27,9 +27,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 libxcb1 libxcb-icccm4 libxcb-keysyms1 libxcb-util1 libxcb-cursor0 libxcb-image0 libxkbcommon-x11-0 libxcb-xkb1
-          pip install PySide6 setproctitle requests pyinstaller
+          # pip install PySide6 setproctitle requests pyinstaller
           # Add any other requirements from your requirements.txt if needed
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt
 
       - name: Create AppDir Structure
         run: |

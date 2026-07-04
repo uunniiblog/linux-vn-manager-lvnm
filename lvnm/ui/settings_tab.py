@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (
     QLabel, QGroupBox, QFormLayout,
     QHBoxLayout, QLineEdit, QPushButton,
     QCheckBox, QFileDialog, QScrollArea, QFrame,
-    QGridLayout, QMessageBox, QStyle, QSizePolicy
+    QGridLayout, QMessageBox, QStyle, QSizePolicy,
+    QToolButton, QProgressBar, QDialog, QApplication
 )
 import threading
 from ui.env_var_manager_dialog import EnvVarManagerDialog
@@ -18,6 +19,7 @@ from game_manager import GameManager
 from logging_manager import setup_logging
 from prefix_manager import PrefixManager
 from game_process_manager import GameProcessManager
+from gdrive_manager import GdriveManager, GdriveDeviceFlowWorker
 
 logger = logging.getLogger(__name__)
 
@@ -382,16 +384,41 @@ class SettingsTab(QWidget):
 
         # Enable Checkbox
         self.savedata_enable = QCheckBox(self.tr("Enable"))
-        self.savedata_enable.setChecked(savedata_settings.get("enabled", False))
+        self.savedata_enable.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False))
         savedata_layout.addRow(QLabel(self.tr("Savedata management:")), self.savedata_enable)
 
         # Auto detect checkbox
         auto_detect_label = QLabel(self.tr("Auto Detect Save:"))
         auto_detect_label.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
         self.auto_detect_save = QCheckBox(self.tr("Enable"))
-        self.auto_detect_save.setChecked(savedata_settings.get("auto_detect_save", False))
+        self.auto_detect_save.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_AUTO_DETECT, False))
         self.auto_detect_save.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
         savedata_layout.addRow(auto_detect_label, self.auto_detect_save)
+
+        # Gdrive Client ID
+        gdrive_id_label = QLabel(self.tr("Gdrive Client ID:"))
+        self.gdrive_client_id_edit, gdrive_id_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, ""))
+        savedata_layout.addRow(gdrive_id_label, gdrive_id_row)
+
+        # Gdrive Client Secret
+        gdrive_secret_label = QLabel(self.tr("Gdrive Client Secret:"))
+        self.gdrive_client_secret_edit, gdrive_secret_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, ""))
+        savedata_layout.addRow(gdrive_secret_label, gdrive_secret_row)
+
+        # Gdrive Sign in button
+        self.gdrive_signin_btn = QPushButton(self.tr("Sign in to Google Drive"))
+        self.gdrive_signin_btn.setFlat(True)
+        self.gdrive_signin_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.gdrive_signin_btn.setCursor(Qt.PointingHandCursor)
+        self.gdrive_signin_btn.clicked.connect(self._sign_in_gdrive)
+
+        self.gdrive_connected_label = QLabel(self.tr("Connected"))
+
+        self.gdrive_logout_btn = QPushButton(self.tr("Log out"))
+        self.gdrive_logout_btn.setFlat(True)
+        self.gdrive_logout_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
+        self.gdrive_logout_btn.setCursor(Qt.PointingHandCursor)
+        self.gdrive_logout_btn.clicked.connect(self._logout_gdrive)
 
         # Savedata dialog
         self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
@@ -402,14 +429,24 @@ class SettingsTab(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(0, 0, 0, 0)
+        btn_row.addWidget(self.gdrive_signin_btn)
+        btn_row.addWidget(self.gdrive_connected_label)
+        btn_row.addWidget(self.gdrive_logout_btn)
         btn_row.addWidget(self.manage_savedata_btn)
         btn_row.addStretch()
         savedata_layout.addRow(btn_row)
+
+        self._update_gdrive_ui_state()
 
         # Widgets that only make sense when savedata management is enabled
         self.savedata_dependent_widgets = [
             auto_detect_label,
             self.auto_detect_save,
+            gdrive_id_label,
+            self.gdrive_client_id_edit,
+            gdrive_secret_label,
+            self.gdrive_client_secret_edit,
+            self.gdrive_signin_btn,
             self.manage_savedata_btn
         ]
 
@@ -427,6 +464,28 @@ class SettingsTab(QWidget):
         dialog = SavedataManagementDialog(self)
         if dialog.exec():
             log.debug("Save data closed")
+
+    def _create_secret_field(self, initial_value=""):
+        """Creates a password-style QLineEdit with a toggle button to reveal/hide the text.
+        Returns (line_edit, container_layout)."""
+        line_edit = QLineEdit(initial_value)
+        line_edit.setEchoMode(QLineEdit.Password)
+
+        toggle_btn = QToolButton()
+        toggle_btn.setCheckable(True)
+        toggle_btn.setText("👁")
+        toggle_btn.setToolTip(self.tr("Show/Hide"))
+        toggle_btn.setFixedWidth(28)
+        toggle_btn.toggled.connect(
+            lambda checked, e=line_edit: e.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
+        )
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(line_edit)
+        row.addWidget(toggle_btn)
+
+        return line_edit, row
 
     def _build_texthooking_group(self):
         texthooker_group = QGroupBox(self.tr("Texthooker"))
@@ -589,15 +648,21 @@ class SettingsTab(QWidget):
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         # self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
-        self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", "timetracking", bool(s)))
-        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
-        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
-        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting("timetracker", config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
+        self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
+        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
+        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
+        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
-        self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, "enabled", bool(s)))
-        self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, "auto_detect_save", bool(s)))
+        self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_ENABLED, bool(s)))
+        self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
+        self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t))
+        self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t))
+
+        # Reset gdrive if credentials changed, maybe using new acc or something
+        self.gdrive_client_id_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t),GdriveManager.reset_service_cache()))
+        self.gdrive_client_secret_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t),GdriveManager.reset_service_cache()))
 
         # Connect signals for dynamic folder inputs
         for key, edit_widget, btn_widget in self.folder_inputs:
@@ -755,6 +820,103 @@ class SettingsTab(QWidget):
             latest = tag.lstrip('v')
             if latest != current:
                 self.update_available_signal.emit(tag, url)
+
+    def _sign_in_gdrive(self):
+        """Starts the Google Drive device-flow sign-in using the configured client id/secret."""
+        client_id = self.gdrive_client_id_edit.text().strip()
+        client_secret = self.gdrive_client_secret_edit.text().strip()
+
+        if not client_id or not client_secret:
+            QMessageBox.warning(
+                self,
+                self.tr("Missing Credentials"),
+                self.tr("Please enter both the Google Client ID and Client Secret before signing in.")
+            )
+            return
+
+        self.gdrive_worker = GdriveDeviceFlowWorker(client_id, client_secret)
+
+        self._gdrive_dialog = QDialog(self)
+        self._gdrive_dialog.setWindowTitle(self.tr("Sign in to Google Drive"))
+        self._gdrive_dialog.resize(400, 250)
+        layout = QVBoxLayout(self._gdrive_dialog)
+
+        self._gdrive_status_label = QLabel(self.tr("Requesting device code..."))
+        layout.addWidget(self._gdrive_status_label)
+
+        self._gdrive_code_label = QLabel("")
+        self._gdrive_copy_btn = QPushButton(self.tr("Copy"))
+        self._gdrive_copy_btn.clicked.connect(self._copy_gdrive_code)
+
+        code_row = QHBoxLayout()
+        code_row.addWidget(self._gdrive_code_label)
+        code_row.addWidget(self._gdrive_copy_btn)
+        code_row.addStretch()
+        layout.addLayout(code_row)
+
+        self._gdrive_link_label = QLabel("")
+        self._gdrive_link_label.linkActivated.connect(SystemUtils.open_url)
+        layout.addWidget(self._gdrive_link_label)
+
+        progress = QProgressBar()
+        progress.setRange(0, 0)  # indeterminate spinner
+        layout.addWidget(progress)
+
+        self.gdrive_worker.device_code_ready.connect(self._on_gdrive_device_code_ready)
+        self.gdrive_worker.login_success.connect(self._on_gdrive_login_success)
+        self.gdrive_worker.login_failed.connect(self._on_gdrive_login_failed)
+        self.gdrive_worker.login_timeout.connect(self._on_gdrive_login_timeout)
+
+        self._gdrive_dialog.finished.connect(self._cancel_gdrive_worker)
+
+        self.gdrive_worker.start()
+        self._gdrive_dialog.exec()
+
+    def _copy_gdrive_code(self):
+        code = getattr(self, "_gdrive_user_code", "")
+        if code:
+            QApplication.clipboard().setText(code)
+
+    def _cancel_gdrive_worker(self):
+        if hasattr(self, "gdrive_worker") and self.gdrive_worker.isRunning():
+            self.gdrive_worker.cancel()
+
+    def _on_gdrive_device_code_ready(self, device_info):
+        user_code = device_info.get("user_code", "")
+        verification_url = device_info.get("verification_url", "")
+
+        self._gdrive_status_label.setText(self.tr("Enter this code at the link below:"))
+        self._gdrive_user_code = user_code
+
+        self._gdrive_code_label.setText(f"<b style='font-size: 18px;'>{user_code}</b>")
+        self._gdrive_link_label.setText(f'<a href="{verification_url}" style="color: #3498db;">🔗 {verification_url}</a>')
+
+    def _on_gdrive_login_success(self, token_data):
+        GdriveManager.save_credentials(token_data)
+        self._gdrive_dialog.accept()
+        self._update_gdrive_ui_state()
+        QMessageBox.information(self, self.tr("Connected"), self.tr("Successfully signed in to Google Drive."))
+
+    def _on_gdrive_login_failed(self, error_message):
+        self._gdrive_dialog.reject()
+        QMessageBox.critical(self, self.tr("Sign-in Failed"), error_message)
+
+    def _on_gdrive_login_timeout(self):
+        self._gdrive_dialog.reject()
+        QMessageBox.warning(self, self.tr("Timed Out"), self.tr("Sign-in timed out. Please try again."))
+
+    def _logout_gdrive(self):
+        client_id = self.gdrive_client_id_edit.text().strip()
+        client_secret = self.gdrive_client_secret_edit.text().strip()
+        GdriveManager.logout(client_id, client_secret)
+        self._update_gdrive_ui_state()
+
+    def _update_gdrive_ui_state(self):
+        """Swaps the sign-in button for a 'Connected' label + logout button, or vice versa."""
+        connected = GdriveManager.is_logged_in()
+        self.gdrive_signin_btn.setVisible(not connected)
+        self.gdrive_connected_label.setVisible(connected)
+        self.gdrive_logout_btn.setVisible(connected)
 
     def _on_update_found(self, tag, url):
         """Updates the UI label with the link to the new release"""

@@ -5,10 +5,12 @@ import json
 import logging
 import shutil
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from prefix_manager import PrefixManager
 from settings_manager import SettingsManager
+from gdrive_manager import GdriveManager
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +175,7 @@ class SavedataManager:
         is found. Returns True if game_card was modified.
         """
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
-        if not savedata_settings.get("auto_detect_save", False):
+        if not savedata_settings.get(config.USER_CONF_SAVEDATA_AUTO_DETECT, False):
             return False
 
         if game_card.savedata_path:
@@ -188,3 +190,177 @@ class SavedataManager:
         logger.warning(f"Could not auto-detect savedata folder for '{name}'.")
         return False
 
+    @staticmethod
+    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 15) -> dict:
+        """
+        Bidirectionally syncs a game's savedata folder with Drive, preserving
+        subfolder structure and propagating deletions:
+        - Present on both sides: newer mtime wins.
+        - Present on only one side: if it was in the last-synced manifest,
+        it was deleted on the other side -> delete it here too.
+        Otherwise it's genuinely new -> copy it over.
+        Returns {"uploaded": [...], "downloaded": [...], "deleted_local": [...],
+                "deleted_remote": [...], "skipped": [...]}
+        """
+        game_name = game_data.get("name", "")
+        savedata_path = game_data.get("savedata_path", "")
+
+        if not game_data.get("gdrive", False):
+            raise ValueError(f"Gdrive sync is not enabled for '{game_name}'.")
+        if not savedata_path:
+            raise ValueError(f"No savedata path set for '{game_name}'.")
+
+        src = Path(savedata_path)
+        if not src.exists():
+            raise FileNotFoundError(f"Savedata path does not exist: {src}")
+
+        root_folder_id = GdriveManager.get_root_folder_id()
+        folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
+        if folder_id is None:
+            folder_id = GdriveManager.create_folder(game_name, parent_id=root_folder_id)
+
+        remote_files, remote_folders = GdriveManager.build_remote_tree(folder_id)
+
+        local_files_by_rel = {
+            f.relative_to(src).as_posix(): f
+            for f in src.rglob("*") if f.is_file()
+        }
+
+        manifest = SavedataManager._get_sync_manifest(game_name)
+        all_rel_paths = set(local_files_by_rel.keys()) | set(remote_files.keys()) | set(manifest.keys())
+
+        upload_plan = []
+        download_plan = []
+        delete_local_plan = []
+        delete_remote_plan = []
+        skipped = []
+
+        for rel_path in all_rel_paths:
+            local_file = local_files_by_rel.get(rel_path)
+            remote_meta = remote_files.get(rel_path)
+            was_known = rel_path in manifest
+            rel_dir = "/".join(rel_path.split("/")[:-1])
+
+            # Present on both sides
+            if local_file is not None and remote_meta is not None:
+                local_mtime = local_file.stat().st_mtime
+                remote_mtime = datetime.fromisoformat(remote_meta["modifiedTime"]).timestamp()
+
+                if local_mtime > remote_mtime + 1:
+                    target_parent_id = GdriveManager.ensure_folder_path(folder_id, rel_dir, remote_folders)
+                    upload_plan.append((local_file, target_parent_id, remote_meta["id"], rel_path))
+                elif remote_mtime > local_mtime + 1:
+                    download_plan.append((remote_meta["id"], local_file, remote_mtime, rel_path))
+                else:
+                    skipped.append(rel_path)
+                continue
+
+            # Local only
+            if local_file is not None and remote_meta is None:
+                if was_known:
+                    # Existed before, now gone from Drive -> deleted remotely -> delete locally too
+                    delete_local_plan.append(local_file)
+                else:
+                    target_parent_id = GdriveManager.ensure_folder_path(folder_id, rel_dir, remote_folders)
+                    upload_plan.append((local_file, target_parent_id, None, rel_path))
+                continue
+
+            # Remote only
+            if local_file is None and remote_meta is not None:
+                if was_known:
+                    # Existed before, now gone locally -> deleted locally -> delete remotely too
+                    delete_remote_plan.append(remote_meta["id"])
+                else:
+                    remote_mtime = datetime.fromisoformat(remote_meta["modifiedTime"]).timestamp()
+                    download_plan.append((remote_meta["id"], src / rel_path, remote_mtime, rel_path))
+                continue
+
+        # Concurrent uploads
+        uploaded = []
+        if upload_plan:
+            def do_upload(item):
+                local_file, parent_id, existing_id, rel_path = item
+                GdriveManager.upload_file(local_file, parent_id, existing_file_id=existing_id)
+                return rel_path
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                uploaded = list(executor.map(do_upload, upload_plan))
+
+        # Concurrent downloads
+        downloaded = []
+        if download_plan:
+            def do_download(item):
+                file_id, local_target, remote_mtime, rel_path = item
+                GdriveManager.download_file(file_id, local_target, remote_mtime)
+                return rel_path
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                downloaded = list(executor.map(do_download, download_plan))
+
+        # Concurrent remote deletions
+        deleted_remote = []
+        if delete_remote_plan:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                list(executor.map(GdriveManager.delete_file, delete_remote_plan))
+            deleted_remote = delete_remote_plan
+
+        # Local deletions
+        deleted_local = []
+        for local_file in delete_local_plan:
+            try:
+                local_file.unlink()
+                deleted_local.append(local_file.relative_to(src).as_posix())
+            except Exception as e:
+                logger.warning(f"Failed to delete local file '{local_file}': {e}")
+
+        # Rebuild manifest
+        new_manifest = {}
+        for f in src.rglob("*"):
+            if f.is_file():
+                rel = f.relative_to(src).as_posix()
+                new_manifest[rel] = f.stat().st_mtime
+        SavedataManager._save_sync_manifest(game_name, new_manifest)
+
+        logger.info(
+            f"Gdrive sync for '{game_name}': {len(uploaded)} uploaded, {len(downloaded)} downloaded, "
+            f"{len(deleted_local)} deleted locally, {len(deleted_remote)} deleted remotely, "
+            f"{len(skipped)} unchanged."
+        )
+        return {
+            "uploaded": uploaded, "downloaded": downloaded,
+            "deleted_local": deleted_local, "deleted_remote": deleted_remote,
+            "skipped": skipped
+        }
+
+    @staticmethod
+    def _load_gsync_metadata() -> dict:
+        """Loads the full gsync metadata file: {game_name: {rel_path: mtime}}"""
+        if not config.GSYNC_METADATA.exists():
+            return {}
+        try:
+            with open(config.GSYNC_METADATA, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
+
+    @staticmethod
+    def _save_gsync_metadata(data: dict):
+        """Saves the full gsync metadata file safely."""
+        try:
+            config.GSYNC_METADATA.parent.mkdir(parents=True, exist_ok=True)
+            with open(config.GSYNC_METADATA, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            logging.error(f"Failed to save to {config.GSYNC_METADATA}: {e}")
+            raise RuntimeError(f"Failed to save gsync metadata: {e}")
+
+    @staticmethod
+    def _get_sync_manifest(game_name: str) -> dict:
+        """Returns {rel_path: mtime} as of the end of the last successful sync for this game."""
+        all_metadata = SavedataManager._load_gsync_metadata()
+        return all_metadata.get(game_name, {})
+
+    @staticmethod
+    def _save_sync_manifest(game_name: str, manifest: dict):
+        """Updates just this game's manifest within the shared metadata file."""
+        all_metadata = SavedataManager._load_gsync_metadata()
+        all_metadata[game_name] = manifest
+        SavedataManager._save_gsync_metadata(all_metadata)

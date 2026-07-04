@@ -24,6 +24,7 @@ USER_SETTINGS = DATA_DIR / ".userconf.json"
 LAST_PLAYED_METADATA = LOG_DIR / ".last_played.json"
 AFK_FILE = Path(tempfile.gettempdir()) / "lvnm" / "lvnm_afk_detection_file"
 TEMP_COVERS = Path(tempfile.gettempdir()) / "lvnm" / "search"
+GSYNC_METADATA = DATA_DIR / ".gsync_metadata.json"
 
 # URLS
 LVNM_API_URL = "https://api.github.com/repos/uunniiblog/linux-vn-manager-lvnm/releases"
@@ -37,6 +38,10 @@ STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps"
 VNDB_SITE_URL = "https://vndb.org/{vndbid}"
 EGS_SITE_URL = "https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/kensaku.php?category=game&word_category=name&word={jpname}"
 WINEPREFIX_URL = "https://www.vnwiki.xyz/linux/wineprefixes.html"
+GDRIVE_DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
+GDRIVE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GDRIVE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file"
 
 # Codec List
 CODEC_LIST = [
@@ -182,6 +187,11 @@ USER_CONF_PROTON_RUNNERS_PATH = "proton_runners_dir"
 USER_CONF_PREFIXES_PATH = "prefixes_dir"
 USER_CONF_LOGS_PATH = "logs_dir"
 USER_CONF_SGDB_API_KEY = "sgdb_api_key"
+USER_CONF_SAVEDATA_AUTO_DETECT = "auto_detect_save"
+USER_CONF_SAVEDATA_ENABLED = "enabled"
+USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID = "gdrive_client_id"
+USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET = "gdrive_client_secret"
+USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN = "gdrive_refresh_token"
 
 # User config
 GAMESCOPE_INSTALLED = False

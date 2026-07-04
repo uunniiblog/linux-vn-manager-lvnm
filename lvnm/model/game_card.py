@@ -37,6 +37,7 @@ class GameCard:
     exit_script: str = ""
     arguments: str = ""
     savedata_path: str = ""
+    gdrive: bool = False
 
     @classmethod
     def from_dict(cls, name: str, data: dict):

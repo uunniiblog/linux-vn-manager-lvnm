@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QDialog, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QSizePolicy,
     QWidget, QLineEdit, QLabel, QFileDialog, QComboBox,
-    QMessageBox
+    QMessageBox, QCheckBox
 )
 from PySide6.QtCore import QSettings, Qt
 import config
@@ -38,7 +38,7 @@ class SavedataManagementDialog(QDialog):
             self.tr("Game"),
             self.tr("Savedata Path"),
             self.tr("Prefix"),
-            self.tr("Gdrive")
+            self.tr("Gdrive Sync")
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -65,7 +65,9 @@ class SavedataManagementDialog(QDialog):
             savedata_widget.line_edit.textChanged.connect(lambda text, btn=prefix_widget.copy_button: btn.setEnabled(bool(text.strip())))
 
             # Column 3: Gdrive - left empty for now
-            self.table.setItem(row, 3, QTableWidgetItem(""))
+            gdrive_widget = self._create_gdrive_widget(row, game_data)
+            self.table.setCellWidget(row, 3, gdrive_widget)
+            savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
 
         layout.addWidget(self.table)
 
@@ -211,6 +213,63 @@ class SavedataManagementDialog(QDialog):
                 self.tr("Couldn't auto-detect the savedata folder for '{0}'. Fill it in manually.")
                     .format(game_data.get("name", ""))
             )
+
+    def _create_gdrive_widget(self, row, game_data):
+        """Creates a checkbox gdrive sync flag and a sync now button."""
+        widget = QWidget()
+        h_layout = QHBoxLayout(widget)
+        h_layout.setContentsMargins(2, 2, 2, 2)
+
+        checkbox = QCheckBox()
+        checkbox.setChecked(bool(game_data.get("gdrive", False)))
+        checkbox.setEnabled(bool(game_data.get("savedata_path", "")))
+        checkbox.stateChanged.connect(lambda state, gd=game_data: self._save_gdrive_flag(gd, bool(state)))
+
+        sync_button = QPushButton(self.tr("Sync Now"))
+        sync_button.setEnabled(checkbox.isChecked())
+        sync_button.clicked.connect(lambda: self._sync_gdrive(game_data))
+        checkbox.stateChanged.connect(lambda state, btn=sync_button: btn.setEnabled(bool(state)))
+
+
+        h_layout.addStretch()
+        h_layout.addWidget(checkbox)
+        h_layout.addWidget(sync_button)
+        h_layout.addStretch()
+
+        widget.checkbox = checkbox
+        widget.sync_button = sync_button
+
+        return widget
+
+    def _save_gdrive_flag(self, game_data, enabled):
+        """Persists the gdrive flag for this game via GameManager."""
+        game_name = game_data.get("name")
+        game_data["gdrive"] = enabled
+        GameManager.update_game(game_name, {"gdrive": enabled})
+
+    def _update_gdrive_widget_enabled(self, gdrive_widget, has_path):
+        """Keeps both the checkbox and sync button correctly enabled as the savedata path changes."""
+        gdrive_widget.checkbox.setEnabled(has_path)
+        gdrive_widget.sync_button.setEnabled(has_path and gdrive_widget.checkbox.isChecked())
+
+    def _sync_gdrive(self, game_data):
+        """Handles the Gdrive sync button via SavedataManager."""
+        try:
+            result = SavedataManager.sync_savedata_to_gdrive(game_data)
+            if result == "uploaded":
+                QMessageBox.information(
+                    self, self.tr("Gdrive Sync"),
+                    self.tr("Savedata for '{0}' uploaded to Google Drive.").format(game_data.get("name", ""))
+                )
+            elif result == "exists":
+                QMessageBox.information(
+                    self, self.tr("Gdrive Sync"),
+                    self.tr("A Gdrive folder for '{0}' already exists. Sync logic for this case isn't implemented yet.")
+                        .format(game_data.get("name", ""))
+                )
+        except Exception as e:
+            logging.error(f"Gdrive sync failed for '{game_data.get('name', '')}': {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Gdrive Sync Failed"), str(e))
 
     def _restore_state(self):
         """Restores the window size and position from the previous session."""

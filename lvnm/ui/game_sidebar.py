@@ -294,7 +294,7 @@ class GameSidebar(QFrame):
                 self.current_game.last_played = game_to_update.last_played
                 self.current_game.savedata_path = game_to_update.savedata_path
                 self.edit_savedata.setText(game_to_update.savedata_path)
-                
+
             self.set_ui_start_state()
             self.reset_tracking_labels()
 
@@ -883,7 +883,7 @@ class GameSidebar(QFrame):
     def update_savedata_visibility(self):
         """Shows/hides the Savedata row based on the current setting."""
         savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
-        enabled = savedata_settings.get("enabled", False)
+        enabled = savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
 
         row, _ = self.gen_form.getLayoutPosition(self.savedata_row)
         self.gen_form.setRowVisible(row, enabled)
