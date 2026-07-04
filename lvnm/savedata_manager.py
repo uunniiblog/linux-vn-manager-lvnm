@@ -217,7 +217,12 @@ class SavedataManager:
         root_folder_id = GdriveManager.get_root_folder_id()
         folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
         if folder_id is None:
+            # Treat this as a fresh sync environment to prevent accidental mass local deletion.
             folder_id = GdriveManager.create_folder(game_name, parent_id=root_folder_id)
+            # Overwrite manifest to be empty; was_known will become False
+            manifest = {}
+        else:
+            manifest = SavedataManager._get_sync_manifest(game_name)
 
         remote_files, remote_folders = GdriveManager.build_remote_tree(folder_id)
 
@@ -226,7 +231,6 @@ class SavedataManager:
             for f in src.rglob("*") if f.is_file()
         }
 
-        manifest = SavedataManager._get_sync_manifest(game_name)
         all_rel_paths = set(local_files_by_rel.keys()) | set(remote_files.keys()) | set(manifest.keys())
 
         upload_plan = []
@@ -274,6 +278,14 @@ class SavedataManager:
                     remote_mtime = datetime.fromisoformat(remote_meta["modifiedTime"]).timestamp()
                     download_plan.append((remote_meta["id"], src / rel_path, remote_mtime, rel_path))
                 continue
+
+        # Safeguard in case of full wipe
+        if len(delete_local_plan) > 0 and len(delete_local_plan) == len(local_files_by_rel):
+            raise RuntimeError(
+                f"Sync aborted for '{game_name}': Safety trigger hit. "
+                f"The algorithm attempted to delete all local save files. "
+                f"Please verify your Google Drive state."
+            )
 
         # Concurrent uploads
         uploaded = []
