@@ -42,6 +42,7 @@ jobs:
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
             --paths lvnm \
+            --exclude-module googleapiclient.discovery_cache \
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
