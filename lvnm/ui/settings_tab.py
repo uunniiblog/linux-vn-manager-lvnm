@@ -177,14 +177,14 @@ class SettingsTab(QWidget):
         self.env_expand_btn.setCursor(Qt.PointingHandCursor)
         self.env_expand_btn.clicked.connect(self._toggle_env_extra)
         
-        self.manage_savedata_btn = QPushButton(self.tr("Manage Environment Variables"))
-        self.manage_savedata_btn.setFlat(True)
-        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
-        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
-        self.manage_savedata_btn.clicked.connect(self._open_env_manager)
+        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
+        self.manage_env_btn.setFlat(True)
+        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
+        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_env_btn.clicked.connect(self._open_env_manager)
 
         btn_layout.addWidget(self.env_expand_btn)
-        btn_layout.addWidget(self.manage_savedata_btn)
+        btn_layout.addWidget(self.manage_env_btn)
         btn_layout.addStretch()
         
         self.env_var_main_layout.addLayout(btn_layout)
@@ -385,6 +385,15 @@ class SettingsTab(QWidget):
         self.savedata_enable.setChecked(savedata_settings.get("enabled", False))
         savedata_layout.addRow(QLabel(self.tr("Savedata management:")), self.savedata_enable)
 
+        # Auto detect checkbox
+        auto_detect_label = QLabel(self.tr("Auto Detect Save:"))
+        auto_detect_label.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
+        self.auto_detect_save = QCheckBox(self.tr("Enable"))
+        self.auto_detect_save.setChecked(savedata_settings.get("auto_detect_save", False))
+        self.auto_detect_save.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
+        savedata_layout.addRow(auto_detect_label, self.auto_detect_save)
+
+        # Savedata dialog
         self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
         self.manage_savedata_btn.setFlat(True)
         self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
@@ -396,6 +405,19 @@ class SettingsTab(QWidget):
         btn_row.addWidget(self.manage_savedata_btn)
         btn_row.addStretch()
         savedata_layout.addRow(btn_row)
+
+        # Widgets that only make sense when savedata management is enabled
+        self.savedata_dependent_widgets = [
+            auto_detect_label,
+            self.auto_detect_save,
+            self.manage_savedata_btn
+        ]
+
+        # Connect the checkbox signal
+        self.savedata_enable.toggled.connect(self._on_savedata_toggled)
+
+        # Set initial state
+        self._on_savedata_toggled(self.savedata_enable.isChecked())
 
         return savedata_group
 
@@ -575,6 +597,7 @@ class SettingsTab(QWidget):
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
         self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, "enabled", bool(s)))
+        self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, "auto_detect_save", bool(s)))
 
         # Connect signals for dynamic folder inputs
         for key, edit_widget, btn_widget in self.folder_inputs:
@@ -664,6 +687,11 @@ class SettingsTab(QWidget):
     def _on_timetracking_toggled(self, checked):
         """Helper to enable/disable all timetracking sub-widgets"""
         for widget in self.tt_dependent_widgets:
+            widget.setEnabled(checked)
+
+    def _on_savedata_toggled(self, checked):
+        """Helper to enable/disable all savedata sub-widgets"""
+        for widget in self.savedata_dependent_widgets:
             widget.setEnabled(checked)
 
     def _toggle_env_extra(self, force_hide=False):

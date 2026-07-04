@@ -8,6 +8,7 @@ from game_runner import GameRunner
 from game_manager import GameManager
 from settings_manager import SettingsManager
 from timetracker.tracking_controller import TrackingController
+from savedata_manager import SavedataManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class CliController(QObject):
     def update_game(self, game):
         game_to_update = GameManager.get_game(game) 
         if game_to_update:
+            SavedataManager.try_auto_detect_savedata(game, game_to_update)
             game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
             GameManager.update_game(game, game_to_update.to_dict())
 

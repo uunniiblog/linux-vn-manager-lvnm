@@ -5,6 +5,7 @@ from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
 from game_runner import GameRunner
 from timetracker.tracking_controller import TrackingController
+from savedata_manager import SavedataManager
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,7 @@ class GameProcessManager(QObject):
 
             game_to_update = GameManager.get_game(name) 
             if game_to_update:
+                SavedataManager.try_auto_detect_savedata(name, game_to_update)
                 game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')      
                 GameManager.update_game(name, game_to_update.to_dict())
             

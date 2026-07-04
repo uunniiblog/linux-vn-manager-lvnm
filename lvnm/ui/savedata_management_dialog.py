@@ -40,8 +40,12 @@ class SavedataManagementDialog(QDialog):
             self.tr("Prefix"),
             self.tr("Gdrive")
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setColumnWidth(0, 150)
+        self.table.setColumnWidth(1, 250)
+        self.table.setColumnWidth(2, 150)
 
         for row, (game_id, game_data) in enumerate(self.games.items()):
             # Column 0: Game name
@@ -78,11 +82,15 @@ class SavedataManagementDialog(QDialog):
         browse_button = QPushButton(self.tr("Browse"))
         browse_button.clicked.connect(lambda: self._browse_savedata_folder(line_edit, game_data))
 
-        # Also persist manual edits (typed directly into the field, not just via Browse)
+        auto_detect_button = QPushButton(self.tr("Auto Detect"))
+        auto_detect_button.clicked.connect(lambda: self._auto_detect_savedata_folder(line_edit, game_data))
+
+        # Also persist manual edits
         line_edit.editingFinished.connect(lambda: self._save_savedata_path(line_edit, game_data))
 
         h_layout.addWidget(line_edit)
         h_layout.addWidget(browse_button)
+        h_layout.addWidget(auto_detect_button)
 
         # Keep a reference so we can retrieve the value later (e.g. on save)
         widget.line_edit = line_edit
@@ -190,18 +198,37 @@ class SavedataManagementDialog(QDialog):
             logging.error(f"Copy to prefix failed: {e}")
             QMessageBox.critical(self, self.tr("Error"), str(e))
 
+    def _auto_detect_savedata_folder(self, line_edit, game_data):
+        """Tries to auto-detect the savedata folder; fills the field on success, warns otherwise."""
+        detected_path = SavedataManager.auto_detect_savedata_folder(game_data)
+        if detected_path:
+            line_edit.setText(detected_path)
+            self._save_savedata_path(line_edit, game_data)
+        else:
+            QMessageBox.warning(
+                self,
+                self.tr("Savedata Not Found"),
+                self.tr("Couldn't auto-detect the savedata folder for '{0}'. Fill it in manually.")
+                    .format(game_data.get("name", ""))
+            )
+
     def _restore_state(self):
         """Restores the window size and position from the previous session."""
         geometry = self.settings.value("SavedataManagementDialog/geometry")
         if geometry:
             self.restoreGeometry(geometry)
+        header_state = self.settings.value("SavedataManagementDialog/header_state")
+        if header_state:
+            self.table.horizontalHeader().restoreState(header_state)
 
     def closeEvent(self, event):
         """Overrides the default close event to save geometry before closing."""
         self.settings.setValue("SavedataManagementDialog/geometry", self.saveGeometry())
+        self.settings.setValue("SavedataManagementDialog/header_state", self.table.horizontalHeader().saveState())
         super().closeEvent(event)
 
     def hideEvent(self, event):
         """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
         self.settings.setValue("SavedataManagementDialog/geometry", self.saveGeometry())
+        self.settings.setValue("SavedataManagementDialog/header_state", self.table.horizontalHeader().saveState())
         super().hideEvent(event)

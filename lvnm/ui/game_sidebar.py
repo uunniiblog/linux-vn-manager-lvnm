@@ -22,6 +22,7 @@ from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
+from ui.savedata_management_dialog import SavedataManagementDialog
 
 logger = logging.getLogger(__name__)
 
@@ -173,9 +174,13 @@ class GameSidebar(QFrame):
         self.btn_savedata = QPushButton("...")
         self.btn_savedata.clicked.connect(self.browse_savedata)
         self.edit_savedata.setPlaceholderText("~/.local/share/lvnm/prefixes/protonge1034/drive_c/users/user/AppData/Roaming/Frontwing/GINKA/")
+        self.btn_open_svdata = QPushButton("+")
+        self.btn_open_svdata.setFixedSize(43, 32)
+        self.btn_open_svdata.clicked.connect(self.open_open_savedata_dialog)
         self.savedata_row = QHBoxLayout()  
         self.savedata_row.addWidget(self.edit_savedata)
         self.savedata_row.addWidget(self.btn_savedata)
+        self.savedata_row.addWidget(self.btn_open_svdata)
 
         self.gen_form.addRow(self.tr("Name:"), self.edit_name)
         self.gen_form.addRow(self.tr("Path:"), path_row)
@@ -287,6 +292,9 @@ class GameSidebar(QFrame):
             game_to_update = GameManager.get_game(name)
             if game_to_update:
                 self.current_game.last_played = game_to_update.last_played
+                self.current_game.savedata_path = game_to_update.savedata_path
+                self.edit_savedata.setText(game_to_update.savedata_path)
+                
             self.set_ui_start_state()
             self.reset_tracking_labels()
 
@@ -745,6 +753,15 @@ class GameSidebar(QFrame):
             index = self.combo_prefix.findText(created_name)
             if index >= 0:
                 self.combo_prefix.setCurrentIndex(index)
+
+    def open_open_savedata_dialog(self):
+        dialog = SavedataManagementDialog(self)
+        dialog.exec()
+        updated_card = GameManager.get_game(self.current_game.name)
+        if updated_card:
+            self.current_game.savedata_path = updated_card.savedata_path
+            self.edit_savedata.setText(updated_card.savedata_path)
+            
 
     def refresh_prefix_combo(self):
         """Refreshes the prefix list and retains the current selection."""
