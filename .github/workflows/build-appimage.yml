@@ -42,7 +42,6 @@ jobs:
           python -m PyInstaller --noconfirm --windowed \
             --paths . \
             --paths lvnm \
-            --exclude-module googleapiclient.discovery_cache \
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
@@ -56,6 +55,10 @@ jobs:
 
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
+
+          # Remove entirely of google api discovery to save file size
+          rm -rf LVNM.AppDir/usr/bin/_internal/googleapiclient/discovery_cache/documents
+
           # Avoid library errors
           rm -f LVNM.AppDir/usr/bin/_internal/libreadline.so*
           rm -f LVNM.AppDir/usr/bin/_internal/libtinfo.so*

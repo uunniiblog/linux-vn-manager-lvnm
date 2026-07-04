@@ -6,6 +6,8 @@ import requests
 import threading
 import io
 import os
+import json
+from googleapiclient.discovery import build_from_document
 from datetime import datetime, timezone
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -131,7 +133,13 @@ class GdriveManager:
             client_secret=client_secret,
             token_uri="https://oauth2.googleapis.com/token",
         )
-        service = build("drive", "v3", credentials=creds)
+
+        schema_path = Path(__file__).parent / "assets" / "drive_v3.json"
+
+        with open(schema_path, "r", encoding="utf-8") as f:
+            drive_schema = json.load(f)
+
+        service = build_from_document(drive_schema, credentials=creds)
         GdriveManager._thread_local.service = service
         return service
 
