@@ -27,6 +27,8 @@ class SavedataManager(QObject):
         "drive_c/users/*/AppData/Local",
     ]
 
+    DELETION_SAFETY_THRESHOLD = 0.5
+
     gdrive_sync_succeeded = Signal(str, dict)
     gdrive_sync_failed = Signal(str, str)
 
@@ -40,9 +42,14 @@ class SavedataManager(QObject):
     def __init__(self):
         super().__init__()
         self._gdrive_sync_workers = {}
+        self.user_settings = SettingsManager()
+        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
 
     def start_gdrive_sync(self, name: str, game_data: dict):
         """Runs the Gdrive sync in a background thread so it doesn't block the UI."""
+        if not self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
+            return
+
         # Safety guard: Prevent launching duplicate threads for the same game
         if name in self._gdrive_sync_workers:
             logger.warning(f"Gdrive sync already in progress for '{name}'. Skipping duplicate request.")
@@ -119,6 +126,10 @@ class SavedataManager(QObject):
             )
             raise ValueError(f"Savedata path is not inside the original prefix: {original_prefix_name}")
 
+        # Remap the username segment steamuser <-> real Linux user
+        rel_path = SavedataManager._remap_user_segment(rel_path, target_prefix_path)
+        logger.debug(f"remapped rel_path: {rel_path}")
+        
         dest = target_prefix_path / rel_path
 
         # Check whether the target already has savedata for this game
@@ -141,6 +152,45 @@ class SavedataManager(QObject):
         except Exception as e:
             logging.error(f"Failed to copy savedata for '{game_name}' to '{prefix_name}': {e}")
             raise RuntimeError(f"Failed to copy savedata: {e}")
+
+    @staticmethod
+    def _get_prefix_user_dir(prefix_path: Path) -> str | None:
+        """
+        Returns the single real user folder name under drive_c/users in a prefix
+        (excluding 'Public'). Proton prefixes have both 'steamuser' and the real
+        username pointing at the same location, so either is fine to use; plain
+        Wine prefixes only have the real username. Returns None if not found.
+        """
+        users_dir = prefix_path / "drive_c" / "users"
+        if not users_dir.exists():
+            return None
+
+        candidates = [d.name for d in users_dir.iterdir() if d.is_dir() and d.name.lower() != "public"]
+        if not candidates:
+            return None
+
+        # Prefer 'steamuser' if present (Proton), otherwise just take whichever one exists
+        return next((u for u in candidates if u.lower() == "steamuser"), candidates[0])
+
+    @staticmethod
+    def _remap_user_segment(rel_path: Path, target_prefix_path: Path) -> Path:
+        """
+        If rel_path starts with drive_c/users/<username>/..., swaps <username>
+        for whatever user folder actually exists in the TARGET prefix.
+        """
+        parts = rel_path.parts
+        if len(parts) < 3 or parts[0] != "drive_c" or parts[1] != "users":
+            return rel_path  # not a per-user path, nothing to remap
+
+        target_user = SavedataManager._get_prefix_user_dir(target_prefix_path)
+        if not target_user:
+            logger.warning(f"No user folder found in target prefix '{target_prefix_path}'; using path as-is.")
+            return rel_path
+
+        if target_user != parts[2]:
+            logger.info(f"Remapping savedata user segment: '{parts[2]}' -> '{target_user}'")
+
+        return Path(*parts[:2], target_user, *parts[3:])
 
     @staticmethod
     def auto_detect_savedata_folder(game_data: dict) -> str | None:
@@ -214,10 +264,7 @@ class SavedataManager(QObject):
         is found. Returns True if game_card was modified.
         """
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
-        if not savedata_settings.get(config.USER_CONF_SAVEDATA_AUTO_DETECT, False):
-            return False
-
-        if game_card.savedata_path:
+        if game_card.savedata_path or not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
             return False
 
         detected_path = SavedataManager.auto_detect_savedata_folder(game_card.to_dict())
@@ -230,7 +277,25 @@ class SavedataManager(QObject):
         return False
 
     @staticmethod
-    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 15) -> dict:
+    def is_savedata_inside_prefix(game_data: dict) -> bool:
+        """Checks whether the game's savedata_path currently lives inside its own prefix folder."""
+        savedata_path = game_data.get("savedata_path", "")
+        prefix_name = game_data.get("prefix", "")
+        if not savedata_path or not prefix_name:
+            return False
+        prefix_info = PrefixManager.get_prefix_info(prefix_name)
+        if not prefix_info:
+            return False
+        prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
+        resolved_src = Path(os.path.abspath(savedata_path))
+        try:
+            resolved_src.relative_to(prefix_path)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 5) -> dict:
         """
         Bidirectionally syncs a game's savedata folder with Drive, preserving
         subfolder structure and propagating deletions:
@@ -241,6 +306,10 @@ class SavedataManager(QObject):
         Returns {"uploaded": [...], "downloaded": [...], "deleted_local": [...],
                 "deleted_remote": [...], "skipped": [...]}
         """
+        savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
+        if not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
+            return False
+
         game_name = game_data.get("name", "")
         savedata_path = game_data.get("savedata_path", "")
 
@@ -318,13 +387,9 @@ class SavedataManager(QObject):
                     download_plan.append((remote_meta["id"], src / rel_path, remote_mtime, rel_path))
                 continue
 
-        # Safeguard in case of full wipe
-        if len(delete_local_plan) > 0 and len(delete_local_plan) == len(local_files_by_rel):
-            raise RuntimeError(
-                f"Sync aborted for '{game_name}': Safety trigger hit. "
-                f"The algorithm attempted to delete all local save files. "
-                f"Please verify your Google Drive state."
-            )
+        # Safeguard in case of mass wipe
+        SavedataManager._check_deletion_safety(len(delete_local_plan), len(manifest), "locally", game_name)
+        SavedataManager._check_deletion_safety(len(delete_remote_plan), len(manifest), "from Google Drive", game_name)
 
         # Concurrent uploads
         uploaded = []
@@ -382,6 +447,18 @@ class SavedataManager(QObject):
         }
 
     @staticmethod
+    def _check_deletion_safety(delete_count: int, known_count: int, direction: str, game_name: str):
+        if known_count == 0 or delete_count == 0:
+            return
+        ratio = delete_count / known_count
+        if ratio >= SavedataManager.DELETION_SAFETY_THRESHOLD:
+            raise SyncSafetyError(
+                f"Sync aborted for '{game_name}': {delete_count}/{known_count} previously-known files "
+                f"would be deleted {direction}. This usually means the savedata path changed, the target "
+                f"folder is wrong/empty, or files were removed outside a sync. Verify before retrying."
+            )
+
+    @staticmethod
     def _load_gsync_metadata() -> dict:
         """Loads the full gsync metadata file: {game_name: {rel_path: mtime}}"""
         if not config.GSYNC_METADATA.exists():
@@ -416,6 +493,18 @@ class SavedataManager(QObject):
         all_metadata[game_name] = manifest
         SavedataManager._save_gsync_metadata(all_metadata)
 
+    @staticmethod
+    def reset_sync_manifest(game_name: str):
+        """
+        Clears the sync manifest for a game. Called whenever savedata_path changes
+        so the next sync treats the new location as a fresh environment to avoid file deletion
+        """
+        all_metadata = SavedataManager._load_gsync_metadata()
+        if game_name in all_metadata:
+            all_metadata.pop(game_name)
+            SavedataManager._save_gsync_metadata(all_metadata)
+            logger.info(f"Reset Gdrive sync manifest for '{game_name}' (savedata path changed).")
+
 class GdriveSyncWorker(QThread):
     """
     Runs SavedataManager.sync_savedata_to_gdrive() in a background thread
@@ -435,3 +524,7 @@ class GdriveSyncWorker(QThread):
         except Exception as e:
             logger.error(f"Gdrive sync failed for '{game_name}': {e}", exc_info=True)
             self.sync_failed.emit(game_name, str(e))
+
+class SyncSafetyError(Exception):
+    """Raised when a sync would delete an unexpectedly large portion of previously-known files."""
+    pass

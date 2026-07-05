@@ -6,9 +6,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
-    QMessageBox, QDialog, QProgressDialog
+    QMessageBox, QDialog, QProgressDialog, QStyle
 )
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent
 from ui.prefix_tab import PrefixTab
 from ui.timetracker_dialog import TimetrackerDialog
@@ -42,6 +42,7 @@ class GameSidebar(QFrame):
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
 
         # Connect to Game Process Manager
         self.process_manager = GameProcessManager.get_instance()
@@ -142,7 +143,10 @@ class GameSidebar(QFrame):
         self.edit_name = VndbAutocompleteLineEdit()
         self.edit_name.vn_selected.connect(self.on_vndb_item_selected)
         self.edit_path = QLineEdit()
-        self.btn_path = QPushButton("...")
+        self.btn_path = QPushButton()
+        browse_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon)
+        self.btn_path.setIcon(browse_icon)
+        self.btn_path.setFixedSize(43, 32)
         self.btn_path.clicked.connect(self.browse_path)
         path_row = QHBoxLayout()
         path_row.addWidget(self.edit_path)
@@ -155,7 +159,9 @@ class GameSidebar(QFrame):
         self.combo_prefix.currentTextChanged.connect(self.on_prefix_changed)
 
         # Create prefix button
-        self.btn_add_prefix = QPushButton("+")
+        self.btn_add_prefix = QPushButton()
+        add_icon = QIcon.fromTheme("list-add")
+        self.btn_add_prefix.setIcon(add_icon)
         self.btn_add_prefix.setFixedSize(43, 32)
         self.btn_add_prefix.clicked.connect(self.open_create_prefix_dialog)
 
@@ -178,10 +184,13 @@ class GameSidebar(QFrame):
 
         # Save data folder (Only if enabled in settings)
         self.edit_savedata = QLineEdit()
-        self.btn_savedata = QPushButton("...")
+        self.btn_savedata = QPushButton()
+        self.btn_savedata.setIcon(browse_icon)
+        self.btn_savedata.setFixedSize(43, 32)
         self.btn_savedata.clicked.connect(self.browse_savedata)
         self.edit_savedata.setPlaceholderText("~/.local/share/lvnm/prefixes/protonge1034/drive_c/users/user/AppData/Roaming/Frontwing/GINKA/")
-        self.btn_open_svdata = QPushButton("+")
+        self.btn_open_svdata = QPushButton()
+        self.btn_open_svdata.setIcon(add_icon)
         self.btn_open_svdata.setFixedSize(43, 32)
         self.btn_open_svdata.clicked.connect(self.open_open_savedata_dialog)
         self.savedata_row = QHBoxLayout()  
@@ -189,12 +198,16 @@ class GameSidebar(QFrame):
         self.savedata_row.addWidget(self.btn_savedata)
         self.savedata_row.addWidget(self.btn_open_svdata)
 
+        # Gdrive sync checkbox
+        self.gdrive_sync_checkbox = QCheckBox(self.tr("Sync this game's savedata to Google Drive"))
+
         self.gen_form.addRow(self.tr("Name:"), self.edit_name)
         self.gen_form.addRow(self.tr("Path:"), path_row)
         self.gen_form.addRow(self.tr("Prefix:"), prefix_row)
         self.gen_form.addRow("", self.prefix_warning)
         self.gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
         self.gen_form.addRow(self.tr("Savedata:"), self.savedata_row)
+        self.gen_form.addRow("", self.gdrive_sync_checkbox)
         form.addWidget(gen_group)
 
         self.update_savedata_visibility()
@@ -338,7 +351,7 @@ class GameSidebar(QFrame):
             QMessageBox.warning(
                 self, 
                 self.tr("Backup Failed"), 
-                self.tr(f"Background save backup failed for '{name}':\n{error_message}.\nYou can sync the data manually from settings.")
+                self.tr(f"Background save backup failed for '{name}':\n{error_message}\nYou can sync the data manually from settings.")
             )
 
     def on_gdrive_sync_succeeded(self, name, result):
@@ -385,6 +398,7 @@ class GameSidebar(QFrame):
         self.edit_path.setText(card.path)
         self.edit_vndb.setText(card.vndb)
         self.edit_savedata.setText(card.savedata_path)
+        self.gdrive_sync_checkbox.setChecked(bool(getattr(card, "gdrive", False)))
         self.update_savedata_visibility()
 
         # Filling Gamescope (using the nested dataclass)
@@ -563,7 +577,7 @@ class GameSidebar(QFrame):
         """Pre-syncs saves with Google Drive if enabled, otherwise launches the game."""
         try:
             game_to_start = GameManager.get_game(name)
-            if game_to_start.gdrive:
+            if self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and game_to_start.gdrive:
                 self.game_pending_launch = name
                 self.pregame_progress = QProgressDialog(self.tr("Syncing save data with Google Drive before launch..."), None, 0, 0, self)
                 self.pregame_progress.setWindowModality(Qt.WindowModal)
@@ -635,6 +649,7 @@ class GameSidebar(QFrame):
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
         self.current_game.savedata_path = self.edit_savedata.text()
+        self.current_game.gdrive = self.gdrive_sync_checkbox.isChecked()
 
         if not self.current_game.name:
             logger.warning("Error: game created without name.")
@@ -712,6 +727,19 @@ class GameSidebar(QFrame):
     def on_prefix_changed(self, prefix_name):
         if not prefix_name: 
             return
+
+        # Gdrive reminder
+        if self.current_game and self.current_game.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
+            if SavedataManager.is_savedata_inside_prefix(self.current_game.to_dict()):
+                QMessageBox.warning(
+                    self, self.tr("Prefix Changed"),
+                    self.tr(
+                        "This game's savedata lives inside its prefix, and Gdrive sync is enabled.\n\n"
+                        "The game will create fresh saves at the new prefix location. Your existing "
+                        "saves won't be deleted.\nIf you want to bring them along use use 'Copy to...' in Manage Savedata "
+                        "before changing the prefix, and update the Savedata Path afterward to keep GDrive sync working."
+                    )
+                )
         
         # Hide warning once a user selects a valid existing prefix
         self.prefix_warning.setVisible(False)
@@ -825,6 +853,7 @@ class GameSidebar(QFrame):
         if updated_card:
             self.current_game.savedata_path = updated_card.savedata_path
             self.edit_savedata.setText(updated_card.savedata_path)
+            self.gdrive_sync_checkbox.setChecked(updated_card.gdrive)
             
 
     def refresh_prefix_combo(self):
@@ -945,12 +974,15 @@ class GameSidebar(QFrame):
             self.reset_tracking_labels()
 
     def update_savedata_visibility(self):
-        """Shows/hides the Savedata row based on the current setting."""
+        """Shows/hides the Savedata rows based on the current setting."""
         savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
-        enabled = savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
+        savedata_enabled = savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
+        gdrive_logged_in = bool(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN, ""))
 
         row, _ = self.gen_form.getLayoutPosition(self.savedata_row)
-        self.gen_form.setRowVisible(row, enabled)
+        self.gen_form.setRowVisible(row, savedata_enabled)
+        gdrive_row, _ = self.gen_form.getWidgetPosition(self.gdrive_sync_checkbox)
+        self.gen_form.setRowVisible(gdrive_row, savedata_enabled and gdrive_logged_in)
 
     def update_tracking_ui(self, stats):
         """Update the labels with data received from the worker."""

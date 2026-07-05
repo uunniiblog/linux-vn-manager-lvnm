@@ -89,6 +89,7 @@ class GameManager:
 
         current_card = GameCard.from_dict(original_name, raw_data[original_name])
         old_vndb = current_card.vndb
+        old_savedata_path = current_card.savedata_path
 
         for key, value in updates.items():
             attr_key = key.replace("-", "_")
@@ -102,6 +103,11 @@ class GameManager:
         # Handle renaming: remove the old key if the name changed
         if new_name != original_name:
             del raw_data[original_name]
+
+        # Reset GDrive sync manifest if savedata changed
+        if current_card.savedata_path != old_savedata_path:
+            from savedata_manager import SavedataManager
+            SavedataManager.reset_sync_manifest(new_name)
 
         # Save under the (potentially new) key
         current_card.update_date = datetime.today().strftime('%Y-%m-%d %H:%M:%S')

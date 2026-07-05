@@ -17,6 +17,7 @@ class CliController(QObject):
     def __init__(self):
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
         self.tracking = None
         self._is_exiting = False
         super().__init__()
@@ -39,7 +40,7 @@ class CliController(QObject):
 
             # Fetch gdrive
             game_card = GameManager.get_game(game)
-            if game_card.gdrive:
+            if game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
                 logger.info(f"Checking Google Drive cloud saves for '{game}' before launch...")
                 try:
                     SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
@@ -100,7 +101,7 @@ class CliController(QObject):
             game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
             GameManager.update_game(game, game_to_update.to_dict())
 
-            if game_to_update.gdrive:
+            if game_to_update.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
                 logger.info(f"Syncing save data to Google Drive for '{game}' after closure...")
                 try:
                     SavedataManager.sync_savedata_to_gdrive(game_to_update.to_dict())
@@ -128,10 +129,9 @@ class CliController(QObject):
             logger.error(f"{game_name} Not found. It must be added to the application first.")
             return
 
-        if game_card.gdrive:
+        if game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
             logger.info(f"Checking Google Drive cloud saves for '{game_name}' before tracking...")
             try:
-                # Run synchronously on the main thread
                 SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
                 logger.info(f"Google Drive pre-tracking sync completed successfully for '{game_name}'.")
             except Exception as e:

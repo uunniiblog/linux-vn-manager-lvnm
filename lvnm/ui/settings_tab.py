@@ -392,20 +392,27 @@ class SettingsTab(QWidget):
         self.gdrive_client_secret_edit, gdrive_secret_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, ""))
         savedata_layout.addRow(gdrive_secret_label, gdrive_secret_row)
 
-        # Gdrive Sign in button
-        self.gdrive_signin_btn = QPushButton(self.tr("Sign in to Google Drive"))
-        self.gdrive_signin_btn.setFlat(True)
-        self.gdrive_signin_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
-        self.gdrive_signin_btn.setCursor(Qt.PointingHandCursor)
-        self.gdrive_signin_btn.clicked.connect(self._sign_in_gdrive)
+        # Gdrive status + single toggling button (Sign in <-> Log out)
+        status_label = QLabel(self.tr("Gdrive Account:"))
 
-        self.gdrive_connected_label = QLabel(self.tr("Connected"))
+        self.gdrive_status_dot = QLabel("●")
+        self.gdrive_status_dot.setFixedWidth(14)
 
-        self.gdrive_logout_btn = QPushButton(self.tr("Log out"))
-        self.gdrive_logout_btn.setFlat(True)
-        self.gdrive_logout_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
-        self.gdrive_logout_btn.setCursor(Qt.PointingHandCursor)
-        self.gdrive_logout_btn.clicked.connect(self._logout_gdrive)
+        self.gdrive_status_text = QLabel()
+
+        self.gdrive_auth_btn = QPushButton()
+        self.gdrive_auth_btn.setFlat(True)
+        self.gdrive_auth_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
+        self.gdrive_auth_btn.setCursor(Qt.PointingHandCursor)
+        self.gdrive_auth_btn.clicked.connect(self._on_gdrive_auth_clicked)
+
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.addWidget(self.gdrive_status_dot)
+        status_row.addWidget(self.gdrive_status_text)
+        status_row.addWidget(self.gdrive_auth_btn)
+        status_row.addStretch()
+        savedata_layout.addRow(status_label, status_row)
 
         # Savedata dialog
         self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
@@ -414,14 +421,11 @@ class SettingsTab(QWidget):
         self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
         self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
 
-        btn_row = QHBoxLayout()
-        btn_row.setContentsMargins(0, 0, 0, 0)
-        btn_row.addWidget(self.gdrive_signin_btn)
-        btn_row.addWidget(self.gdrive_connected_label)
-        btn_row.addWidget(self.gdrive_logout_btn)
-        btn_row.addWidget(self.manage_savedata_btn)
-        btn_row.addStretch()
-        savedata_layout.addRow(btn_row)
+        manage_row = QHBoxLayout()
+        manage_row.setContentsMargins(0, 0, 0, 0)
+        manage_row.addWidget(self.manage_savedata_btn)
+        manage_row.addStretch()
+        savedata_layout.addRow(manage_row)
 
         self._update_gdrive_ui_state()
 
@@ -433,7 +437,10 @@ class SettingsTab(QWidget):
             self.gdrive_client_id_edit,
             gdrive_secret_label,
             self.gdrive_client_secret_edit,
-            self.gdrive_signin_btn,
+            status_label,
+            self.gdrive_status_dot,
+            self.gdrive_status_text,
+            self.gdrive_auth_btn,
             self.manage_savedata_btn
         ]
 
@@ -444,6 +451,7 @@ class SettingsTab(QWidget):
         self._on_savedata_toggled(self.savedata_enable.isChecked())
 
         return savedata_group
+
 
     def _open_savedata_manager(self):
         """Opens the dialog to manage savedata."""
@@ -861,6 +869,7 @@ class SettingsTab(QWidget):
 
         self.gdrive_worker.start()
         self._gdrive_dialog.exec()
+        self._update_gdrive_ui_state() 
 
     def _copy_gdrive_code(self):
         code = getattr(self, "_gdrive_user_code", "")
@@ -895,6 +904,13 @@ class SettingsTab(QWidget):
         self._gdrive_dialog.reject()
         QMessageBox.warning(self, self.tr("Timed Out"), self.tr("Sign-in timed out. Please try again."))
 
+    def _on_gdrive_auth_clicked(self):
+        """Routes to sign-in or logout depending on current state."""
+        if GdriveManager.is_logged_in():
+            self._logout_gdrive()
+        else:
+            self._sign_in_gdrive()
+
     def _logout_gdrive(self):
         client_id = self.gdrive_client_id_edit.text().strip()
         client_secret = self.gdrive_client_secret_edit.text().strip()
@@ -902,11 +918,17 @@ class SettingsTab(QWidget):
         self._update_gdrive_ui_state()
 
     def _update_gdrive_ui_state(self):
-        """Swaps the sign-in button for a 'Connected' label + logout button, or vice versa."""
+        """Updates the status dot/text and toggles the auth button between Sign in / Log out."""
         connected = GdriveManager.is_logged_in()
-        self.gdrive_signin_btn.setVisible(not connected)
-        self.gdrive_connected_label.setVisible(connected)
-        self.gdrive_logout_btn.setVisible(connected)
+
+        if connected:
+            self.gdrive_status_dot.setStyleSheet("color: #4caf50;")
+            self.gdrive_status_text.setText(self.tr("Connected"))
+            self.gdrive_auth_btn.setText(self.tr("Log out"))
+        else:
+            self.gdrive_status_dot.setStyleSheet("color: #888888;")
+            self.gdrive_status_text.setText(self.tr("Not connected"))
+            self.gdrive_auth_btn.setText(self.tr("Sign in to Google Drive"))
 
     def _on_update_found(self, tag, url):
         """Updates the UI label with the link to the new release"""

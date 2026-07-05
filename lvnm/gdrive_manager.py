@@ -11,7 +11,6 @@ import json
 from googleapiclient.discovery import build_from_document
 from datetime import datetime, timezone
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -39,6 +38,7 @@ class GdriveManager:
         Kicks off the device flow. Returns a dict with:
         device_code, user_code, verification_url, interval, expires_in
         """
+        logger.debug("request_device_code")
         resp = requests.post(config.GDRIVE_DEVICE_CODE_URL, data={
             "client_id": client_id,
             "scope": config.GDRIVE_SCOPES,
@@ -98,6 +98,7 @@ class GdriveManager:
     @staticmethod
     def logout(client_id: str = "", client_secret: str = ""):
         """Revokes the refresh_token with Google (best-effort) and clears it locally."""
+        logger.debug("logout")
         refresh_token = GdriveManager.get_refresh_token()
         if refresh_token:
             try:
@@ -121,6 +122,7 @@ class GdriveManager:
         is expired/missing, only ONE actually hits the network; the rest wait
         on the lock and then reuse the result.
         """
+        logger.debug("_get_access_token")
         now = time.time()
 
         # Token still valid, no lock needed for the common case
@@ -149,7 +151,7 @@ class GdriveManager:
 
             GdriveManager._cached_access_token = data["access_token"]
             expires_in = data.get("expires_in", 3600)
-            GdriveManager._cached_token_expiry = time.time() + expires_in - 60  # refresh a bit early
+            GdriveManager._cached_token_expiry = time.time() + expires_in - 60
 
             logger.debug("Refreshed Google Drive access token.")
             return GdriveManager._cached_access_token
@@ -157,6 +159,7 @@ class GdriveManager:
     @staticmethod
     def invalidate_token_cache():
         """Force a fresh refresh next call."""
+        logger.debug("invalidate_token_cache")
         GdriveManager._cached_access_token = None
         GdriveManager._cached_token_expiry = 0
     
@@ -171,12 +174,10 @@ class GdriveManager:
     @staticmethod
     def _get_drive_service():
         """
-        Returns a Drive service scoped to the current thread. The underlying
-        httplib2 transport isn't thread-safe, so each thread gets its own
-        service object - but they all share the SAME access token via
-        _get_access_token(), so only one network refresh happens across
-        however many threads are active.
+        Returns a Drive service scoped to the current thread. 
+        They all share the SAME access token via _get_access_token()
         """
+        logger.debug("_get_drive_service")
         access_token = GdriveManager._get_access_token()
 
         cached_token = getattr(GdriveManager._thread_local, "token", None)
@@ -200,12 +201,14 @@ class GdriveManager:
 
     @staticmethod
     def reset_service_cache():
+        logger.debug("reset_service_cache")
         GdriveManager._thread_local.service = None
         GdriveManager._thread_local.token = None
 
     @staticmethod
     def find_folder(name: str, parent_id: str = None) -> str | None:
-        """Searches Drive for a folder with the given name (optionally under a parent). Returns its ID or None."""
+        """Searches Drive for a folder with the given name Returns its ID."""
+        logger.debug(f"find_folder name: '{name}' parent_id: '{parent_id}'")
         service = GdriveManager._get_drive_service()
         query = f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         if parent_id:
@@ -218,6 +221,7 @@ class GdriveManager:
     @staticmethod
     def create_folder(name: str, parent_id: str = None) -> str:
         """Creates a folder in Drive and returns its ID."""
+        logger.debug(f"create_folder name: '{name}' parent_id: '{parent_id}'")
         service = GdriveManager._get_drive_service()
         metadata = {"name": name, "mimeType": "application/vnd.google-apps.folder"}
         if parent_id:
@@ -272,6 +276,7 @@ class GdriveManager:
         - folder_map: {relative_path: folder_id}
         relative_path uses "/" as separator (matches Path.as_posix()).
         """
+        logger.debug(f"build_remote_tree folder_id: '{folder_id}' prefix: '{prefix}'")
         service = GdriveManager._get_drive_service()
         query = f"'{folder_id}' in parents and trashed = false"
 
@@ -311,6 +316,7 @@ class GdriveManager:
         calls for files in the same subfolder don't recreate it.
         Returns the folder_id of the deepest folder.
         """
+        logger.debug(f"ensure_folder_path root_folder_id: '{root_folder_id}' relative_dir: '{relative_dir}' folder_map: '{folder_map}'")
         if not relative_dir:
             return root_folder_id
 
@@ -341,6 +347,7 @@ class GdriveManager:
         compare correctly. Atomic so a kill mid-download can't leave a corrupted
         save file at the real path.
         """
+        logger.debug(f"download_file file_id: '{file_id}' local_path: '{local_path}' remote_mtime: '{remote_mtime}'")
         service = GdriveManager._get_drive_service()
         local_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = local_path.with_name(local_path.name + ".part")
@@ -358,9 +365,14 @@ class GdriveManager:
 
     @staticmethod
     def delete_file(file_id: str):
+        """
+        Moves a file to Drive's Trash rather than permanently deleting it,
+        giving a ~30-day recovery window if a deletion turns out to be wrong.
+        """
+        logger.debug(f"delete_file file_id: '{file_id}'")
         service = GdriveManager._get_drive_service()
-        service.files().delete(fileId=file_id).execute()
-        logger.debug(f"Deleted Drive file {file_id}")
+        service.files().update(fileId=file_id, body={"trashed": True}).execute()
+        logger.debug(f"Trashed Drive file {file_id}")
 
 
 class GdriveDeviceFlowWorker(QThread):
