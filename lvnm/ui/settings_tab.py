@@ -341,6 +341,12 @@ class SettingsTab(QWidget):
         self.autostart_label = QLabel(self.tr("Auto Start"))
         timetracker_layout.addRow(self.autostart_label, self.timetracking_autostart)
 
+        # Gdrive sync timetracking
+        self.timetracking_sync = QCheckBox(self.tr("Automatically sync timetracker files for games with Gdrive savedata sync enabled"))
+        self.timetracking_sync.setChecked(tt_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False))
+        self.tt_sync_label = QLabel(self.tr("Gdrive sync"))
+        timetracker_layout.addRow(self.tt_sync_label, self.timetracking_sync)
+
         self.tt_dependent_widgets = [
             self.tt_warning_label,
             self.afk_timer_edit,
@@ -657,6 +663,7 @@ class SettingsTab(QWidget):
         self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
         self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t.strip()))
         self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t.strip()))
+        self.timetracking_sync.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, bool(s)))
 
         # Reset gdrive if credentials changed, maybe using new acc or something
         self.gdrive_client_id_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t),GdriveManager.reset_service_cache()))
@@ -751,6 +758,16 @@ class SettingsTab(QWidget):
         """Helper to enable/disable all timetracking sub-widgets"""
         for widget in self.tt_dependent_widgets:
             widget.setEnabled(checked)
+
+        self._update_timetracking_sync_state()
+
+    def _update_timetracking_sync_state(self):
+        """Evaluates both TT and GDrive state to enable/disable the sync checkbox."""
+        is_tt_enabled = self.timetracking_enable.isChecked()
+        is_gdrive_connected = GdriveManager.is_logged_in()        
+        can_enable = is_tt_enabled and is_gdrive_connected
+        self.timetracking_sync.setEnabled(can_enable)
+        self.tt_sync_label.setEnabled(can_enable)
 
     def _on_savedata_toggled(self, checked):
         """Helper to enable/disable all savedata sub-widgets"""
@@ -929,6 +946,8 @@ class SettingsTab(QWidget):
             self.gdrive_status_dot.setStyleSheet("color: #888888;")
             self.gdrive_status_text.setText(self.tr("Not connected"))
             self.gdrive_auth_btn.setText(self.tr("Sign in to Google Drive"))
+
+        self._update_timetracking_sync_state()
 
     def _on_update_found(self, tag, url):
         """Updates the UI label with the link to the new release"""

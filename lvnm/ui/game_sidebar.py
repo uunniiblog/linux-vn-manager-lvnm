@@ -24,6 +24,7 @@ from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
+from timetracker.log_manager import TrackingSyncWorker
 
 logger = logging.getLogger(__name__)
 
@@ -357,16 +358,40 @@ class GameSidebar(QFrame):
     def on_gdrive_sync_succeeded(self, name, result):
         """Start game after successful sync or show log if closing game"""
         if self.game_pending_launch == name:
+            
+            # Check if Tracking Sync is also enabled.
+            if self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
+                if self.pregame_progress:
+                    self.pregame_progress.setLabelText(self.tr("Syncing time tracking data..."))
+                
+                # Start the tracking sync worker
+                self.tracking_worker = TrackingSyncWorker(self.current_game.path)
+                self.tracking_worker.sync_finished.connect(lambda res: self._on_tracking_sync_finished(name, res))
+                self.tracking_worker.start()
+            else:
+                # Tracking sync is disabled, close progress and launch immediately
+                self.game_pending_launch = None
+                if self.pregame_progress:
+                    self.pregame_progress.close()
+                    self.pregame_progress = None
+                
+                self._execute_game_launch(name)
+        else:
+            # This handles ordinary background/post-game sync finishes
+            logger.info(f"Post-game cloud backup finished for '{name}': {result}")
+
+    def _on_tracking_sync_finished(self, name, result):
+        """Called when Pre-game Tracking sync completes."""
+        logger.debug(f"Pre-game tracking sync result for '{name}': {result}")
+        
+        if self.game_pending_launch == name:
             self.game_pending_launch = None
             if self.pregame_progress:
                 self.pregame_progress.close()
                 self.pregame_progress = None
             
-            # Sync succeeded! Proceed to launch game
+            # Proceed to launch game
             self._execute_game_launch(name)
-        else:
-            # This handles ordinary background/post-game sync finishes
-            logger.info(f"Post-game cloud backup finished for '{name}': {result}")
 
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""

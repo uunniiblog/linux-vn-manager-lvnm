@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from settings_manager import SettingsManager
+from gdrive_manager import GdriveManager
 
 logger = logging.getLogger(__name__)
 
@@ -264,3 +265,84 @@ class LogManager:
         if not path or not os.path.exists(path):
             return ""
         return f"{os.path.basename(path)}_{os.path.getsize(path)}"
+
+    def sync_tracking_to_gdrive(self, app_name: str) -> dict:
+        """
+        Syncs a single time-tracking CSV log file with Google Drive.
+        If the remote file is newer, it downloads it. 
+        If the local file is newer (or only exists locally), it uploads it.
+        """
+        savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
+        timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+
+        if not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) or not timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
+            logger.info("sync_tracking_to_gdrive skipped")
+            return {"status": "skipped", "reason": "not configured"}
+
+        log_file = self.get_log_name_from_path(app_name)
+        logger.debug(f"Starting sync for {log_file}")
+        local_path = self.get_app_file(log_file)
+        filename = local_path.name
+        
+        try:
+            # Ensure the 'Timetracking' root folder exists in Drive
+            root_id = GdriveManager.get_root_folder_id()
+            timetracker_folder_id = GdriveManager.find_folder("Timetracking", parent_id=root_id)
+            if not timetracker_folder_id:
+                timetracker_folder_id = GdriveManager.create_folder("Timetracking", parent_id=root_id)
+                
+            # Get remote files in the Timetracking folder
+            remote_files, _ = GdriveManager.build_remote_tree(timetracker_folder_id)
+            remote_meta = remote_files.get(filename)
+            
+            local_exists = local_path.exists() and local_path.stat().st_size > 0
+            
+            if local_exists and remote_meta:
+                local_mtime = local_path.stat().st_mtime
+                remote_time_str = remote_meta["modifiedTime"].replace("Z", "+00:00")
+                remote_mtime = datetime.fromisoformat(remote_time_str).timestamp()
+                
+                if local_mtime > remote_mtime + 1:
+                    GdriveManager.upload_file(local_path, timetracker_folder_id, existing_file_id=remote_meta["id"])
+                    result = {"status": "uploaded"}
+                elif remote_mtime > local_mtime + 1:
+                    GdriveManager.download_file(remote_meta["id"], local_path, remote_mtime)
+                    result = {"status": "downloaded"}
+                else:
+                    result = {"status": "skipped", "reason": "in_sync"}
+                    
+            elif local_exists and not remote_meta:
+                GdriveManager.upload_file(local_path, timetracker_folder_id)
+                result = {"status": "uploaded"}
+                
+            elif not local_exists and remote_meta:
+                remote_time_str = remote_meta["modifiedTime"].replace("Z", "+00:00")
+                remote_mtime = datetime.fromisoformat(remote_time_str).timestamp()
+                GdriveManager.download_file(remote_meta["id"], local_path, remote_mtime)
+                result = {"status": "downloaded"}
+                
+            else:
+                result = {"status": "skipped", "reason": "no_data"}
+
+            logger.info(f"Tracking sync for '{log_file}' completed with status: {result.get('status')}")
+            return result
+        except Exception as e:
+            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': {e}", exc_info=True)
+            raise RuntimeError(f"Error syncing tracking log to GDrive for '{app_name}': {e}")
+
+from PySide6.QtCore import QThread, Signal
+
+class TrackingSyncWorker(QThread):
+    sync_finished = Signal(dict)
+
+    def __init__(self, app_name: str):
+        super().__init__()
+        self.app_name = app_name
+
+    def run(self):
+        try:
+            manager = LogManager()
+            result = manager.sync_tracking_to_gdrive(self.app_name)
+            self.sync_finished.emit(result)
+        except Exception:
+            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': {e}", exc_info=True)

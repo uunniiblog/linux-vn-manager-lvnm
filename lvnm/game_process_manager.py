@@ -5,7 +5,8 @@ from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
 from game_runner import GameRunner
 from timetracker.tracking_controller import TrackingController
-from savedata_manager import SavedataManager, GdriveSyncWorker
+from savedata_manager import SavedataManager
+from timetracker.log_manager import TrackingSyncWorker
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class GameProcessManager(QObject):
         self.active_runners = {}
         self.runners_logs = {}
         self.active_trackers = {}
+        self._active_sync_workers = {}
 
         # Polling loop to check if games were closed
         self.monitor_timer = QTimer(self)
@@ -114,6 +116,15 @@ class GameProcessManager(QObject):
             tracker.stop_tracking()
             self.active_trackers.pop(name, None)
 
+    def sync_tracking(self, name: str):
+        # Store the worker in the class dictionary to prevent garbage collection
+        worker = TrackingSyncWorker(name)
+        self._active_sync_workers[name] = worker
+        # Auto-cleanup when the thread naturally finishes
+        worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(lambda n=name: self._active_sync_workers.pop(n, None))
+        worker.start()
+
     def _check_active_runners(self):
         """Polls ALL active runners. Cleans up those that finished."""
         finished_games = []
@@ -141,6 +152,7 @@ class GameProcessManager(QObject):
                 GameManager.update_game(name, game_to_update.to_dict())
                 if game_to_update.gdrive:
                     SavedataManager.get_instance().start_gdrive_sync(name, game_to_update.to_dict())
+                    self.sync_tracking(game_to_update.path)
             
             # Notify UI
             self.game_stopped.emit(name)
