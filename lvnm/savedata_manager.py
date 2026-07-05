@@ -25,6 +25,7 @@ class SavedataManager(QObject):
         "drive_c/users/*/AppData/Roaming",
         "drive_c/users/*/AppData/LocalLow",
         "drive_c/users/*/AppData/Local",
+        "drive_c/users/*/AppData/LocalLow"
     ]
 
     DELETION_SAFETY_THRESHOLD = 0.5
