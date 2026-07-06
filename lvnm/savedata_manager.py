@@ -27,7 +27,7 @@ class SavedataManager(QObject):
         "drive_c/users/*/AppData/Local",
     ]
 
-    DELETION_SAFETY_THRESHOLD = 0.5
+    DELETION_SAFETY_THRESHOLD = 0.7
 
     gdrive_sync_succeeded = Signal(str, dict)
     gdrive_sync_failed = Signal(str, str)

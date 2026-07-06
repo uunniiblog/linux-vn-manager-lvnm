@@ -1,5 +1,6 @@
 import logging
 import config
+from typing import Callable
 from datetime import datetime
 from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
@@ -7,6 +8,7 @@ from game_runner import GameRunner
 from timetracker.tracking_controller import TrackingController
 from savedata_manager import SavedataManager
 from timetracker.log_manager import TrackingSyncWorker
+from timetracker.log_manager import LogManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,14 @@ class GameProcessManager(QObject):
         self.monitor_timer = QTimer(self)
         self.monitor_timer.timeout.connect(self._check_active_runners)
         self.monitor_timer.start(1000)
+
+        self._exit_hooks: list[Callable[[str, GameRunner], None]] = [
+            self._capture_final_log,
+            self._run_exit_script,
+            self._stop_tracking_hook,
+            self._update_game_metadata,
+            self._sync_savedata_and_tracking,
+        ]
 
     def is_game_running(self, name: str) -> bool:
         """Check if game is currently running"""
@@ -114,16 +124,11 @@ class GameProcessManager(QObject):
         if tracker:
             logger.debug(f"Stopping background tracking for {name}")
             tracker.stop_tracking()
-            self.active_trackers.pop(name, None)
+            self.active_trackers.pop(name, None) 
 
-    def sync_tracking(self, name: str):
-        # Store the worker in the class dictionary to prevent garbage collection
-        worker = TrackingSyncWorker(name)
-        self._active_sync_workers[name] = worker
-        # Auto-cleanup when the thread naturally finishes
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(lambda n=name: self._active_sync_workers.pop(n, None))
-        worker.start()
+    def register_exit_hook(self, hook: Callable[[str, GameRunner], None]):
+        """Allows other components to plug into the game-exit lifecycle"""
+        self._exit_hooks.append(hook)
 
     def _check_active_runners(self):
         """Polls ALL active runners. Cleans up those that finished."""
@@ -135,24 +140,39 @@ class GameProcessManager(QObject):
 
         for name in finished_games:
             logging.debug(f"[Game {name} exited. Cleaning up...]")
-            
             runner = self.active_runners.pop(name, None)
             if runner:
-                self.runners_logs[name] = runner.get_full_log()
-                runner.logs.clear()
-                if runner.game.exit_script.strip():
-                    runner.run_external_script(runner.game.exit_script.strip())
+              for hook in self._exit_hooks:
+                try:
+                    hook(name, runner)
+                except Exception as e:
+                    logger.error(f"Exit hook {hook.__name__} failed for {name}: {e}")
 
-            self.stop_tracking(name)
+                # Notify UI
+                self.game_stopped.emit(name)
 
-            game_to_update = GameManager.get_game(name) 
-            if game_to_update:
-                SavedataManager.try_auto_detect_savedata(name, game_to_update)
-                game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')      
-                GameManager.update_game(name, game_to_update.to_dict())
-                if game_to_update.gdrive:
-                    SavedataManager.get_instance().start_gdrive_sync(name, game_to_update.to_dict())
-                    self.sync_tracking(game_to_update.path)
-            
-            # Notify UI
-            self.game_stopped.emit(name)
+    ### Post exit methods
+
+    def _capture_final_log(self, name, runner):
+        self.runners_logs[name] = runner.get_full_log()
+        runner.logs.clear()
+
+    def _run_exit_script(self, name, runner):
+        if runner.game.exit_script.strip():
+            runner.run_external_script(runner.game.exit_script.strip())
+
+    def _stop_tracking_hook(self, name, runner):
+        self.stop_tracking(name)
+
+    def _update_game_metadata(self, name, runner):
+        game = GameManager.get_game(name)
+        if game:
+            SavedataManager.try_auto_detect_savedata(name, game)
+            game.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+            GameManager.update_game(name, game.to_dict())
+
+    def _sync_savedata_and_tracking(self, name, runner):
+        game = GameManager.get_game(name)
+        if game and game.gdrive:
+            SavedataManager.get_instance().start_gdrive_sync(name, game.to_dict())
+            LogManager.get_instance().start_gdrive_sync(game.path)

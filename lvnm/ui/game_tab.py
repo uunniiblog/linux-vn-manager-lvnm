@@ -390,7 +390,7 @@ class GameTab(QWidget):
         """ Handles launching game from double click/menu """
         self.sidebar.load_game(game_card)
         self.show_sidebar_safely()
-        self.sidebar.start_game(game_card.name)
+        self.sidebar.launch_game(game_card.name)
 
     def on_game_stop_requested(self, game_card):
         """ Handles stoping game """

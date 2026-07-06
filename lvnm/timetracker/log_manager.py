@@ -7,15 +7,33 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from settings_manager import SettingsManager
 from gdrive_manager import GdriveManager
+from PySide6.QtCore import QThread, Signal, QObject
 
 logger = logging.getLogger(__name__)
 
-class LogManager:
+class LogManager(QObject):
+    _instance = None
+
+    # Signals for the UI
+    gdrive_sync_succeeded = Signal(str, dict)
+    gdrive_sync_failed = Signal(str, str)
+
     def __init__(self):
+        super().__init__()
         self.user_settings = SettingsManager()
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.header = "Timestamp_Start;Timestamp_End;Duration;ActiveTime;App;Title;Status;Tags\n"
         self.metadata_file = config.LAST_PLAYED_METADATA
+        self._gdrive_sync_workers = {}
+
+    @classmethod
+    def get_instance(cls):
+        """Singleton instance accessor, used for the Gdrive sync/signal API.
+        Plain `LogManager()` instantiation elsewhere (reading/writing logs) is
+        unaffected and does not need to go through this."""
+        if cls._instance is None:
+            cls._instance = LogManager()
+        return cls._instance
 
     @property
     def log_dir(self) -> Path:
@@ -330,19 +348,46 @@ class LogManager:
             logger.error(f"Error syncing tracking log to GDrive for '{app_name}': {e}", exc_info=True)
             raise RuntimeError(f"Error syncing tracking log to GDrive for '{app_name}': {e}")
 
-from PySide6.QtCore import QThread, Signal
+
+    def start_gdrive_sync(self, app_name: str):
+        """
+        Runs the tracking-log Gdrive sync for `app_name` in a background thread
+        """
+        # Prevent launching duplicate threads for the same app
+        if app_name in self._gdrive_sync_workers:
+            logger.warning(f"Tracking sync already in progress for '{app_name}'. Skipping duplicate request.")
+            return
+ 
+        worker = TrackingSyncWorker(app_name)
+        worker.sync_succeeded.connect(self._on_gdrive_sync_succeeded)
+        worker.sync_failed.connect(self._on_gdrive_sync_failed)
+        worker.finished.connect(lambda: self._gdrive_sync_workers.pop(app_name, None))
+ 
+        self._gdrive_sync_workers[app_name] = worker
+        worker.start()
+ 
+    def _on_gdrive_sync_succeeded(self, app_name: str, result: dict):
+        logger.info(f"Tracking sync completed for '{app_name}': {result.get('status')}")
+        self.gdrive_sync_succeeded.emit(app_name, result)
+ 
+    def _on_gdrive_sync_failed(self, app_name: str, error_message: str):
+        self.gdrive_sync_failed.emit(app_name, error_message)
+
 
 class TrackingSyncWorker(QThread):
-    sync_finished = Signal(dict)
-
+    """Runs LogManager.sync_tracking_to_gdrive() in a background thread."""
+    sync_succeeded = Signal(str, dict)
+    sync_failed = Signal(str, str)
+ 
     def __init__(self, app_name: str):
         super().__init__()
         self.app_name = app_name
-
+ 
     def run(self):
         try:
             manager = LogManager()
             result = manager.sync_tracking_to_gdrive(self.app_name)
-            self.sync_finished.emit(result)
-        except Exception:
-            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': {e}", exc_info=True)
+            self.sync_succeeded.emit(self.app_name, result)
+        except Exception as e:
+            logger.error(f"Error syncing tracking log to GDrive for '{self.app_name}': {e}", exc_info=True)
+            self.sync_failed.emit(self.app_name, str(e))

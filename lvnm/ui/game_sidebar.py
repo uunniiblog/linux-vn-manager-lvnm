@@ -24,7 +24,8 @@ from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
-from timetracker.log_manager import TrackingSyncWorker
+from timetracker.log_manager import LogManager
+from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, TrackingSyncStep
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,9 @@ class GameSidebar(QFrame):
         self.is_running = None
         self.runner = None
         self.active_controller = None
+        self._pending_pipeline = None
+        self._pending_savedata_name = None
+        self._pending_tracking_path = None
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
@@ -52,6 +56,8 @@ class GameSidebar(QFrame):
         self.process_manager.tracking_updated.connect(self.on_tracking_updated_signal)
         SavedataManager.get_instance().gdrive_sync_failed.connect(self.on_gdrive_sync_failed)
         SavedataManager.get_instance().gdrive_sync_succeeded.connect(self.on_gdrive_sync_succeeded)
+        LogManager.get_instance().gdrive_sync_failed.connect(self.on_tracking_sync_failed)
+        LogManager.get_instance().gdrive_sync_succeeded.connect(self.on_tracking_sync_succeeded)
 
         # State tracking for pre-game cloud syncs
         self.game_pending_launch = None
@@ -327,71 +333,39 @@ class GameSidebar(QFrame):
             self.lbl_total_play.setText(stats.get("total_playtime", "00:00:00"))
 
     def on_gdrive_sync_failed(self, name, error_message):
-        """Shown when Gdrive sync fails."""
-        if self.game_pending_launch == name:
-            self.game_pending_launch = None
-            if self.pregame_progress:
-                self.pregame_progress.close()
-                self.pregame_progress = None
-                
-            # Ask the user if they want to override the failure (e.g. they are playing offline)
-            reply = QMessageBox.question(
-                self,
-                self.tr("Sync Failed"),
-                self.tr(
-                    f"Google Drive sync failed:\n\n{error_message}\n\n"
-                    f"Do you want to launch the game anyway using local saves?"
-                ),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                self._execute_game_launch(name)
-        else:
-            # Game close error uploading data notify
-            QMessageBox.warning(
-                self, 
-                self.tr("Backup Failed"), 
-                self.tr(f"Background save backup failed for '{name}':\n{error_message}\nYou can sync the data manually from settings.")
-            )
+        """
+        Fires for EVERY savedata Gdrive sync failure. 
+        this is only the post-game background-backup case.
+        """
+        if self._pending_pipeline and name == self._pending_savedata_name:
+            return
+        QMessageBox.warning(
+            self,
+            self.tr("Savedata Cloud Sync Failed"),
+            self.tr(f"Background save backup failed for '{name}':\n{error_message}\nYou can sync the data manually from settings.")
+        )
 
     def on_gdrive_sync_succeeded(self, name, result):
-        """Start game after successful sync or show log if closing game"""
-        if self.game_pending_launch == name:
-            
-            # Check if Tracking Sync is also enabled.
-            if self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
-                if self.pregame_progress:
-                    self.pregame_progress.setLabelText(self.tr("Syncing time tracking data..."))
-                
-                # Start the tracking sync worker
-                self.tracking_worker = TrackingSyncWorker(self.current_game.path)
-                self.tracking_worker.sync_finished.connect(lambda res: self._on_tracking_sync_finished(name, res))
-                self.tracking_worker.start()
-            else:
-                # Tracking sync is disabled, close progress and launch immediately
-                self.game_pending_launch = None
-                if self.pregame_progress:
-                    self.pregame_progress.close()
-                    self.pregame_progress = None
-                
-                self._execute_game_launch(name)
-        else:
-            # This handles ordinary background/post-game sync finishes
-            logger.info(f"Post-game cloud backup finished for '{name}': {result}")
+        """Post-game background savedata backup finished"""
+        if self._pending_pipeline and name == self._pending_savedata_name:
+            return
+        logger.info(f"Post-game cloud backup finished for '{name}': {result}")
 
-    def _on_tracking_sync_finished(self, name, result):
-        """Called when Pre-game Tracking sync completes."""
-        logger.debug(f"Pre-game tracking sync result for '{name}': {result}")
-        
-        if self.game_pending_launch == name:
-            self.game_pending_launch = None
-            if self.pregame_progress:
-                self.pregame_progress.close()
-                self.pregame_progress = None
-            
-            # Proceed to launch game
-            self._execute_game_launch(name)
+    def on_tracking_sync_failed(self, app_name, error_message):
+        """Post-game background tracking-log backup failed"""
+        if self._pending_pipeline and app_name == self._pending_tracking_path:
+            return
+        QMessageBox.warning(
+            self,
+            self.tr("Timetracking Cloud Sync Failed"),
+            self.tr(f"Background timetracking backup failed for {app_name}:\n{error_message}")
+        )
+    
+    def on_tracking_sync_succeeded(self, app_name, result):
+        """Post-game background tracking-log backup finished."""
+        if self._pending_pipeline and app_name == self._pending_tracking_path:
+            return
+        logger.info(f"Post-game tracking backup finished for '{app_name}': {result}")
 
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
@@ -592,36 +566,64 @@ class GameSidebar(QFrame):
             self.stop_game(game_name)
         else:
             # Game is not running, start it
-            self.start_game(game_name)
+            self.launch_game(game_name)
 
     def stop_game(self, name):
         """Call process manager to stop game."""
         self.process_manager.stop_game(name)
 
-    def start_game(self, name):
-        """Pre-syncs saves with Google Drive if enabled, otherwise launches the game."""
+    def launch_game(self, name):
+        """
+        Builds the list of prelaunch cloud sync steps that apply for this
+        game, runs them through PreLaunchSyncPipeline, and launches the 
+        game once they've all succeeded or the user chose to
+        proceed anyway after a failure).
+        """
         try:
             game_to_start = GameManager.get_game(name)
+            steps = []
+ 
             if self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and game_to_start.gdrive:
-                self.game_pending_launch = name
-                self.pregame_progress = QProgressDialog(self.tr("Syncing save data with Google Drive before launch..."), None, 0, 0, self)
-                self.pregame_progress.setWindowModality(Qt.WindowModal)
-                self.pregame_progress.setWindowTitle(self.tr("Cloud Sync"))
-                self.pregame_progress.setWindowFlags(self.pregame_progress.windowFlags() & ~Qt.WindowCloseButtonHint)
-                self.pregame_progress.show()
-                SavedataManager.get_instance().start_gdrive_sync(name, game_to_start.to_dict())
-            else:
+                self._pending_savedata_name = name
+                steps.append(SavedataSyncStep(
+                    name, game_to_start.to_dict(),
+                    self.tr("Syncing save data with Google Drive...")
+                ))
+ 
+            if self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
+                self._pending_tracking_path = game_to_start.path
+                steps.append(TrackingSyncStep(
+                    game_to_start.path,
+                    self.tr("Syncing time tracking data...")
+                ))
+ 
+            if not steps:
                 self._execute_game_launch(name)
-
+                return
+ 
+            self._pending_pipeline = PreLaunchSyncPipeline(self, steps)
+            self._pending_pipeline.finished.connect(
+                lambda proceed, n=name: self._on_pipeline_finished(n, proceed)
+            )
+            self._pending_pipeline.start()
+ 
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)), exc_info=True)
+            QMessageBox.critical(self, self.tr("Error"), str(e), exc_info=True)
+
+    def _on_pipeline_finished(self, name, proceed):
+        """Called once after all pre-launch sync steps."""
+        self._pending_pipeline = None
+        self._pending_savedata_name = None
+        self._pending_tracking_path = None
+        if proceed:
+            self._execute_game_launch(name)
 
     def _execute_game_launch(self, name):
         """Call process manager to initialize the runner and starts the process."""
         try:
             self.process_manager.start_game(name, self.timetracker_settings)
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)), exc_info=True)
+            QMessageBox.critical(self, self.tr("Error"), str(e), exc_info=True)
 
     def browse_path(self):
         """File system browser"""
