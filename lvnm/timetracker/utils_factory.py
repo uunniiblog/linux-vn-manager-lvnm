@@ -22,7 +22,8 @@ def get_desktop_utils():
         return KdeUtils()
     elif "GAMESCOPE" in de.upper():
         logger.info("Using GamescopeUtils")
-        return GamescopeUtils()
+        # return GamescopeUtils()
+        return X11Utils()
     else:
         logger.info("Using X11Utils")
         return X11Utils()
