@@ -576,8 +576,7 @@ class GameSidebar(QFrame):
         """
         Builds the list of prelaunch cloud sync steps that apply for this
         game, runs them through PreLaunchSyncPipeline, and launches the 
-        game once they've all succeeded or the user chose to
-        proceed anyway after a failure).
+        game once they've all succeeded or the user chose to proceed anyway after a failure.
         """
         try:
             game_to_start = GameManager.get_game(name)

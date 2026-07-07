@@ -28,9 +28,7 @@ class LogManager(QObject):
 
     @classmethod
     def get_instance(cls):
-        """Singleton instance accessor, used for the Gdrive sync/signal API.
-        Plain `LogManager()` instantiation elsewhere (reading/writing logs) is
-        unaffected and does not need to go through this."""
+        """Singleton class used for the Gdrive sync/signal API."""
         if cls._instance is None:
             cls._instance = LogManager()
         return cls._instance
@@ -38,7 +36,6 @@ class LogManager(QObject):
     @property
     def log_dir(self) -> Path:
         """Dynamically retrieves the logs directory from settings."""
-        # Using the same key you defined in SettingsTab: "logs_dir"
         path_val = self.user_settings.get(config.USER_CONF_LOGS_PATH, config.LOG_DIR)
         return Path(path_val)
         
@@ -298,6 +295,10 @@ class LogManager(QObject):
             return {"status": "skipped", "reason": "not configured"}
 
         log_file = self.get_log_name_from_path(app_name)
+        if log_file is None:
+            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': log_file is empty. )")
+            return {"status": "skipped", "reason": "log_file is empty"}
+
         logger.debug(f"Starting sync for {log_file}")
         local_path = self.get_app_file(log_file)
         filename = local_path.name

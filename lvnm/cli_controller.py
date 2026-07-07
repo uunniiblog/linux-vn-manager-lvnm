@@ -1,3 +1,4 @@
+import logging
 import sys
 import time
 import signal
@@ -9,18 +10,18 @@ from game_manager import GameManager
 from settings_manager import SettingsManager
 from timetracker.tracking_controller import TrackingController
 from savedata_manager import SavedataManager
-import logging
+from timetracker.log_manager import LogManager
 
 logger = logging.getLogger(__name__)
 
 class CliController(QObject):
     def __init__(self):
+        super().__init__()
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
         self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
         self.tracking = None
         self._is_exiting = False
-        super().__init__()
     
     def handle_args(self, args):
         if args.run:
@@ -37,17 +38,9 @@ class CliController(QObject):
         runner.load_data()
         
         if not runner.is_running():
-
-            # Fetch gdrive
             game_card = GameManager.get_game(game)
-            if game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
-                logger.info(f"Checking Google Drive cloud saves for '{game}' before launch...")
-                try:
-                    SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
-                    logger.info(f"Google Drive pre-launch sync completed successfully for '{game}'.")
-                except Exception as e:
-                    logger.error(f"Google Drive pre-launch sync failed for '{game}': {e}. Proceeding with local saves.")
-
+            tracking_enabled = self.timetracker_settings.get("timetracking", False)
+            self._sync_before_launch(game, game_card, "pre-launch", tracking_enabled=tracking_enabled)            
             app = QCoreApplication.instance() or QCoreApplication(sys.argv)
 
             def kill_handler(signum, frame):
@@ -67,7 +60,7 @@ class CliController(QObject):
             runner.run(is_headless=True)
 
             # Start tracking
-            if self.timetracker_settings.get("timetracking", False):
+            if tracking_enabled:
                 save_interval = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)
                 afk_timer = self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)
                 logger.debug(f"calling tracking controller with process {runner.game.path}")
@@ -100,14 +93,7 @@ class CliController(QObject):
             SavedataManager.try_auto_detect_savedata(game, game_to_update)
             game_to_update.last_played = datetime.today().strftime('%Y-%m-%d %H:%M:%S')                
             GameManager.update_game(game, game_to_update.to_dict())
-
-            if game_to_update.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
-                logger.info(f"Syncing save data to Google Drive for '{game}' after closure...")
-                try:
-                    SavedataManager.sync_savedata_to_gdrive(game_to_update.to_dict())
-                    logger.info(f"Google Drive post-game backup completed successfully for '{game}'.")
-                except Exception as e:
-                    logger.error(f"Google Drive post-game backup failed for '{game}': {e}")
+            self._sync_after_exit(game, game_to_update)
 
     def cleanup_exit(self, game, runner):
         logger.info(f"Closing {game}...")
@@ -129,14 +115,7 @@ class CliController(QObject):
             logger.error(f"{game_name} Not found. It must be added to the application first.")
             return
 
-        if game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
-            logger.info(f"Checking Google Drive cloud saves for '{game_name}' before tracking...")
-            try:
-                SavedataManager.sync_savedata_to_gdrive(game_card.to_dict())
-                logger.info(f"Google Drive pre-tracking sync completed successfully for '{game_name}'.")
-            except Exception as e:
-                logger.error(f"Google Drive pre-tracking sync failed for '{game_name}': {e}. Proceeding with local tracking.")
-
+        self._sync_before_launch(game_name, game_card, "pre-tracking")
         runner = GameRunner(game_card)
         runner.game = game_card
 
@@ -200,3 +179,42 @@ class CliController(QObject):
             self._is_exiting = True
             self.tracking.stop_tracking()
             self.update_game(game_name)
+
+    def _sync_savedata_to_cloud(self, game: str, game_data: dict):
+        logger.info(f"Syncing save data with Google Drive for '{game}'...")
+        try:
+            SavedataManager.sync_savedata_to_gdrive(game_data)
+            logger.info(f"Google Drive save sync completed successfully for '{game}'.")
+        except Exception as e:
+            logger.error(f"Google Drive save sync failed for '{game}': {e}. Proceeding with local saves.", exc_info=True)
+
+    def _sync_tracking_to_cloud(self, game: str, path: str):
+        if not self.tracking_file:
+            return
+        logger.info(f"Syncing time tracking data with Google Drive for '{game}'")
+        try:
+            LogManager().sync_tracking_to_gdrive(path)
+            logger.info(f"Google Drive tracking sync completed successfully for '{game}'")
+        except Exception as e:
+            logger.error(f"Google Drive tracking sync failed for '{game}': {e}. Proceeding with local tracking data.", exc_info=True)
+
+    def _sync_before_launch(self, game: str, game_card, phase: str, tracking_enabled: bool = True):
+        """Pre launch sync."""
+        if not (game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)):
+            return
+
+        self._sync_savedata_to_cloud(game, game_card.to_dict())
+
+        if tracking_enabled and self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
+            self.tracking_file = LogManager().get_log_name_from_path(game_card.path)
+            self._sync_tracking_to_cloud(game, game_card.path)
+
+    def _sync_after_exit(self, game: str, game_card):
+        """Post-game sync."""
+        if not (game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)):
+            return
+
+        self._sync_savedata_to_cloud(game, game_card.to_dict())
+
+        if self.tracking and self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
+            self._sync_tracking_to_cloud(game, game_card.path)
