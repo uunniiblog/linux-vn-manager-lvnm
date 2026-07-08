@@ -111,8 +111,15 @@ class GameSidebar(QFrame):
         self.launch_btn.setStyleSheet("background-color: #2e7d32; color: white; height: 40px; font-weight: bold;")
         self.launch_btn.clicked.connect(self.toggle_game)
         top_layout.addWidget(self.launch_btn)
-        
+
         layout.addLayout(top_layout)
+
+        # Sync confirmation label        
+        self.lbl_sync_status = QLabel("")
+        self.lbl_sync_status.setAlignment(Qt.AlignLeft)
+        self.lbl_sync_status.setStyleSheet("color: #4CAF50; font-weight: bold; margin-left: 1em;")
+        self.lbl_sync_status.hide()
+        layout.addWidget(self.lbl_sync_status)
 
         # Scrollable Edit Section 
         scroll = QScrollArea()
@@ -350,6 +357,8 @@ class GameSidebar(QFrame):
         if self._pending_pipeline and name == self._pending_savedata_name:
             return
         logger.info(f"Post-game cloud backup finished for '{name}': {result}")
+        if self.current_game and self.current_game.name == name:
+            self.show_sync_success_message(self.tr("Gdrive synced successfully"))
 
     def on_tracking_sync_failed(self, app_name, error_message):
         """Post-game background tracking-log backup failed"""
@@ -366,6 +375,13 @@ class GameSidebar(QFrame):
         if self._pending_pipeline and app_name == self._pending_tracking_path:
             return
         logger.info(f"Post-game tracking backup finished for '{app_name}': {result}")
+
+    def show_sync_success_message(self, message: str):
+        """Displays a success message below the play button for 5 seconds."""
+        self.lbl_sync_status.setText(message)
+        self.lbl_sync_status.show()
+        # Hide after 5 seconds
+        QTimer.singleShot(5000, self.lbl_sync_status.hide)
 
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
