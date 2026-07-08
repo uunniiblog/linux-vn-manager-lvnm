@@ -215,11 +215,18 @@ class GameManager:
         
         source_card = GameManager.get_game(name)
         game_data = source_card.to_dict()
+
+        # Remove personal fields from export
         game_data["path"] = ""
         game_data["last_played"] = ""
         game_data["label"] = ""
         game_data["cover_path"] = ""
         game_data["layout_path"] = ""
+        game_data["pre_launch_script"] = ""
+        game_data["pre_launch_script_wait"] = False
+        game_data["exit_script"] = ""
+        game_data["savedata_path"] = ""
+        game_data["gdrive"] = ""
 
         if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":
             game_data["gamescope"]["parameters"] = ""

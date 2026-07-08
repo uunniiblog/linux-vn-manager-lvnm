@@ -1,15 +1,15 @@
 import config
 import json
 import logging
+import urllib.parse
+import requests
 from pathlib import Path
-
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QLineEdit, QPushButton, QFileDialog, QScrollArea, QWidget,
     QMessageBox, QSizePolicy
 )
 from PySide6.QtCore import Signal, QSettings, Qt
-
 from ui.console_dialog import ConsoleDialog
 from game_manager import GameManager
 from prefix_manager import PrefixManager
@@ -283,6 +283,12 @@ class ImportGameDialog(QDialog):
             )
         else:
             self._setup_prefix_tasks(console, self.prefix_data, runner_type, runner_path)
+
+        # Download covers
+        console.add_task(
+            lambda logger: self._task_download_assets(logger, self.game_data),
+            {}, self.tr("Downloading game artwork")
+        )
                     
         # Add game task
         console.add_task(
@@ -463,6 +469,44 @@ class ImportGameDialog(QDialog):
             except Exception as e:
                 console_logger(f"VNDB fetch failed: {e}")
                 logger.error(f"VNDB fetch failed during import: {e}")
+
+    def _task_download_assets(self, console_logger, game_data):
+        """Downloads external cover and layout artwork if URLs are present."""
+        covers_dir = Path(self.user_settings.get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
+
+        assets_to_download = [
+            ("cover_source_url", "cover_path", "Cover"),
+            ("layout_source_url", "layout_path", "Layout")
+        ]
+
+        for url_key, path_key, label in assets_to_download:
+            url = game_data.get(url_key)
+            if not url or not url.strip():
+                continue
+
+            console_logger(f"Downloading game {label.lower()} from URL...")
+            try:
+                # Extract filename from URL safely
+                parsed_url = urllib.parse.urlparse(url)
+                filename = Path(parsed_url.path).name
+                target_path = covers_dir / filename
+
+                # Request image
+                response = requests.get(url, timeout=5)
+                response.raise_for_status()
+
+                # Save image file
+                with open(target_path, "wb") as f:
+                    f.write(response.content)
+
+                # Save the covers paths
+                game_data[path_key] = str(target_path)
+                console_logger(f"Successfully saved {label.lower()} to: {filename}")
+
+            except Exception as e:
+                # Catching exceptions ensures the import queue keeps moving even if downloading fails
+                console_logger(f"[WARNING] Could not download {label.lower()}: {e}. Skipping artwork...")
+                logger.warning(f"Failed to download artwork asset ({label}) from {url}: {e}")
 
     def _on_autocomplete_selected(self, vn_data: dict):
         """Updates the VNDB input when an autocomplete result is clicked."""

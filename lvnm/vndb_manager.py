@@ -228,14 +228,14 @@ class VndbManager:
                 target = temp_dir / filename
                 
                 if target.exists():
-                    return str(target)
+                    return {"local_path": str(target), "url": url}
                     
                 try:
                     img_res = session.get(url, timeout=5)
                     img_res.raise_for_status()
                     with open(target, 'wb') as f:
                         f.write(img_res.content)
-                    return str(target)
+                    return {"local_path": str(target), "url": url}
                 except Exception as e:
                     logger.error(f"Failed to download release image {url}: {e}")
                     return None

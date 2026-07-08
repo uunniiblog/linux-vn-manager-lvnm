@@ -302,6 +302,7 @@ class AdvancedSettingsDialog(QDialog):
 
                 role_index = combo.currentIndex()
                 temp_path = combo.property("image_path")
+                source_url = combo.property("source_url")
                 if role_index == 0:
                     # Explicitly set to None, delete target image
                     if temp_path and SystemUtils.are_files_identical(temp_path, self.current_game.cover_path):
@@ -314,12 +315,12 @@ class AdvancedSettingsDialog(QDialog):
                     saved = SystemUtils.save_image_to_covers(temp_path, self.selected_vndb_id, "vertical")
                     if saved:
                         self.current_game.cover_path = saved
-                        self.current_game.cover_source_url = ""
+                        self.current_game.cover_source_url = source_url
                 elif role_index == 2 and temp_path:
                     saved = SystemUtils.save_image_to_covers(temp_path, self.selected_vndb_id, "horizontal")
                     if saved:
                         self.current_game.layout_path = saved
-                        self.current_game.layout_source_url = ""
+                        self.current_game.cover_source_url = source_url
 
         # SteamGridDB image selections
         if self.sgdb_game_id and self.sgdb_api_key:
@@ -442,14 +443,17 @@ class AdvancedSettingsDialog(QDialog):
                 widget.deleteLater()
 
         # Measure scaled widths for all valid paths
-        valid_paths = []  # list of (path, scaled_width)
-        for path in self._vndb_image_paths:
+        valid_paths = []  # list of list of (path, url, scaled_width)
+        for img_dict in self._vndb_image_paths:
+            path = img_dict.get("local_path", "")
+            url = img_dict.get("url", "")
+
             pixmap = QPixmap(path)
             if pixmap.isNull():
                 continue
             ph = pixmap.height()
             scaled_w = int(pixmap.width() * MAX_HEIGHT / ph) if ph > 0 else MAX_HEIGHT
-            valid_paths.append((path, scaled_w))
+            valid_paths.append((path, url, scaled_w))
 
         if not valid_paths:
             return
@@ -461,12 +465,12 @@ class AdvancedSettingsDialog(QDialog):
             available_w = self.width() - 36
 
         # Compute column count
-        max_img_w = max(scaled_w for _, scaled_w in valid_paths)
+        max_img_w = max(scaled_w for _, _, scaled_w in valid_paths)
         columns = max(1, (available_w + spacing) // (max_img_w + spacing))
 
         # Build grid
         row, col = 0, 0
-        for path, _ in valid_paths:
+        for path, url, _ in valid_paths:
             container = QWidget()
             cont_layout = QVBoxLayout(container)
             cont_layout.setContentsMargins(5, 5, 5, 5)
@@ -484,6 +488,7 @@ class AdvancedSettingsDialog(QDialog):
             combo = QComboBox()
             combo.addItems([self.tr("None"), self.tr("Vertical Cover"), self.tr("Horizontal Layout")])
             combo.setProperty("image_path", path)
+            combo.setProperty("source_url", url)
             combo.blockSignals(True)
 
             if path in previous_selections:
