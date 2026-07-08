@@ -607,7 +607,8 @@ class GameSidebar(QFrame):
             self._pending_pipeline.start()
  
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), str(e), exc_info=True)
+            logger.error(f"Error in launch_game {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Error"), str(e))
 
     def _on_pipeline_finished(self, name, proceed):
         """Called once after all pre-launch sync steps."""

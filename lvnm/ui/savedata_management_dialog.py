@@ -1,3 +1,5 @@
+import logging
+import config
 from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton,
     QDialog, QTableWidget, QTableWidgetItem,
@@ -6,12 +8,11 @@ from PySide6.QtWidgets import (
     QMessageBox, QCheckBox, QStyle, QDialogButtonBox
 )
 from PySide6.QtCore import QSettings, Qt, QObject, QEvent
-import config
 from settings_manager import SettingsManager
 from game_manager import GameManager
 from prefix_manager import PrefixManager
 from savedata_manager import SavedataManager
-import logging
+from pregame_sync_pipeline import ManualSyncPipeline, SavedataSyncStep, TrackingSyncStep
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ class SavedataManagementDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Manage Savedata files"))
         self.resize(600, 400)
+
+        self._pending_pipeline = None
 
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
@@ -323,18 +326,14 @@ class SavedataManagementDialog(QDialog):
     def _sync_gdrive(self, game_data):
         """Handles the Gdrive sync button via SavedataManager."""
         try:
-            result = SavedataManager.sync_savedata_to_gdrive(game_data)
-            if result == "uploaded":
-                QMessageBox.information(
-                    self, self.tr("Gdrive Sync"),
-                    self.tr("Savedata for '{0}' uploaded to Google Drive.").format(game_data.get("name", ""))
-                )
-            elif result == "exists":
-                QMessageBox.information(
-                    self, self.tr("Gdrive Sync"),
-                    self.tr("A Gdrive folder for '{0}' already exists. Sync logic for this case isn't implemented yet.")
-                        .format(game_data.get("name", ""))
-                )
+            steps = []
+
+            steps.append(SavedataSyncStep(game_data['name'], game_data, self.tr("Syncing save data with Google Drive...")))
+            steps.append(TrackingSyncStep(game_data['path'], self.tr("Syncing time tracking data...")))
+            
+            self._pending_pipeline = ManualSyncPipeline(self, steps)
+            self._pending_pipeline.finished.connect(lambda proceed: setattr(self, '_pending_pipeline', None))
+            self._pending_pipeline.start()
         except Exception as e:
             logging.error(f"Gdrive sync failed for '{game_data.get('name', '')}': {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Gdrive Sync Failed"), str(e))

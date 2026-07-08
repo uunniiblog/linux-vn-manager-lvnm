@@ -150,3 +150,18 @@ class PreLaunchSyncPipeline(QObject):
             QMessageBox.No,
         )
         self.finished.emit(reply == QMessageBox.Yes)
+
+class ManualSyncPipeline(PreLaunchSyncPipeline):
+    """
+    A sync pipeline variant for manual triggers. 
+    """
+    def _on_step_failed(self, error_message: str):
+        self.progress.close()        
+        QMessageBox.critical(
+            self._parent,
+            self.tr("Sync Failed"),
+            self.tr(f"Cloud sync failed:\n\n{error_message}")
+        )
+        
+        # Emit False since the sync sequence failed/cancelled
+        self.finished.emit(False)
