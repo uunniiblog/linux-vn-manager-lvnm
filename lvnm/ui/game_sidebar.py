@@ -794,9 +794,10 @@ class GameSidebar(QFrame):
                     self, self.tr("Prefix Changed"),
                     self.tr(
                         "This game's savedata lives inside its prefix, and Gdrive sync is enabled.\n\n"
-                        "The game will create fresh saves at the new prefix location. Your existing "
-                        "saves won't be deleted.\nIf you want to bring them along use use 'Copy to...' in Manage Savedata "
-                        "before changing the prefix, and update the Savedata Path afterward to keep GDrive sync working."
+                        "Your existing saves won't be deleted. But the game will create fresh saves at the new prefix location.\n\n"
+                        "If you want to bring them along use use 'Copy to...' in Manage Savedata before changing the prefix, "
+                        "and update the Savedata Path afterward to keep GDrive sync working.\n\n"
+                        "Alternatively: Remove the savedata path field from the game to automatically fill it from the actual Gdrive sync info into the new prefix."
                     )
                 )
         

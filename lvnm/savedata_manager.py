@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import os
+import tempfile
 from PySide6.QtCore import QThread, Signal, QObject
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -12,6 +13,7 @@ from datetime import datetime, timezone
 from prefix_manager import PrefixManager
 from settings_manager import SettingsManager
 from gdrive_manager import GdriveManager
+from game_manager import GameManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,10 @@ class SavedataManager(QObject):
         "drive_c/users/*/AppData/Local",
     ]
 
+    # More than 70% files deleted safeguard
     DELETION_SAFETY_THRESHOLD = 0.7
+    # # Uploaded alongside savedata files with savedata path info
+    SYNC_LOCATION_METADATA_FILENAME = ".lvnm_savedata_location.json"
 
     gdrive_sync_succeeded = Signal(str, dict)
     gdrive_sync_failed = Signal(str, str)
@@ -295,7 +300,131 @@ class SavedataManager(QObject):
             return False
 
     @staticmethod
-    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 5) -> dict:
+    def _compute_portable_location_reference(game_data: dict) -> dict | None:
+        """
+        Describes this device's savedata_path in a form meaningful on ANY device
+        running the same game, not this device's absolute path. Returns:
+        Savedata inside prefix: {"kind": "prefix", "rel_path": ...} 
+        Next to game's exe: {"kind": "install", "rel_path": ...}
+        None
+        """
+        savedata_path = game_data.get("savedata_path", "")
+        if not savedata_path:
+            return None
+        src = Path(os.path.abspath(savedata_path))
+
+        if SavedataManager.is_savedata_inside_prefix(game_data):
+            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+            prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
+            return {"kind": "prefix", "rel_path": src.relative_to(prefix_path).as_posix()}
+
+        game_path = game_data.get("path", "")
+        if game_path:
+            install_dir = Path(os.path.abspath(game_path)).parent
+            try:
+                return {"kind": "install", "rel_path": src.relative_to(install_dir).as_posix()}
+            except ValueError:
+                # TODO: savedata_path isn't under the install dir either
+                logger.warn("_compute_portable_location_reference: Savedata path is not in prefix or game's folder")
+                pass  
+
+        return None
+
+    @staticmethod
+    def _resolve_portable_location(game_data: dict, reference: dict) -> Path | None:
+        """
+        Resolves game's savedata path in local prefix from _compute_portable_location_reference
+        """
+        kind = reference.get("kind")
+        rel_path = reference.get("rel_path")
+        if not kind or not rel_path:
+            return None
+
+        if kind == "prefix":
+            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+            if not prefix_info:
+                logger.error("_resolve_portable_location: no prefix set for game")
+                raise ValueError("_resolve_portable_location: no prefix set for game")
+
+            prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
+            remapped = SavedataManager._remap_user_segment(Path(rel_path), prefix_path)
+            return prefix_path / remapped
+
+        if kind == "install":
+            game_path = game_data.get("path", "")
+            if not game_path:
+                return None
+            return Path(os.path.abspath(game_path)).parent / rel_path
+
+        return None
+
+    @staticmethod
+    def _upload_location_reference(folder_id: str, existing_location_meta: dict | None, game_data: dict):
+        """
+        Refreshes the portable location hint in Drive after a successful sync.
+        """
+        reference = SavedataManager._compute_portable_location_reference(game_data)
+        if reference is None:
+            logger.warning(f"Could not upload savedata location hint for '{game_data.get('name', '')}")
+            return
+        try:
+            tmp_dir = Path(tempfile.mkdtemp())
+            tmp_path = tmp_dir / SavedataManager.SYNC_LOCATION_METADATA_FILENAME
+            tmp_path.write_text(json.dumps(reference), encoding="utf-8")
+            GdriveManager.upload_file(
+                tmp_path, folder_id,
+                existing_file_id=existing_location_meta["id"] if existing_location_meta else None
+            )
+            tmp_path.unlink(missing_ok=True)
+            tmp_dir.rmdir()
+        except Exception as e:
+            logger.warning(f"Could not upload savedata location hint for '{game_data.get('name', '')}': {e}")
+
+    @staticmethod
+    def get_savedata_path_from_gdrive(game_data: dict) -> str | None:
+        """
+        For a game with NO savedata_path set yet: checks whether Drive already
+        has savedata for it from another device, and if so, predicts where it
+        should live on this device.
+        Returns the predicted absolute path as a string.
+        """
+        game_name = game_data.get("name", "")
+        if game_data.get("savedata_path", ""):
+            return None
+
+        root_folder_id = GdriveManager.get_root_folder_id()
+        folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
+        if folder_id is None:
+            logger.debug("get_savedata_path_from_gdrive: No cloud data for this game yet")
+            return None
+
+        remote_files, _ = GdriveManager.build_remote_tree(folder_id)
+        location_meta = remote_files.get(SavedataManager.SYNC_LOCATION_METADATA_FILENAME)
+        if location_meta is None:
+            logger.warning("get_savedata_path_from_gdrive: no savedata path in gdrive.")
+            return None
+
+        try:
+            tmp_dir = Path(tempfile.mkdtemp())
+            tmp_path = tmp_dir / SavedataManager.SYNC_LOCATION_METADATA_FILENAME
+            GdriveManager.download_file(location_meta["id"], tmp_path, 0)
+            reference = json.loads(tmp_path.read_text(encoding="utf-8"))
+            tmp_path.unlink(missing_ok=True)
+            tmp_dir.rmdir()
+        except Exception as e:
+            logger.warning(f"get_savedata_path_from_gdrive: Could not read savedata savedata location hint for '{game_name}': {e}")
+            return None
+
+        predicted_path = SavedataManager._resolve_portable_location(game_data, reference)
+        if predicted_path is None:
+            logger.warning("get_savedata_path_from_gdrive: predicted_path not found")
+            return None
+
+        logger.info(f"Predicted savedata location for '{game_name}' from cloud hint: {predicted_path}")
+        return str(predicted_path)
+
+    @staticmethod
+    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 10) -> dict:
         """
         Bidirectionally syncs a game's savedata folder with Drive, preserving
         subfolder structure and propagating deletions:
@@ -312,15 +441,27 @@ class SavedataManager(QObject):
 
         game_name = game_data.get("name", "")
         savedata_path = game_data.get("savedata_path", "")
+        savedata_path_was_already_set = bool(savedata_path)
 
         if not game_data.get("gdrive", False):
             raise ValueError(f"Gdrive sync is not enabled for '{game_name}'.")
+
         if not savedata_path:
-            raise ValueError(f"No savedata path set for '{game_name}'.")
+            predicted_path = SavedataManager.get_savedata_path_from_gdrive(game_data)
+            if predicted_path is None:
+                raise ValueError(f"No savedata path set for '{game_name}'.")
+
+            logger.info(f"savedata path for '{game_name}' from cloud hint: {predicted_path}")
+            savedata_path = predicted_path
+            game_data["savedata_path"] = predicted_path
+            GameManager.update_game(game_name, {"savedata_path": predicted_path})
+            # savedata_path will be refreshed on game close in the UI
 
         src = Path(savedata_path)
-        if not src.exists():
-            raise FileNotFoundError(f"Savedata path does not exist: {src}")
+        try:
+            src.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise FileNotFoundError(f"Could not create/access savedata path: {src} ({e})")
 
         root_folder_id = GdriveManager.get_root_folder_id()
         folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
@@ -333,6 +474,9 @@ class SavedataManager(QObject):
             manifest = SavedataManager._get_sync_manifest(game_name)
 
         remote_files, remote_folders = GdriveManager.build_remote_tree(folder_id)
+
+        # Exclude the reserved filename from regular sync
+        existing_location_meta = remote_files.pop(SavedataManager.SYNC_LOCATION_METADATA_FILENAME, None)
 
         local_files_by_rel = {
             f.relative_to(src).as_posix(): f
@@ -434,16 +578,19 @@ class SavedataManager(QObject):
                 rel = f.relative_to(src).as_posix()
                 new_manifest[rel] = f.stat().st_mtime
         SavedataManager._save_sync_manifest(game_name, new_manifest)
+        SavedataManager._upload_location_reference(folder_id, existing_location_meta, game_data)
 
         logger.info(
             f"Gdrive sync for '{game_name}': {len(uploaded)} uploaded, {len(downloaded)} downloaded, "
             f"{len(deleted_local)} deleted locally, {len(deleted_remote)} deleted remotely, "
-            f"{len(skipped)} unchanged."
+            f"{len(skipped)} unchanged. "
+            f"get_savedata_path_from_gdrive: {predicted_path if not savedata_path_was_already_set else None}"
         )
         return {
             "uploaded": uploaded, "downloaded": downloaded,
             "deleted_local": deleted_local, "deleted_remote": deleted_remote,
-            "skipped": skipped
+            "skipped": skipped,
+            "get_savedata_path_from_gdrive": predicted_path if not savedata_path_was_already_set else None,
         }
 
     @staticmethod

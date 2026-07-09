@@ -226,7 +226,7 @@ class GameManager:
         game_data["pre_launch_script_wait"] = False
         game_data["exit_script"] = ""
         game_data["savedata_path"] = ""
-        game_data["gdrive"] = ""
+        game_data["gdrive"] = False
 
         if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":
             game_data["gamescope"]["parameters"] = ""
