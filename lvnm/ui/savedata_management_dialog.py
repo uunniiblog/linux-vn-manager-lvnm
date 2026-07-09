@@ -114,7 +114,8 @@ class SavedataManagementDialog(QDialog):
             self.table.setItem(row, 3, gdrive_sort_item)
 
             # Enable/disable the copy button as the path changes
-            savedata_widget.line_edit.textChanged.connect(lambda text, btn=prefix_widget.copy_button: btn.setEnabled(bool(text.strip())))
+            savedata_widget.line_edit.textChanged.connect(lambda text, btn=prefix_widget.copy_button: btn.setEnabled(
+                    bool(text.strip()) and SavedataManager.is_savedata_inside_prefix({**game_data, "savedata_path": text.strip()})))
             savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
 
         self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
@@ -191,6 +192,8 @@ class SavedataManagementDialog(QDialog):
         copy_button = QPushButton(self.tr("Copy to..."))
         copy_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         copy_button.setEnabled(bool(game_data.get("savedata_path", "")))
+        is_inside = SavedataManager.is_savedata_inside_prefix(game_data)
+        copy_button.setEnabled(is_inside)
         copy_button.clicked.connect(lambda: self._open_copy_to_prefix_dialog(game_data))
 
         h_layout.addWidget(prefix_label, 1)
@@ -202,10 +205,22 @@ class SavedataManagementDialog(QDialog):
         return widget
 
     def _browse_savedata_folder(self, line_edit, game_data, path_item=None):
-        folder = QFileDialog.getExistingDirectory(self, self.tr("Select Savedata Folder"), "")
-        if folder:
-            line_edit.setText(folder)
-            self._save_savedata_path(line_edit, game_data, path_item)
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(self.tr("Select Savedata Folder"))
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+
+        current_path = game_data.get("savedata_path", "")
+        if current_path:
+            dialog.setDirectory(current_path)
+        
+        if dialog.exec():
+            selected_files = dialog.selectedFiles()
+            if selected_files:
+                folder = selected_files[0]
+                line_edit.setText(folder)
+                self._save_savedata_path(line_edit, game_data, path_item)
 
     def _open_copy_to_prefix_dialog(self, game_data):
         """Opens a small dialog to pick a prefix and copy the savedata into it."""

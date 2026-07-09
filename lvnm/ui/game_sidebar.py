@@ -766,6 +766,7 @@ class GameSidebar(QFrame):
         self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
         self.show_saved_feedback()
+        self.update_savedata_visibility()
 
     def on_prefix_changed(self, prefix_name):
         if not prefix_name: 
@@ -897,6 +898,7 @@ class GameSidebar(QFrame):
             self.current_game.savedata_path = updated_card.savedata_path
             self.edit_savedata.setText(updated_card.savedata_path)
             self.gdrive_sync_checkbox.setChecked(updated_card.gdrive)
+            self.update_savedata_visibility()
             
 
     def refresh_prefix_combo(self):
@@ -1021,11 +1023,13 @@ class GameSidebar(QFrame):
         savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
         savedata_enabled = savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
         gdrive_logged_in = bool(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN, ""))
+        has_savedata = self.current_game and self.current_game.savedata_path
+        is_visible = savedata_enabled and gdrive_logged_in and bool(has_savedata)
 
         row, _ = self.gen_form.getLayoutPosition(self.savedata_row)
         self.gen_form.setRowVisible(row, savedata_enabled)
         gdrive_row, _ = self.gen_form.getWidgetPosition(self.gdrive_sync_checkbox)
-        self.gen_form.setRowVisible(gdrive_row, savedata_enabled and gdrive_logged_in)
+        self.gdrive_sync_checkbox.setVisible(is_visible)           
 
     def update_tracking_ui(self, stats):
         """Update the labels with data received from the worker."""
