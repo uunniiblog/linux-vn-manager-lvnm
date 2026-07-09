@@ -316,7 +316,7 @@ class GameSidebar(QFrame):
             self.set_ui_stop_state()
 
     def on_game_stopped_signal(self, name):
-        """ Triggered by Backend when ANY game finishes """
+        """ Triggered by GameProcessManager when ANY game finishes """
         # Notify GameTab list item to refresh last played text
         if hasattr(self, 'on_metadata_updated'):
             self.on_metadata_updated(name)
@@ -328,6 +328,9 @@ class GameSidebar(QFrame):
                 self.current_game.last_played = game_to_update.last_played
                 self.current_game.savedata_path = game_to_update.savedata_path
                 self.edit_savedata.setText(game_to_update.savedata_path)
+
+                if self.current_game.gdrive:
+                    self.show_sync_message(self.tr("Gdrive Syncing..."), "#ffc107", timeout_ms=0)
 
             self.set_ui_start_state()
             self.reset_tracking_labels()
@@ -351,6 +354,8 @@ class GameSidebar(QFrame):
             self.tr("Savedata Cloud Sync Failed"),
             self.tr(f"Background save backup failed for '{name}':\n{error_message}\nYou can sync the data manually from settings.")
         )
+        if self.current_game and self.current_game.name == name:
+            self.show_sync_message(self.tr(f"Gdrive synced error {error_message}"), "#FF0000")
 
     def on_gdrive_sync_succeeded(self, name, result):
         """Post-game background savedata backup finished"""
@@ -358,7 +363,7 @@ class GameSidebar(QFrame):
             return
         logger.info(f"Post-game cloud backup finished for '{name}': {result}")
         if self.current_game and self.current_game.name == name:
-            self.show_sync_success_message(self.tr("Gdrive synced successfully"))
+            self.show_sync_message(self.tr("Gdrive synced successfully"), "#4CAF50")
 
     def on_tracking_sync_failed(self, app_name, error_message):
         """Post-game background tracking-log backup failed"""
@@ -376,12 +381,16 @@ class GameSidebar(QFrame):
             return
         logger.info(f"Post-game tracking backup finished for '{app_name}': {result}")
 
-    def show_sync_success_message(self, message: str):
-        """Displays a success message below the play button for 5 seconds."""
+    def show_sync_message(self, message: str, color: str, timeout_ms=5000):
+        """Displays a success message below the play button for 5 seconds or perma if 0 timeout."""
         self.lbl_sync_status.setText(message)
+        self.lbl_sync_status.setStyleSheet(f"color: {color}; font-weight: bold; margin-left: 1em;")
         self.lbl_sync_status.show()
-        # Hide after 5 seconds
-        QTimer.singleShot(5000, self.lbl_sync_status.hide)
+        # Hide if prompted
+        if timeout_ms > 0:
+            QTimer.singleShot(timeout_ms, self.lbl_sync_status.hide)
+        else:
+            pass
 
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
