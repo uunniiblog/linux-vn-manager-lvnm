@@ -413,6 +413,9 @@ class GameSidebar(QFrame):
         else:
             self.set_ui_start_state()
 
+        # Hide gdrive status text
+        self.lbl_sync_status.hide()
+
         # Update Top Header Name
         self.lbl_display_name.setText(card.name)
         self.update_game_cover()
@@ -540,6 +543,9 @@ class GameSidebar(QFrame):
         self.lbl_display_name.setText(self.tr("New Game"))
         self.media_container.hide() # Hide media for new games by default
         self.launch_btn.setVisible(False)
+
+        # Hide gdrive status text
+        self.lbl_sync_status.hide()
         
         # Clear General UI Fields
         self.launch_btn.setVisible(False)
