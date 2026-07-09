@@ -24,7 +24,9 @@ def main():
         cert_path = certifi.where()
         os.environ['SSL_CERT_FILE'] = cert_path
         os.environ['REQUESTS_CA_BUNDLE'] = cert_path
-        os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
+    
+    # QFileDialog native system integration
+    os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
 
     # Close with ctrl c in terminal
     signal.signal(signal.SIGINT, signal.SIG_DFL)
