@@ -116,6 +116,7 @@ class GameSidebar(QFrame):
 
         # Sync confirmation label        
         self.lbl_sync_status = QLabel("")
+        self.lbl_sync_status.setWordWrap(True)
         self.lbl_sync_status.setAlignment(Qt.AlignLeft)
         self.lbl_sync_status.setStyleSheet("color: #4CAF50; font-weight: bold; margin-left: 1em;")
         self.lbl_sync_status.hide()

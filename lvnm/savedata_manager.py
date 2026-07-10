@@ -33,6 +33,7 @@ class SavedataManager(QObject):
     DELETION_SAFETY_THRESHOLD = 0.7
     # # Uploaded alongside savedata files with savedata path info
     SYNC_LOCATION_METADATA_FILENAME = ".lvnm_savedata_location.json"
+    LOCATION_REFERENCE_METADATA_KEY = "__location_references__"
 
     gdrive_sync_succeeded = Signal(str, dict)
     gdrive_sync_failed = Signal(str, str)
@@ -367,6 +368,13 @@ class SavedataManager(QObject):
         if reference is None:
             logger.warning(f"Could not upload savedata location hint for '{game_data.get('name', '')}")
             return
+
+        game_name = game_data.get("name", "")
+        last_uploaded = SavedataManager._get_last_uploaded_location_reference(game_name)
+        if reference == last_uploaded and existing_location_meta is not None:
+            # Unchanged
+            return  
+
         try:
             tmp_dir = Path(tempfile.mkdtemp())
             tmp_path = tmp_dir / SavedataManager.SYNC_LOCATION_METADATA_FILENAME
@@ -377,6 +385,7 @@ class SavedataManager(QObject):
             )
             tmp_path.unlink(missing_ok=True)
             tmp_dir.rmdir()
+            SavedataManager._save_last_uploaded_location_reference(game_name, reference)
         except Exception as e:
             logger.warning(f"Could not upload savedata location hint for '{game_data.get('name', '')}': {e}")
 
@@ -458,10 +467,19 @@ class SavedataManager(QObject):
             # savedata_path will be refreshed on game close in the UI
 
         src = Path(savedata_path)
-        try:
-            src.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            raise FileNotFoundError(f"Could not create/access savedata path: {src} ({e})")
+        if savedata_path_was_already_set:
+            # Savedata path explicitly set doesn't exist
+            if not src.exists():
+                raise FileNotFoundError(
+                    f"Configured savedata path for '{game_name}' does not exist: {src}. "
+                    f"If the game was moved, update the savedata path in settings before syncing."
+                )
+        else:
+            # Predicted savedata folder when not set
+            try:
+                src.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                raise FileNotFoundError(f"Could not create savedata path: {src} ({e})")
 
         root_folder_id = GdriveManager.get_root_folder_id()
         folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
@@ -594,6 +612,18 @@ class SavedataManager(QObject):
         }
 
     @staticmethod
+    def _get_last_uploaded_location_reference(game_name: str) -> dict | None:
+        all_metadata = SavedataManager._load_gsync_metadata()
+        return all_metadata.get(SavedataManager.LOCATION_REFERENCE_METADATA_KEY, {}).get(game_name)
+
+    @staticmethod
+    def _save_last_uploaded_location_reference(game_name: str, reference: dict):
+        all_metadata = SavedataManager._load_gsync_metadata()
+        refs = all_metadata.setdefault(SavedataManager.LOCATION_REFERENCE_METADATA_KEY, {})
+        refs[game_name] = reference
+        SavedataManager._save_gsync_metadata(all_metadata)
+
+    @staticmethod
     def _check_deletion_safety(delete_count: int, known_count: int, direction: str, game_name: str):
         if known_count == 0 or delete_count == 0:
             return
@@ -649,6 +679,8 @@ class SavedataManager(QObject):
         all_metadata = SavedataManager._load_gsync_metadata()
         if game_name in all_metadata:
             all_metadata.pop(game_name)
+            refs = all_metadata.get(SavedataManager.LOCATION_REFERENCE_METADATA_KEY, {})
+            refs.pop(game_name, None)
             SavedataManager._save_gsync_metadata(all_metadata)
             logger.info(f"Reset Gdrive sync manifest for '{game_name}' (savedata path changed).")
 
