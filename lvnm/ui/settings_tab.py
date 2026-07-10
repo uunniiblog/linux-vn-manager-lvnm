@@ -388,6 +388,45 @@ class SettingsTab(QWidget):
         self.auto_detect_save.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
         savedata_layout.addRow(auto_detect_label, self.auto_detect_save)
 
+        # Savedata dialog
+        self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
+        self.manage_savedata_btn.setFlat(True)
+        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px; margin-top: 0.7em")
+        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
+
+        manage_row = QHBoxLayout()
+        manage_row.setContentsMargins(0, 0, 0, 0)
+        manage_row.addWidget(self.manage_savedata_btn)
+        manage_row.addStretch()
+        savedata_layout.addRow(manage_row)
+
+        # Separator for Gdrive section
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 15, 0, 5)
+
+        gdrive_section_title = QLabel(self.tr("Google Drive Options"))
+        gdrive_section_title.setStyleSheet("font-weight: bold;color: palette(link);")
+
+        trailing_line = QFrame()
+        trailing_line.setFrameShape(QFrame.Shape.HLine)
+        trailing_line.setFrameShadow(QFrame.Shadow.Sunken)
+        trailing_line.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        trailing_line.setStyleSheet("color: rgba(255, 255, 255, 0.1); margin-left: 1em; color: palette(mid);border: none;min-height: 1px;max-height: 1px;")
+
+        header_layout.addWidget(gdrive_section_title)
+        header_layout.addWidget(trailing_line)
+        savedata_layout.addRow(header_widget)
+
+        # Auto enable Gsync games checkbox
+        all_gdrive_label = QLabel(self.tr("Automatically enable:"))
+        all_gdrive_label.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
+        self.all_gdrive_ckbox = QCheckBox(self.tr("Automatically enables GDrive Sync for all new games (Recommended)"))
+        self.all_gdrive_ckbox.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False))
+        self.all_gdrive_ckbox.setToolTip(self.tr("Recommended to enable if using from the start if syncing between two devices. Will autofetch and create the savedata folder to avoid conflicts in first launch"))
+        savedata_layout.addRow(all_gdrive_label, self.all_gdrive_ckbox)
+
         # Gdrive Client ID
         gdrive_id_label = QLabel(self.tr("Gdrive Client ID:"))
         self.gdrive_client_id_edit, gdrive_id_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, ""))
@@ -420,19 +459,6 @@ class SettingsTab(QWidget):
         status_row.addStretch()
         savedata_layout.addRow(status_label, status_row)
 
-        # Savedata dialog
-        self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
-        self.manage_savedata_btn.setFlat(True)
-        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
-        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
-        self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
-
-        manage_row = QHBoxLayout()
-        manage_row.setContentsMargins(0, 0, 0, 0)
-        manage_row.addWidget(self.manage_savedata_btn)
-        manage_row.addStretch()
-        savedata_layout.addRow(manage_row)
-
         self._update_gdrive_ui_state()
 
         # Widgets that only make sense when savedata management is enabled
@@ -447,7 +473,9 @@ class SettingsTab(QWidget):
             self.gdrive_status_dot,
             self.gdrive_status_text,
             self.gdrive_auth_btn,
-            self.manage_savedata_btn
+            self.manage_savedata_btn,
+            all_gdrive_label,
+            self.all_gdrive_ckbox
         ]
 
         # Connect the checkbox signal
@@ -656,6 +684,7 @@ class SettingsTab(QWidget):
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
         self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
+        self.timetracking_sync.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
@@ -663,7 +692,7 @@ class SettingsTab(QWidget):
         self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
         self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t.strip()))
         self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t.strip()))
-        self.timetracking_sync.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, bool(s)))
+        self.all_gdrive_ckbox.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, bool(s)))
 
         # Reset gdrive if credentials changed, maybe using new acc or something
         self.gdrive_client_id_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t),GdriveManager.reset_service_cache()))
@@ -773,6 +802,8 @@ class SettingsTab(QWidget):
         """Helper to enable/disable all savedata sub-widgets"""
         for widget in self.savedata_dependent_widgets:
             widget.setEnabled(checked)
+        if checked:
+            self._update_gdrive_ui_state()
 
     def _toggle_env_extra(self, force_hide=False):
         """Toggles the visibility of checkboxes beyond the first row."""
@@ -925,6 +956,7 @@ class SettingsTab(QWidget):
         """Routes to sign-in or logout depending on current state."""
         if GdriveManager.is_logged_in():
             self._logout_gdrive()
+            self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False)
         else:
             self._sign_in_gdrive()
 
@@ -942,10 +974,13 @@ class SettingsTab(QWidget):
             self.gdrive_status_dot.setStyleSheet("color: #4caf50;")
             self.gdrive_status_text.setText(self.tr("Connected"))
             self.gdrive_auth_btn.setText(self.tr("Log out"))
+            self.all_gdrive_ckbox.setEnabled(True)
         else:
             self.gdrive_status_dot.setStyleSheet("color: #888888;")
             self.gdrive_status_text.setText(self.tr("Not connected"))
             self.gdrive_auth_btn.setText(self.tr("Sign in to Google Drive"))
+            self.all_gdrive_ckbox.setEnabled(False)
+            self.all_gdrive_ckbox.setChecked(False)
 
         self._update_timetracking_sync_state()
 

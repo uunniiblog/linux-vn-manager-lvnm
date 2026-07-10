@@ -43,6 +43,7 @@ class ImportGameDialog(QDialog):
         # Load Stored UI settings
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
         self.user_settings = SettingsManager()
+        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
 
         if not self._load_json():
             return
@@ -448,27 +449,12 @@ class ImportGameDialog(QDialog):
             vndb=vndb
         )
 
+        if self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and self.savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False):
+            card.gdrive = True
+
         # Persist extra fields
         GameManager.update_game(name, card.to_dict())
         console_logger(f"Game '{name}' registered successfully.")
-
-        # VNDB metadata fetch 
-        if vndb and vndb.strip():
-            console_logger(f"Fetching VNDB metadata for '{vndb}'...")
-            try:
-                results = VndbManager.fetch_and_store_vn(vndb)
-                if results:
-                    og_title = VndbManager.get_original_title(results[0])
-                    updated_card = GameManager.get_game(name)
-                    if updated_card:
-                        updated_card.ogtitle = og_title
-                        GameManager.update_game(name, updated_card.to_dict())
-                    console_logger(f"VNDB metadata saved. Original title: '{og_title}'")
-                else:
-                    console_logger(f"No VNDB results found for '{vndb}', skipping.")
-            except Exception as e:
-                console_logger(f"VNDB fetch failed: {e}")
-                logger.error(f"VNDB fetch failed during import: {e}")
 
     def _task_download_assets(self, console_logger, game_data):
         """Downloads external cover and layout artwork if URLs are present."""

@@ -556,6 +556,9 @@ class GameSidebar(QFrame):
         self.edit_savedata.clear()
         self.update_savedata_visibility()
         
+        if self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and self.savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False):
+            self.gdrive_sync_checkbox.setChecked(True)
+        
         # Apply Gamescope Defaults from Settings or leave empty
         gs_default_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
         gs_default_params = self.user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, "")
@@ -1040,13 +1043,13 @@ class GameSidebar(QFrame):
         savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
         savedata_enabled = savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
         gdrive_logged_in = bool(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN, ""))
-        has_savedata = self.current_game and self.current_game.savedata_path
-        is_visible = savedata_enabled and gdrive_logged_in and bool(has_savedata)
+        # has_savedata = self.current_game and self.current_game.savedata_path
+        # is_visible = savedata_enabled and gdrive_logged_in and bool(has_savedata)
 
         row, _ = self.gen_form.getLayoutPosition(self.savedata_row)
         self.gen_form.setRowVisible(row, savedata_enabled)
-        gdrive_row, _ = self.gen_form.getWidgetPosition(self.gdrive_sync_checkbox)
-        self.gdrive_sync_checkbox.setVisible(is_visible)           
+        # gdrive_row, _ = self.gen_form.getWidgetPosition(self.gdrive_sync_checkbox)
+        # self.gdrive_sync_checkbox.setVisible(is_visible)           
 
     def update_tracking_ui(self, stats):
         """Update the labels with data received from the worker."""

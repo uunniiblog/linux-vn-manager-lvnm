@@ -116,7 +116,7 @@ class SavedataManagementDialog(QDialog):
             # Enable/disable the copy button as the path changes
             savedata_widget.line_edit.textChanged.connect(lambda text, btn=prefix_widget.copy_button: btn.setEnabled(
                     bool(text.strip()) and SavedataManager.is_savedata_inside_prefix({**game_data, "savedata_path": text.strip()})))
-            savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
+            # savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
 
         self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
         self.table.verticalHeader().setDefaultSectionSize(40)
@@ -306,7 +306,7 @@ class SavedataManagementDialog(QDialog):
 
         checkbox = QCheckBox()
         checkbox.setChecked(bool(game_data.get("gdrive", False)))
-        checkbox.setEnabled(bool(game_data.get("savedata_path", "")))
+        #checkbox.setEnabled(bool(game_data.get("savedata_path", "")))
         checkbox.stateChanged.connect(lambda state, gd=game_data: self._save_gdrive_flag(gd, bool(state), gdrive_item))
 
         sync_button = QPushButton(self.tr("Sync Now"))
@@ -334,7 +334,7 @@ class SavedataManagementDialog(QDialog):
 
     def _update_gdrive_widget_enabled(self, gdrive_widget, has_path):
         """Keeps both the checkbox and sync button correctly enabled as the savedata path changes."""
-        gdrive_widget.checkbox.setEnabled(has_path)
+        #gdrive_widget.checkbox.setEnabled(has_path)
         gdrive_widget.sync_button.setEnabled(has_path and gdrive_widget.checkbox.isChecked())
 
     def _sync_gdrive(self, game_data):
