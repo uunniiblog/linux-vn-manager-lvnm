@@ -684,9 +684,13 @@ class GameSidebar(QFrame):
         """File system browser"""
         dialog = QFileDialog(self)
         current_path = self.edit_path.text()
-        if current_path:
+        savedata_path = self.edit_savedata.text()
+        if savedata_path:
+            dialog.setDirectory(savedata_path.strip())
+        elif current_path:
             dialog.setDirectory(current_path.strip())
         
+        # TODO: doesn't seem to be a way to show files but only choose directories
         dialog.setFileMode(QFileDialog.ExistingFile)
         dialog.setViewMode(QFileDialog.Detail)
 

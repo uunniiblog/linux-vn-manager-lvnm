@@ -211,9 +211,12 @@ class SavedataManagementDialog(QDialog):
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
 
-        current_path = game_data.get("savedata_path", "")
-        if current_path:
-            dialog.setDirectory(current_path)
+        savedata_path = game_data.get("savedata_path", "")
+        game_folder = game_data.get("path", "")
+        if savedata_path:
+            dialog.setDirectory(savedata_path)
+        elif game_folder:
+            dialog.setDirectory(game_folder)
         
         if dialog.exec():
             selected_files = dialog.selectedFiles()
