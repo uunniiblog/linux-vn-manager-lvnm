@@ -4,13 +4,15 @@ import time
 import signal
 import config
 from datetime import datetime
-from PySide6.QtCore import QObject, QCoreApplication, QTimer
+from PySide6.QtCore import QObject, QCoreApplication, QTimer, QEventLoop
 from game_runner import GameRunner
 from game_manager import GameManager
 from settings_manager import SettingsManager
 from timetracker.tracking_controller import TrackingController
 from savedata_manager import SavedataManager
 from timetracker.log_manager import LogManager
+from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, TrackingSyncStep
+from ui.savedata_conflict_prompt import prompt_savedata_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,10 @@ class CliController(QObject):
         if not runner.is_running():
             game_card = GameManager.get_game(game)
             tracking_enabled = self.timetracker_settings.get("timetracking", False)
-            self._sync_before_launch(game, game_card, "pre-launch", tracking_enabled=tracking_enabled)            
+            if not self._sync_before_launch(game, game_card, "pre-launch", tracking_enabled=tracking_enabled):
+                logger.info(f"Launch of '{game}' cancelled during pre-launch sync.")
+                return
+
             app = QCoreApplication.instance() or QCoreApplication(sys.argv)
 
             def kill_handler(signum, frame):
@@ -115,7 +120,11 @@ class CliController(QObject):
             logger.error(f"{game_name} Not found. It must be added to the application first.")
             return
 
-        self._sync_before_launch(game_name, game_card, "pre-tracking")
+        tracking_enabled = self.timetracker_settings.get("timetracking", False)
+        if not self._sync_before_launch(game_name, game_card, "pre-tracking", tracking_enabled=tracking_enabled):
+            logger.info(f"Launch of '{game_name}' cancelled during pre-launch sync.")
+            return
+
         runner = GameRunner(game_card)
         runner.game = game_card
 
@@ -201,13 +210,19 @@ class CliController(QObject):
     def _sync_before_launch(self, game: str, game_card, phase: str, tracking_enabled: bool = True):
         """Pre launch sync."""
         if not (game_card.gdrive and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)):
-            return
+            return True
 
         self._sync_savedata_to_cloud(game, game_card.to_dict())
+        steps = [SavedataSyncStep(
+            game, game_card.to_dict(), f"Syncing save data with Google Drive...",
+            conflict_prompt=lambda conflicts: prompt_savedata_conflict(None, game, conflicts)
+        )]
 
         if tracking_enabled and self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
             self.tracking_file = LogManager().get_log_name_from_path(game_card.path)
-            self._sync_tracking_to_cloud(game, game_card.path)
+            steps.append(TrackingSyncStep(game_card.path, f"Syncing time tracking data..."))
+
+        return self._run_sync_pipeline_blocking(steps)
 
     def _sync_after_exit(self, game: str, game_card):
         """Post-game sync."""
@@ -218,3 +233,24 @@ class CliController(QObject):
 
         if self.tracking and self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
             self._sync_tracking_to_cloud(game, game_card.path)
+
+    def _run_sync_pipeline_blocking(self, steps) -> bool:
+        """
+        Runs a PreLaunchSyncPipeline and blocks via a nested Qt event loop
+        until it finishes, so the game doesn't launch until sync (and any
+        conflict prompt) has fully resolved
+        """
+        if not steps:
+            return True
+        loop = QEventLoop()
+        outcome = {"proceed": True}
+
+        def on_finished(proceed):
+            outcome["proceed"] = proceed
+            loop.quit()
+
+        pipeline = PreLaunchSyncPipeline(None, steps)
+        pipeline.finished.connect(on_finished)
+        pipeline.start()
+        loop.exec()
+        return outcome["proceed"]

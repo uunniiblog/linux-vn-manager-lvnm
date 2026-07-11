@@ -34,6 +34,8 @@ class SavedataManager(QObject):
     # # Uploaded alongside savedata files with savedata path info
     SYNC_LOCATION_METADATA_FILENAME = ".lvnm_savedata_location.json"
     LOCATION_REFERENCE_METADATA_KEY = "__location_references__"
+    CONFLICT_PREFER_LOCAL = "prefer_local"
+    CONFLICT_PREFER_REMOTE = "prefer_remote"
 
     gdrive_sync_succeeded = Signal(str, dict)
     gdrive_sync_failed = Signal(str, str)
@@ -51,7 +53,7 @@ class SavedataManager(QObject):
         self.user_settings = SettingsManager()
         self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
 
-    def start_gdrive_sync(self, name: str, game_data: dict):
+    def start_gdrive_sync(self, name: str, game_data: dict, conflict_resolution: str = "defer"):
         """Runs the Gdrive sync in a background thread so it doesn't block the UI."""
         if not self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
             return
@@ -61,7 +63,7 @@ class SavedataManager(QObject):
             logger.warning(f"Gdrive sync already in progress for '{name}'. Skipping duplicate request.")
             return
 
-        worker = GdriveSyncWorker(game_data)
+        worker = GdriveSyncWorker(game_data, conflict_resolution=conflict_resolution)
         worker.sync_succeeded.connect(self._on_gdrive_sync_succeeded)
         worker.sync_failed.connect(self._on_gdrive_sync_failed)
         worker.finished.connect(lambda: self._gdrive_sync_workers.pop(name, None))
@@ -433,7 +435,7 @@ class SavedataManager(QObject):
         return str(predicted_path)
 
     @staticmethod
-    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 10) -> dict:
+    def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 10, conflict_resolution: str = "defer") -> dict:
         """
         Bidirectionally syncs a game's savedata folder with Drive, preserving
         subfolder structure and propagating deletions:
@@ -441,8 +443,12 @@ class SavedataManager(QObject):
         - Present on only one side: if it was in the last-synced manifest,
         it was deleted on the other side -> delete it here too.
         Otherwise it's genuinely new -> copy it over.
+        - If first sync and no savedata path defined it creates the savedata path fetched from
+        GDrive relative to the prefix/game location.
+        - If first sync and newer mtime than what already exists in gdrive ask/defer files.
         Returns {"uploaded": [...], "downloaded": [...], "deleted_local": [...],
-                "deleted_remote": [...], "skipped": [...]}
+                "deleted_remote": [...], "skipped": [...], "deferred_conflicts": [...],
+                get_savedata_path_from_gdrive: bool}
         """
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
         if not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
@@ -508,6 +514,7 @@ class SavedataManager(QObject):
         delete_local_plan = []
         delete_remote_plan = []
         skipped = []
+        deferred_conflicts = []
 
         for rel_path in all_rel_paths:
             local_file = local_files_by_rel.get(rel_path)
@@ -520,7 +527,16 @@ class SavedataManager(QObject):
                 local_mtime = local_file.stat().st_mtime
                 remote_mtime = datetime.fromisoformat(remote_meta["modifiedTime"]).timestamp()
 
-                if local_mtime > remote_mtime + 1:
+                if not was_known and local_mtime > remote_mtime + 1:
+                    # Ambiguous: never synced from this device, and looks newer than Drive.
+                    if conflict_resolution == SavedataManager.CONFLICT_PREFER_LOCAL:
+                        target_parent_id = GdriveManager.ensure_folder_path(folder_id, rel_dir, remote_folders)
+                        upload_plan.append((local_file, target_parent_id, remote_meta["id"], rel_path))
+                    elif conflict_resolution == SavedataManager.CONFLICT_PREFER_REMOTE:
+                        download_plan.append((remote_meta["id"], local_file, remote_mtime, rel_path))
+                    else:
+                        deferred_conflicts.append({"rel_path": rel_path, "local_mtime": local_mtime, "remote_mtime": remote_mtime})
+                elif local_mtime > remote_mtime + 1:
                     target_parent_id = GdriveManager.ensure_folder_path(folder_id, rel_dir, remote_folders)
                     upload_plan.append((local_file, target_parent_id, remote_meta["id"], rel_path))
                 elif remote_mtime > local_mtime + 1:
@@ -589,11 +605,17 @@ class SavedataManager(QObject):
             except Exception as e:
                 logger.warning(f"Failed to delete local file '{local_file}': {e}")
 
+        # Deferred
+        deferred_rel_paths = {c["rel_path"] for c in deferred_conflicts}
+
         # Rebuild manifest
         new_manifest = {}
         for f in src.rglob("*"):
             if f.is_file():
                 rel = f.relative_to(src).as_posix()
+                if rel in deferred_rel_paths:
+                    # Deferred conflicts are left out so they keep showing up as ambiguous until resolved
+                    continue
                 new_manifest[rel] = f.stat().st_mtime
         SavedataManager._save_sync_manifest(game_name, new_manifest)
         SavedataManager._upload_location_reference(folder_id, existing_location_meta, game_data)
@@ -601,13 +623,13 @@ class SavedataManager(QObject):
         logger.info(
             f"Gdrive sync for '{game_name}': {len(uploaded)} uploaded, {len(downloaded)} downloaded, "
             f"{len(deleted_local)} deleted locally, {len(deleted_remote)} deleted remotely, "
-            f"{len(skipped)} unchanged. "
+            f"{len(skipped)} unchanged, {len(deferred_conflicts)} deffered. "
             f"get_savedata_path_from_gdrive: {predicted_path if not savedata_path_was_already_set else None}"
         )
         return {
             "uploaded": uploaded, "downloaded": downloaded,
             "deleted_local": deleted_local, "deleted_remote": deleted_remote,
-            "skipped": skipped,
+            "skipped": skipped, "deferred_conflicts": deferred_conflicts,
             "get_savedata_path_from_gdrive": predicted_path if not savedata_path_was_already_set else None,
         }
 
@@ -691,14 +713,15 @@ class GdriveSyncWorker(QThread):
     sync_succeeded = Signal(str, dict)
     sync_failed = Signal(str, str)
 
-    def __init__(self, game_data: dict):
+    def __init__(self, game_data: dict, conflict_resolution: str = "defer"):
         super().__init__()
         self.game_data = game_data
+        self.conflict_resolution = conflict_resolution
 
     def run(self):
         game_name = self.game_data.get("name", "")
         try:
-            result = SavedataManager.sync_savedata_to_gdrive(self.game_data)
+            result = SavedataManager.sync_savedata_to_gdrive(self.game_data, conflict_resolution=self.conflict_resolution)
             self.sync_succeeded.emit(game_name, result)
         except Exception as e:
             logger.error(f"Gdrive sync failed for '{game_name}': {e}", exc_info=True)

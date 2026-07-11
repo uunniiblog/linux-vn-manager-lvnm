@@ -18,32 +18,50 @@ class SyncStep(Protocol):
     """
     label: str
 
-    def start(self, on_success: Callable[[], None], on_failure: Callable[[str], None]) -> None:
+    def start(self, on_success: Callable[[], None], on_failure: Callable[[str], None], on_cancelled: Callable[[str], None]) -> None:
         ...
 
 
 class SavedataSyncStep:
     """Syncs a game's savedata folder with Google Drive before launch."""
 
-    def __init__(self, name: str, game_data: dict, label: str):
+    def __init__(self, name: str, game_data: dict, label: str, conflict_prompt=None):
         self.name = name
         self.game_data = game_data
         self.label = label
+        self.conflict_prompt = conflict_prompt
         self._on_success = None
         self._on_failure = None
+        self._on_cancelled = None
 
-    def start(self, on_success, on_failure):
+    def start(self, on_success, on_failure, on_cancelled=None):
         self._on_success = on_success
         self._on_failure = on_failure
+        self._on_cancelled = on_cancelled
+        self._run_sync(conflict_resolution="defer")
+
+    def _run_sync(self, conflict_resolution):
         manager = SavedataManager.get_instance()
         manager.gdrive_sync_succeeded.connect(self._handle_succeeded)
         manager.gdrive_sync_failed.connect(self._handle_failed)
-        manager.start_gdrive_sync(self.name, self.game_data)
+        manager.start_gdrive_sync(self.name, self.game_data, conflict_resolution=conflict_resolution)
 
     def _handle_succeeded(self, name, result):
         if name != self.name:
-            return  # Some other game's background sync finishing - not ours
+            return  # Some other game's background sync finishing
         self._disconnect()
+
+        deferred = result.get("deferred_conflicts") or []
+        if deferred and self.conflict_prompt is not None:
+            resolution = self.conflict_prompt(deferred)
+            if resolution == "cancel":
+                self._on_cancelled()
+                return
+            if resolution in ("prefer_local", "prefer_remote"):
+                self._run_sync(conflict_resolution=resolution)
+                return
+            # resolution == "defer": Launch without syncing these
+
         self._on_success()
 
     def _handle_failed(self, name, error_message):
@@ -67,7 +85,7 @@ class TrackingSyncStep:
         self._on_success = None
         self._on_failure = None
 
-    def start(self, on_success, on_failure):
+    def start(self, on_success, on_failure, on_cancelled=None):
         self._on_success = on_success
         self._on_failure = on_failure
         manager = LogManager.get_instance()
@@ -131,7 +149,7 @@ class PreLaunchSyncPipeline(QObject):
         step = self._steps[self._index]
         logger.debug(f"Pre-launch sync step {self._index + 1}/{len(self._steps)}: {step.label}")
         self.progress.setLabelText(step.label)
-        step.start(on_success=self._on_step_succeeded, on_failure=self._on_step_failed)
+        step.start(on_success=self._on_step_succeeded, on_failure=self._on_step_failed, on_cancelled=self._on_step_cancelled)
 
     def _on_step_succeeded(self):
         self._index += 1
@@ -150,6 +168,10 @@ class PreLaunchSyncPipeline(QObject):
             QMessageBox.No,
         )
         self.finished.emit(reply == QMessageBox.Yes)
+
+    def _on_step_cancelled(self):
+        self.progress.close()
+        self.finished.emit(False)
 
 class ManualSyncPipeline(PreLaunchSyncPipeline):
     """

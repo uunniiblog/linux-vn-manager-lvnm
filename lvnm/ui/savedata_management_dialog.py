@@ -13,6 +13,7 @@ from game_manager import GameManager
 from prefix_manager import PrefixManager
 from savedata_manager import SavedataManager
 from pregame_sync_pipeline import ManualSyncPipeline, SavedataSyncStep, TrackingSyncStep
+from ui.savedata_conflict_prompt import prompt_savedata_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +343,10 @@ class SavedataManagementDialog(QDialog):
         try:
             steps = []
 
-            steps.append(SavedataSyncStep(game_data['name'], game_data, self.tr("Syncing save data with Google Drive...")))
+            steps.append(SavedataSyncStep(
+                game_data['name'], game_data, self.tr("Syncing save data with Google Drive..."),
+                conflict_prompt=lambda conflicts: prompt_savedata_conflict(self, game_data['name'], conflicts)
+            ))
             steps.append(TrackingSyncStep(game_data['path'], self.tr("Syncing time tracking data...")))
             
             self._pending_pipeline = ManualSyncPipeline(self, steps)

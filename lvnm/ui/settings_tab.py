@@ -424,7 +424,7 @@ class SettingsTab(QWidget):
         all_gdrive_label.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
         self.all_gdrive_ckbox = QCheckBox(self.tr("Automatically enables GDrive Sync for all new games (Recommended)"))
         self.all_gdrive_ckbox.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False))
-        self.all_gdrive_ckbox.setToolTip(self.tr("Recommended to enable if using from the start if syncing between two devices. Will autofetch and create the savedata folder to avoid conflicts in first launch"))
+        self.all_gdrive_ckbox.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
         savedata_layout.addRow(all_gdrive_label, self.all_gdrive_ckbox)
 
         # Gdrive Client ID
@@ -613,6 +613,8 @@ class SettingsTab(QWidget):
             # Store references so we can connect their signals later
             self.folder_inputs.append((key, edit, btn))
             self.folder_widgets.extend([edit, btn])
+
+        self._set_folders_enabled(not is_game_running)
 
         return directories_group
 

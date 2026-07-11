@@ -26,6 +26,7 @@ from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
 from timetracker.log_manager import LogManager
 from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, TrackingSyncStep
+from ui.savedata_conflict_prompt import prompt_savedata_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +354,7 @@ class GameSidebar(QFrame):
         QMessageBox.warning(
             self,
             self.tr("Savedata Cloud Sync Failed"),
-            self.tr(f"Background save backup failed for '{name}':\n{error_message}\nYou can sync the data manually from settings.")
+            self.tr(f"Background save backup failed for '{name}':\n{error_message}\n\nYou can sync the data manually from settings.")
         )
         if self.current_game and self.current_game.name == name:
             self.show_sync_message(self.tr(f"Gdrive synced error {error_message}"), "#FF0000")
@@ -621,7 +622,8 @@ class GameSidebar(QFrame):
                 self._pending_savedata_name = name
                 steps.append(SavedataSyncStep(
                     name, game_to_start.to_dict(),
-                    self.tr("Syncing save data with Google Drive...")
+                    self.tr("Syncing save data with Google Drive..."),
+                    conflict_prompt=lambda conflicts: prompt_savedata_conflict(self, name, conflicts)
                 ))
  
             if self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False) and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and game_to_start.gdrive:
