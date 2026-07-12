@@ -252,17 +252,36 @@ class SavedataManager(QObject):
                     continue
                 for found_dir in base_dir.rglob("*"):
                     if found_dir.is_dir() and found_dir.name.lower() in target_names:
-                        candidates.append(found_dir)
+                        candidates.append((found_dir, True))
+                    elif found_dir.is_dir() and SavedataManager._is_fuzzy_name_match(found_dir.name, target_names):
+                        candidates.append((found_dir, False))
 
         if not candidates:
             logger.debug(f"No savedata folder found in prefix for '{game_name}'.")
             return None
 
         # Prefer the most deeply nested match (most specific location)
-        candidates.sort(key=lambda p: len(p.parts), reverse=True)
-        best_match = candidates[0]
+        # Prefer exact matches over fuzzy
+        candidates.sort(key=lambda c: (c[1], len(c[0].parts)), reverse=True)
+        best_match = candidates[0][0]
         logger.debug(f"Found savedata folder in prefix: {best_match}")
         return str(best_match)
+
+    @staticmethod
+    def _is_fuzzy_name_match(folder_name: str, target_names: set[str], min_len: int = 4) -> bool:
+        """
+        Loose containment match for when a game's name doesn't exactly match its
+        savedata folder
+        """
+        folder_name = folder_name.lower()
+        if len(folder_name) < min_len:
+            return False
+        for target in target_names:
+            if len(target) < min_len:
+                continue
+            if target in folder_name or folder_name in target:
+                return True
+        return False
 
     @staticmethod
     def try_auto_detect_savedata(name: str, game_card) -> bool:

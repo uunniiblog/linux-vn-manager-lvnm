@@ -349,7 +349,7 @@ class GdriveManager:
         """
         logger.debug(f"download_file file_id: '{file_id}' local_path: '{local_path}' remote_mtime: '{remote_mtime}'")
         service = GdriveManager._get_drive_service()
-        #local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = local_path.with_name(local_path.name + ".part")
 
         request = service.files().get_media(fileId=file_id)

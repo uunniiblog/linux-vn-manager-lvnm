@@ -660,7 +660,8 @@ class GameSidebar(QFrame):
         try:
             self.process_manager.start_game(name, self.timetracker_settings)
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), str(e), exc_info=True)
+            logger.error(f"Error in _execute_game_launch {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Error"), str(e))
 
     def browse_path(self):
         """File system browser"""
