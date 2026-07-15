@@ -243,6 +243,8 @@ class LogManager(QObject):
             start_filter = now - timedelta(days=7)
         elif timeframe == "Last 30 Days":
             start_filter = now - timedelta(days=30)
+        elif timeframe == "Current Year":
+            start_filter = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Iterate through every app CSV file
         for log_file in self.log_dir.glob("*.csv"):

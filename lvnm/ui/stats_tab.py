@@ -127,7 +127,8 @@ class StatsTab(QWidget):
         controls = QHBoxLayout()
         controls.addWidget(QLabel(self.tr("Timeframe:")))
         self.range_combo = QComboBox()
-        self.range_combo.addItems([self.tr("Today"), self.tr("Last 7 Days"), self.tr("Last 30 Days"), self.tr("All Time")])
+        self.range_combo.addItems([self.tr("Today"), self.tr("Last 7 Days"), self.tr("Last 30 Days"), self.tr("Current Year"), self.tr("All Time")])
+        self.range_combo.setCurrentIndex(1)
         self.range_combo.currentIndexChanged.connect(self.update_global_stats)
         controls.addWidget(self.range_combo, stretch=1)
         layout.addLayout(controls)
@@ -171,6 +172,10 @@ class StatsTab(QWidget):
         series.append(bar_set)
         series.setBarWidth(0.6)
         chart.addSeries(series)
+
+        # Tooltip
+        self._ind_dates = sorted_dates
+        series.hovered.connect(self.show_individual_tooltip)
 
         # X axis - dates
         categories = [d.strftime('%b %d') for d in sorted_dates]
@@ -243,6 +248,17 @@ class StatsTab(QWidget):
         else:
             QToolTip.hideText()
 
+    def show_individual_tooltip(self, status, index, bar_set=None):
+        if status:
+            date = self._ind_dates[index]
+            hours = bar_set.at(index) if bar_set is not None else None
+            h = int(hours) if hours is not None else 0
+            m = int(round((hours - h) * 60)) if hours is not None else 0
+            label = f"{date.strftime('%b %d')}\n{h}h {m}m"
+            QToolTip.showText(QCursor.pos(), label, self.ind_chart_view)
+        else:
+            QToolTip.hideText()
+
     def refresh_data(self):
         self.app_combo.blockSignals(True)
         self.app_combo.clear()
@@ -270,6 +286,7 @@ class StatsTab(QWidget):
         if current_text == self.tr("Today"): timeframe = "Today"
         elif current_text == self.tr("Last 7 Days"): timeframe = "Last 7 Days"
         elif current_text == self.tr("Last 30 Days"): timeframe = "Last 30 Days"
+        elif current_text == self.tr("Year"): timeframe = "Current Year"
 
         data = self.log_manager.get_global_summary(timeframe)
         total_seconds = sum(item[1] for item in data)
