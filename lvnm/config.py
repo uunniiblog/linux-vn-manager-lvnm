@@ -116,6 +116,12 @@ ENV_VARIABLES = [
         "req": "proton"
     },
     {
+        "id": "winedebug_level",
+        "name": "Winedebug Log level",
+        "key": "WINEDEBUG",
+        "value": "-all,err+all,fixme+all",
+    },
+    {
         "id": "run_in_prefix",
         "name": "Proton Verb Run in prefix (Two games same prefix)",
         "key": "PROTON_VERB",
@@ -195,6 +201,7 @@ USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET = "gdrive_client_secret"
 USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN = "gdrive_refresh_token"
 USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES = "gdrive_all_games"
 USER_CONF_LOG_TO_FILE = "log_to_file"
+USER_CONF_LOGS_WINE = "log_wine"
 
 # User config
 GAMESCOPE_INSTALLED = False

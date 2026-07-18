@@ -24,19 +24,19 @@ class ExecutionManager:
             # Show everything
             env["UMU_LOG"] = "1"
             # errors + everything
-            env["WINEDEBUG"] = "err+all"
+            #env["WINEDEBUG"] = "err+all"
             env["DXVK_LOG_LEVEL"] = "info"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
         
         elif log_level == "INFO":
             # Show only errors and major fixmes
-            env["WINEDEBUG"] = "-all,err+all,fixme+all"
+            #env["WINEDEBUG"] = "-all,err+all,fixme+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             
         elif log_level == "ERROR":
             # Only errors
-            env["WINEDEBUG"] = "-all,err+all"
+            #env["WINEDEBUG"] = "-all,err+all"
             env["UMU_LOG"] = "0"
             env["STEAM_LINUX_RUNTIME_VERBOSE"] = "0"
             env["PRESSURE_VESSEL_VERBOSE"] = "0"
@@ -99,8 +99,10 @@ class ExecutionManager:
                     # Filter wine logs
                     if any(pattern in stripped for pattern in ExecutionManager.FILTERED_PATTERNS):
                         continue
+                    
+                    if settings.get(config.USER_CONF_LOGS_WINE, True):
+                        logger.info(stripped)
 
-                    logger.info(stripped)
                     if log_callback:
                         log_callback(stripped)
             except Exception as e:

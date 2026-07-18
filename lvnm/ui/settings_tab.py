@@ -131,9 +131,16 @@ class SettingsTab(QWidget):
                     "Requires an app restart to take effect.")
         )
 
+        self.log_wine_traces = QCheckBox(self.tr("Show Wine logs in application logs"))
+        self.log_wine_traces.setChecked(self.user_settings.get(config.USER_CONF_LOGS_WINE, True))
+        self.log_wine_traces.setToolTip(
+            self.tr("Show Wine logs in system logs and write to file if enabled.\nRegardless of this setting you can right click show logs for any game.")
+        )
+
         log_row = QHBoxLayout()
         log_row.addWidget(self.log_level_combo)
         log_row.addWidget(self.log_to_file_checkbox)
+        log_row.addWidget(self.log_wine_traces)
         log_row.addStretch()
         settings_layout.addRow(QLabel(self.tr("Log Level:")), log_row)
 
@@ -679,9 +686,9 @@ class SettingsTab(QWidget):
         self.sgdb_key_edit.textChanged.connect(lambda text: self.save_setting(config.USER_CONF_SGDB_API_KEY, text))
         self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
         self.log_to_file_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOG_TO_FILE, bool(s)))
+        self.log_wine_traces.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOGS_WINE, bool(s)))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
-        # self.ogop_checkbox.stateChanged.connect(lambda s: self.save_setting("one_game_one_prefix", bool(s)))
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
