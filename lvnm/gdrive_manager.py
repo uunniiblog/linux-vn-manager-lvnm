@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 ROOT_FOLDER_NAME = "LVNM"
 GDRIVE_FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
-
 GDRIVE_API_TIMEOUT = 15
 
 class GdriveManager:
