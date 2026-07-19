@@ -114,6 +114,7 @@ class CliController(QObject):
             runner.run_external_script(runner.game.exit_script.strip())
             
     def headless_timetracker(self, game_name):
+        logger.info(f"headless_timetracker for {game_name}")
         game_card = GameManager.get_game(game_name)
         
         if not game_card:

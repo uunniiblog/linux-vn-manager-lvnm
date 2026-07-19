@@ -8,7 +8,9 @@ import time
 import io
 import os
 import json
+import httplib2
 from googleapiclient.discovery import build_from_document
+from google_auth_httplib2 import AuthorizedHttp
 from datetime import datetime, timezone
 from pathlib import Path
 from google.oauth2.credentials import Credentials
@@ -22,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 ROOT_FOLDER_NAME = "LVNM"
 GDRIVE_FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
+
+GDRIVE_API_TIMEOUT = 15
 
 class GdriveManager:
     _root_folder_id = None
@@ -145,7 +149,7 @@ class GdriveManager:
                 "client_secret": client_secret,
                 "refresh_token": refresh_token,
                 "grant_type": "refresh_token",
-            })
+            }, timeout=GDRIVE_API_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 
@@ -194,7 +198,10 @@ class GdriveManager:
         with open(schema_path, "r", encoding="utf-8") as f:
             drive_schema = json.load(f)
 
-        service = build_from_document(drive_schema, credentials=creds)
+        http = httplib2.Http(timeout=GDRIVE_API_TIMEOUT)
+        authorized_http = AuthorizedHttp(creds, http=http)
+
+        service = build_from_document(drive_schema, http=authorized_http)
         GdriveManager._thread_local.service = service
         GdriveManager._thread_local.token = access_token
         return service

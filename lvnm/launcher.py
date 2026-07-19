@@ -55,6 +55,9 @@ def main():
     zoom = settings.get("ui_zoom", 1.0) # Default to 1.0
     SystemUtils.apply_ui_zoom(zoom)
 
+    logger = logging.getLogger(__name__)
+    logger.debug(sys.argv)
+
     # Launch UI
     if len(sys.argv) == 1:
         SystemUtils.print_diagnostic_report()
