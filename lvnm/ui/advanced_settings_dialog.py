@@ -23,7 +23,7 @@ class AdvancedSettingsDialog(QDialog):
 
     def __init__(self, prefix_type, current_game, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr(f"Advanced Settings {current_game.name}"))
+        self.setWindowTitle(self.tr("Advanced Settings {}").format(current_game.name))
         self.setMinimumWidth(450)
         self.resize(550, 600)
 
@@ -283,9 +283,9 @@ class AdvancedSettingsDialog(QDialog):
         """Opens file system to select a script."""
         path, _ = QFileDialog.getOpenFileName(
             self, 
-            self.tr("Select Script File"), 
-            "", 
-            "All Files (*);;Shell Scripts (*.sh)"
+            self.tr("Select Script File"),
+            "",
+            self.tr("All Files (*);;Shell Scripts (*.sh)")
         )
         if path:
             target_line_edit.setText(path)
@@ -746,11 +746,11 @@ class SelectableImageWidget(QFrame):
             # Scale to height; width adjusts automatically based on aspect ratio
             self.lbl_img.setPixmap(pixmap.scaledToHeight(max_height, Qt.SmoothTransformation))
         else:
-            self.lbl_img.setText("Invalid Image")
+            self.lbl_img.setText(self.tr("Invalid Image"))
 
         # Metadata (Style/Author)
-        author = item.get("author", "Unknown")
-        style  = item.get("style", "Default")
+        author = item.get("author", self.tr("Unknown"))
+        style  = item.get("style", self.tr("Default"))
         lbl_meta = QLabel(f"{style} • {author}")
         lbl_meta.setStyleSheet("font-size: 10px; color: #888;")
         lbl_meta.setAlignment(Qt.AlignCenter)
@@ -758,7 +758,7 @@ class SelectableImageWidget(QFrame):
 
         # The Combo Box
         self.combo = QComboBox()
-        self.combo.addItems(["None", "Vertical Cover", "Horizontal Layout"])
+        self.combo.addItems([self.tr("None"), self.tr("Vertical Cover"), self.tr("Horizontal Layout")])
         self.combo.setProperty("image_path", local_path)
         self.combo.setFixedWidth(160)
 

@@ -161,9 +161,9 @@ class PreLaunchSyncPipeline(QObject):
             self._parent,
             self.tr("Sync Failed"),
             self.tr(
-                f"Cloud sync failed:\n\n{error_message}\n\n"
-                f"Do you want to launch the game anyway using local data?"
-            ),
+                "Cloud sync failed:\n\n{}\n\n"
+                "Do you want to launch the game anyway using local data?"
+            ).format(error_message),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -182,7 +182,7 @@ class ManualSyncPipeline(PreLaunchSyncPipeline):
         QMessageBox.critical(
             self._parent,
             self.tr("Sync Failed"),
-            self.tr(f"Cloud sync failed:\n\n{error_message}")
+            self.tr("Cloud sync failed:\n\n{}").format(error_message)
         )
         
         # Emit False since the sync sequence failed/cancelled

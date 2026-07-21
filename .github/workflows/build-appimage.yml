@@ -37,6 +37,11 @@ jobs:
           mkdir -p LVNM.AppDir/usr/share/applications
           mkdir -p LVNM.AppDir/usr/share/icons/hicolor/256x256/apps
 
+      - name: Compile Translations
+        run: |
+          pyside6-lrelease lvnm/locale/lvnm_de.ts -qm lvnm/locale/lvnm_de.qm
+          pyside6-lrelease lvnm/locale/lvnm_en.ts -qm lvnm/locale/lvnm_en.qm
+
       - name: Build Main LVNM Binary
         run: |
           python -m PyInstaller --noconfirm --windowed \
@@ -44,6 +49,7 @@ jobs:
             --paths lvnm \
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
             --add-data "lvnm/assets:assets" \
+            --add-data "lvnm/locale:locale" \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-keysyms.so.1:." \

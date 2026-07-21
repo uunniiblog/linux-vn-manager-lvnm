@@ -35,7 +35,7 @@ class DownloadDialog(QDialog):
         # Pagination
         page_layout = QHBoxLayout()
         self.prev_btn = QPushButton(self.tr("← Previous"))
-        self.page_label = QLabel(self.tr(f"Page {self.current_page}"))
+        self.page_label = QLabel(self.tr("Page {}").format(self.current_page))
         self.page_label.setAlignment(Qt.AlignCenter)
         self.next_btn = QPushButton(self.tr("Next →"))
         
@@ -64,7 +64,7 @@ class DownloadDialog(QDialog):
     def fetch_page(self):
         """Fetches and populates the list for the current page"""
         self.list_widget.clear()
-        self.page_label.setText(self.tr(f"Page {self.current_page}"))
+        self.page_label.setText(self.tr("Page {}").format(self.current_page))
         self.prev_btn.setEnabled(self.current_page > 1)
         
         # Update UI while fetching
@@ -125,7 +125,7 @@ class RunnerSubTab(QWidget):
         layout = QVBoxLayout(self)
         
         # GroupBox for installed runners
-        self.group = QGroupBox(self.tr(f"Installed {runner_type.capitalize()} Runners"))
+        self.group = QGroupBox(self.tr("Installed {} Runners").format(runner_type.capitalize()))
         group_layout = QVBoxLayout(self.group)
         
         self.list_widget = QListWidget()
@@ -160,7 +160,7 @@ class RunnerSubTab(QWidget):
             if rel_data:
                 try:
                     console = ConsoleDialog(self)
-                    console.setWindowTitle(self.tr(f"Installing {self.runner_type.capitalize()}: {rel_data['tag']}"))
+                    console.setWindowTitle(self.tr("Installing {runner}: {tag}").format(runner=self.runner_type.capitalize(), tag=rel_data['tag']))
 
                     shared_data = {"downloaded_path": None}
                     # Create Download Task
@@ -252,8 +252,8 @@ class RunnerSubTab(QWidget):
         
         # Select runner name without prefixes attached
         folder = current.text().split(" (")[0]
-        confirm = QMessageBox.question(self, self.tr("Delete?"), 
-                                     f"{self.tr('Delete runner')} {folder}?")
+        confirm = QMessageBox.question(self, self.tr("Delete?"),
+                                     self.tr("Delete runner {}?").format(folder))
         
         if confirm == QMessageBox.Yes:
             try:
@@ -278,8 +278,8 @@ class RunnerTab(QWidget):
         self.proton_manager = RunnerManagerProtonGE()
         
         # Add sub-tabs
-        self.tabs.addTab(RunnerSubTab(self.wine_manager, self.wine_manager.WINE_RUNNERS_PATH, "wine"), "Wine")
-        self.tabs.addTab(RunnerSubTab(self.proton_manager, self.proton_manager.PROTON_RUNNER_DIR, "proton"), "Proton")
+        self.tabs.addTab(RunnerSubTab(self.wine_manager, self.wine_manager.WINE_RUNNERS_PATH, "wine"), self.tr("Wine"))
+        self.tabs.addTab(RunnerSubTab(self.proton_manager, self.proton_manager.PROTON_RUNNER_DIR, "proton"), self.tr("Proton"))
 
         self.tabs.currentChanged.connect(self.refresh_active_tab)
         

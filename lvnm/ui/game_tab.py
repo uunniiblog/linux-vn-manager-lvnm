@@ -342,7 +342,7 @@ class GameTab(QWidget):
         dialog = QFileDialog(self)
         dialog.setWindowTitle(self.tr("Import Game"))
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setNameFilter(self.tr("JSON Files (*.json)"))
         dialog.setViewMode(QFileDialog.Detail)
 
         if dialog.exec():
@@ -451,7 +451,7 @@ class RunInPrefixDialog(QDialog):
         dialog.setWindowTitle(self.tr("Select Game Executable"))
         
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter("All Files (*)")
+        dialog.setNameFilter(self.tr("All Files (*)"))
         dialog.setViewMode(QFileDialog.Detail)      
 
         if dialog.exec():
@@ -542,7 +542,7 @@ class SectionHeader(QWidget):
             return
 
         menu = QMenu(self)
-        delete_action = menu.addAction(self.tr(f"Delete Label: {self.label_name}"))
+        delete_action = menu.addAction(self.tr("Delete Label: {}").format(self.label_name))
         
         action = menu.exec(event.globalPos())
         if action == delete_action:

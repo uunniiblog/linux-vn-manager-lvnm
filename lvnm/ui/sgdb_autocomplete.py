@@ -97,8 +97,8 @@ class SgdbAutocompleteLineEdit(QLineEdit):
         if not SteamGridDbManager._get_api_key():
             QMessageBox.critical(
                 self.window(),
-                "No API Key",
-                "No SteamGridDB API key is set.\n\nPlease add your key in Settings."
+                self.tr("No API Key"),
+                self.tr("No SteamGridDB API key is set.\n\nPlease add your key in Settings.")
             )
             return
 
@@ -173,7 +173,7 @@ class SgdbAutocompleteLineEdit(QLineEdit):
         self.fetch_game_assets(game_data['id'], game_data['name'])
 
     def fetch_game_assets(self, game_id, game_name: str = ""):
-        self.status_changed.emit("Fetching images...")
+        self.status_changed.emit(self.tr("Fetching images..."))
         
         if self.active_asset_worker:
             self.active_asset_worker.cancel()
@@ -281,7 +281,7 @@ class SgdbResultWidget(QWidget):
         layout.addWidget(self.lbl_thumb)
         
         text_layout = QVBoxLayout()
-        self.lbl_title = QLabel(game_data.get("name", "Unknown"))
+        self.lbl_title = QLabel(game_data.get("name", self.tr("Unknown")))
         self.lbl_title.setStyleSheet("font-weight: bold; font-size: 12px;")
         self.lbl_title.setWordWrap(True)
         

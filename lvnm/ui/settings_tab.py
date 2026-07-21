@@ -69,7 +69,18 @@ class SettingsTab(QWidget):
         settings_group = QGroupBox(self.tr("Settings"))
         settings_layout = QFormLayout(settings_group)
         settings_layout.setLabelAlignment(Qt.AlignLeft)
-        
+
+        # Language
+        self.language_combo = QComboBox()
+        self.language_combo.setFixedWidth(200)
+        current_lang = self.user_settings.get(config.USER_CONF_LANGUAGE, "")
+        for i, lang in enumerate(config.LANGUAGES):
+            self.language_combo.addItem(lang["name"], lang["code"])
+            if lang["code"] == current_lang:
+                self.language_combo.setCurrentIndex(i)
+        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        settings_layout.addRow(QLabel(self.tr("Language:")), self.language_combo)
+
         # Font Folder
         font_layout = QHBoxLayout()
         self.font_edit = QLineEdit(self.user_settings.get(config.USER_CONF_FONT_FOLDER, ""))
@@ -145,6 +156,15 @@ class SettingsTab(QWidget):
         settings_layout.addRow(QLabel(self.tr("Log Level:")), log_row)
 
         return settings_group
+
+    def _on_language_changed(self, index):
+        code = self.language_combo.itemData(index)
+        self.user_settings.set(config.USER_CONF_LANGUAGE, code)
+        QMessageBox.information(
+            self,
+            self.tr("Language Changed"),
+            self.tr("The language change will take effect after restarting the application.")
+        )
 
     def get_env_variables_list(self):
         """Fetches the custom list or falls back to default config."""
@@ -733,9 +753,9 @@ class SettingsTab(QWidget):
             self,
             self.tr("Delete Covers"),
             self.tr(
-                f"This will permanently delete all .jpg and .png files in:\n{folder_path}\n\n"
+                "This will permanently delete all .jpg and .png files in:\n{}\n\n"
                 "This action cannot be undone. Continue?"
-            ),
+            ).format(folder_path),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -755,7 +775,7 @@ class SettingsTab(QWidget):
         old_path = edit_widget.text()        
         new_path = QFileDialog.getExistingDirectory(
             self, 
-            self.tr(f"Select Folder for {key}"), 
+            self.tr("Select Folder for {}").format(key),
             old_path # Open dialog at the current location
         )
 
@@ -763,7 +783,7 @@ class SettingsTab(QWidget):
             reply = QMessageBox.question(
                 self,
                 self.tr("Move files?"),
-                self.tr(f"Do you want to move your data from:\n{old_path}\n\nto:\n\n{new_path}? \n\nNot moving the data will reset all the data for the new folder."),
+                self.tr("Do you want to move your data from:\n{old_path}\n\nto:\n\n{new_path}? \n\nNot moving the data will reset all the data for the new folder.").format(old_path=old_path, new_path=new_path),
                 QMessageBox.Yes | QMessageBox.No
             )
 
@@ -995,7 +1015,7 @@ class SettingsTab(QWidget):
 
     def _on_update_found(self, tag, url):
         """Updates the UI label with the link to the new release"""
-        new_text = f'{config.VERSION} <a href="{url}" font-weight: bold;"> Newest version available: {tag} </a>'
+        new_text = f'{config.VERSION} <a href="{url}" font-weight: bold;"> {self.tr("Newest version available:")} {tag} </a>'
         self.version_label_val.setText(new_text)
 
     def save_setting(self, key, value):
