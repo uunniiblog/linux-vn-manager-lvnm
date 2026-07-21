@@ -229,7 +229,7 @@ class GameSidebar(QFrame):
         self.update_savedata_visibility()
 
         # Gamescope
-        gs_group = QGroupBox("Gamescope")
+        gs_group = QGroupBox(self.tr("Gamescope"))
         gs_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         gs_form = QFormLayout(gs_group)
         self.gs_enabled = QCheckBox(self.tr("Enable Gamescope"))
@@ -354,10 +354,10 @@ class GameSidebar(QFrame):
         QMessageBox.warning(
             self,
             self.tr("Savedata Cloud Sync Failed"),
-            self.tr(f"Background save backup failed for '{name}':\n{error_message}\n\nYou can sync the data manually from settings.")
+            self.tr("Background save backup failed for '{name}':\n{error_message}\n\nYou can sync the data manually from settings.").format(name=name, error_message=error_message)
         )
         if self.current_game and self.current_game.name == name:
-            self.show_sync_message(self.tr(f"Gdrive synced error {error_message}"), "#FF0000")
+            self.show_sync_message(self.tr("Gdrive synced error {}").format(error_message), "#FF0000")
 
     def on_gdrive_sync_succeeded(self, name, result):
         """Post-game background savedata backup finished"""
@@ -374,7 +374,7 @@ class GameSidebar(QFrame):
         QMessageBox.warning(
             self,
             self.tr("Timetracking Cloud Sync Failed"),
-            self.tr(f"Background timetracking backup failed for {app_name}:\n{error_message}")
+            self.tr("Background timetracking backup failed for {app_name}:\n{error_message}").format(app_name=app_name, error_message=error_message)
         )
     
     def on_tracking_sync_succeeded(self, app_name, result):
@@ -446,7 +446,7 @@ class GameSidebar(QFrame):
         else:
             # Prefix is missing!
             self.combo_prefix.setCurrentIndex(-1) # Set empty
-            self.prefix_warning.setText(self.tr(f"⚠ Warning: Prefix '{card.prefix}' not found!"))
+            self.prefix_warning.setText(self.tr("⚠ Warning: Prefix '{}' not found!").format(card.prefix))
             self.prefix_warning.setVisible(True)
         self.combo_prefix.blockSignals(False)
 
@@ -673,7 +673,7 @@ class GameSidebar(QFrame):
             dialog.setDirectory(current_path.strip())
         
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter("All Files (*);;Executables (*.exe *.sh *.bin)")
+        dialog.setNameFilter(self.tr("All Files (*);;Executables (*.exe *.sh *.bin)"))
         dialog.setViewMode(QFileDialog.Detail)
 
         if dialog.exec():
@@ -725,7 +725,7 @@ class GameSidebar(QFrame):
             QMessageBox.critical(
                 self,
                 self.tr("Error"),
-                self.tr(f"A name for the game is needed.")
+                self.tr("A name for the game is needed.")
             )
             return
 
@@ -734,7 +734,7 @@ class GameSidebar(QFrame):
             reply = QMessageBox.question(
                 self, 
                 self.tr("Warning"),
-                self.tr(self.tr("Prefix or Path data are missing, it can be added later.\n\n Are you sure you want to continue?")),
+                self.tr("Prefix or Path data are missing, it can be added later.\n\n Are you sure you want to continue?"),
                 QMessageBox.Yes | QMessageBox.No, 
                 QMessageBox.No
             )
@@ -860,7 +860,7 @@ class GameSidebar(QFrame):
         reply = QMessageBox.question(
             self, 
             self.tr("Confirm Deletion"),
-            self.tr(f"Are you sure you want to delete '{self.current_game.name}'?"),
+            self.tr("Are you sure you want to delete '{}'?").format(self.current_game.name),
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.No
         )
@@ -889,7 +889,7 @@ class GameSidebar(QFrame):
         dialog.setWindowTitle(self.tr("Export Game"))
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setFileMode(QFileDialog.AnyFile)
-        dialog.setNameFilter("JSON Files (*.json)")
+        dialog.setNameFilter(self.tr("JSON Files (*.json)"))
         dialog.setViewMode(QFileDialog.Detail)
         dialog.selectFile(f"{self.current_game.name}.json")
 

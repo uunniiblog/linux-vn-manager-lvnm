@@ -66,7 +66,7 @@ class EnvVarManagerDialog(QDialog):
     def add_row(self):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self.table.setItem(row, 0, QTableWidgetItem("New Variable"))
+        self.table.setItem(row, 0, QTableWidgetItem(self.tr("New Variable")))
         self.table.setItem(row, 1, QTableWidgetItem("KEY"))
         self.table.setItem(row, 2, QTableWidgetItem("1"))
         self.table.setCellWidget(row, 3, self._create_type_combo(""))

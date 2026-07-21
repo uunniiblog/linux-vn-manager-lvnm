@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtWidgets import QMessageBox
 
 logger = logging.getLogger(__name__)
@@ -9,14 +9,14 @@ def _format_age(mtime: float) -> str:
     """Turns a unix timestamp into a short how long ago string"""
     delta = datetime.now().timestamp() - mtime
     if delta < 60:
-        return "just now"
+        return QCoreApplication.translate("savedata_conflict_prompt", "just now")
     minutes = delta / 60
     if minutes < 60:
-        return f"{int(minutes)} min ago"
+        return QCoreApplication.translate("savedata_conflict_prompt", "{} min ago").format(int(minutes))
     hours = minutes / 60
     if hours < 24:
-        return f"{hours:.1f} hr ago"
-    return f"{hours / 24:.1f} days ago"
+        return QCoreApplication.translate("savedata_conflict_prompt", "{:.1f} hr ago").format(hours)
+    return QCoreApplication.translate("savedata_conflict_prompt", "{:.1f} days ago").format(hours / 24)
 
 def prompt_savedata_conflict(parent, game_name: str, conflicts: list[dict]) -> str:
     """
@@ -26,29 +26,25 @@ def prompt_savedata_conflict(parent, game_name: str, conflicts: list[dict]) -> s
     """
     max_shown = 8
     lines = [
-        f"<b>{c['rel_path']}</b> &nbsp; (this device: {_format_age(c['local_mtime'])}, "
-        f"cloud: {_format_age(c['remote_mtime'])})"
+        QCoreApplication.translate("savedata_conflict_prompt", "<b>{rel_path}</b> &nbsp; (this device: {local}, cloud: {remote})").format(rel_path=c['rel_path'], local=_format_age(c['local_mtime']), remote=_format_age(c['remote_mtime']))
         for c in conflicts[:max_shown]
     ]
     if len(conflicts) > max_shown:
-        lines.append(f"...and {len(conflicts) - max_shown} more")
+        lines.append(QCoreApplication.translate("savedata_conflict_prompt", "...and {} more").format(len(conflicts) - max_shown))
     file_list = "<br>".join(lines)
     logger.info(f"Conflicts for {game_name}: {file_list}")
 
     box = QMessageBox(parent)
-    box.setWindowTitle("Save Conflict Detected")
+    box.setWindowTitle(QCoreApplication.translate("savedata_conflict_prompt", "Save Conflict Detected"))
     box.setIcon(QMessageBox.Warning)
     box.setTextFormat(Qt.RichText)
     box.setText(
-        f"<b>'{game_name}'</b> has save file(s) that look newer than what's on Google Drive, "
-        f"but this device has never synced them before:<br><br>{file_list}<br><br>"
-        f"This can mean real new progress on this device, or just a freshly-created save. "
-        f"Which version do you want to keep?"
+        QCoreApplication.translate("savedata_conflict_prompt", "<b>'{game_name}'</b> has save file(s) that look newer than what's on Google Drive, but this device has never synced them before:<br><br>{file_list}<br><br>This can mean real new progress on this device, or just a freshly-created save. Which version do you want to keep?").format(game_name=game_name, file_list=file_list)
     )
-    keep_local = box.addButton("Keep This Device's Save", QMessageBox.AcceptRole)
-    keep_remote = box.addButton("Keep Cloud Save", QMessageBox.DestructiveRole)
-    decide_later = box.addButton("Sync Without These", QMessageBox.ActionRole)
-    box.addButton("Cancel", QMessageBox.RejectRole)
+    keep_local = box.addButton(QCoreApplication.translate("savedata_conflict_prompt", "Keep This Device's Save"), QMessageBox.AcceptRole)
+    keep_remote = box.addButton(QCoreApplication.translate("savedata_conflict_prompt", "Keep Cloud Save"), QMessageBox.DestructiveRole)
+    decide_later = box.addButton(QCoreApplication.translate("savedata_conflict_prompt", "Sync Without These"), QMessageBox.ActionRole)
+    box.addButton(QCoreApplication.translate("savedata_conflict_prompt", "Cancel"), QMessageBox.RejectRole)
     box.exec()
 
     clicked = box.clickedButton()

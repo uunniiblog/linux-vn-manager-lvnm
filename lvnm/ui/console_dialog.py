@@ -51,7 +51,7 @@ class ConsoleDialog(QDialog):
     def start_queue(self):
         """Starts executing the first task in the queue."""
         if not self.task_queue:
-            self.console.append("\n[Done] No tasks to execute.")
+            self.console.append(self.tr("\n[Done] No tasks to execute."))
             self.close_btn.setEnabled(True)
             return
         self._run_next()
@@ -62,7 +62,7 @@ class ConsoleDialog(QDialog):
             logger.debug(f"[debug] Starting task {task["desc"]}")
             self.current_callback = task["callback"]
             
-            self.console.append(f"\n>>> {task['desc']}...")
+            self.console.append(self.tr("\n>>> {}...").format(task['desc']))
 
             cmd = task["cmd"]
 
@@ -89,7 +89,7 @@ class ConsoleDialog(QDialog):
                 logger.error(f"[Error] Task failed: {e}")
 
         else:
-            self.console.append("\n--- All tasks completed successfully ---")
+            self.console.append(self.tr("\n--- All tasks completed successfully ---"))
             self.close_btn.setEnabled(True)
             self.finished_all.emit()
 
@@ -111,9 +111,9 @@ class ConsoleDialog(QDialog):
         error_msg = self.process.errorString()
         exit_code = self.process.exitCode()
         exit_status = self.process.exitStatus()
-        self.append_text_signal.emit(f"\n[FATAL ERROR] Could not start process: {error_msg}")
+        self.append_text_signal.emit(self.tr("\n[FATAL ERROR] Could not start process: {}").format(error_msg))
         logger.error(f"console tasks ERROR: {error_msg} | exitCode={exit_code} | exitStatus={exit_status} | errorCode={error}")
-        self.console.append("\n Task queue aborted due to error")
+        self.console.append(self.tr("\n Task queue aborted due to error"))
         
         self.close_btn.setEnabled(True)
 
@@ -131,14 +131,14 @@ class ConsoleDialog(QDialog):
 
     def set_header_info(self, prefix_path, runner_path):
         """Displays initialization info at the top."""
-        html = f"""
+        html = self.tr("""
         <div style='margin-bottom: 10px;'>
             <b style='color: #ff9800;'>[ENVIRONMENT]</b><br>
             <b style='color: #4db6ac;'>Prefix:</b> {prefix_path}<br>
             <b style='color: #4db6ac;'>Runner:</b> {runner_path}
         </div>
         <hr style='border: 1px solid #333;'>
-        """
+        """).format(prefix_path=prefix_path, runner_path=runner_path)
         self.console.insertHtml(html)
         # Move cursor to end so tasks append after the header
         self.console.moveCursor(QTextCursor.End)

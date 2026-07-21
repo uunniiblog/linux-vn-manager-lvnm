@@ -6,6 +6,7 @@ GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
+LOCALE_DIR = BASE_DIR / "locale"
 DATA_DIR = Path.home() / ".local" / "share" / "lvnm" 
 WINE_RUNNERS_DIR = DATA_DIR / "runners" / "wine"
 # PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
@@ -202,6 +203,14 @@ USER_CONF_SAVEDATA_GDRIVE_REFRESH_TOKEN = "gdrive_refresh_token"
 USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES = "gdrive_all_games"
 USER_CONF_LOG_TO_FILE = "log_to_file"
 USER_CONF_LOGS_WINE = "log_wine"
+USER_CONF_LANGUAGE = "language"
+
+# Available UI languages ("" = follow system locale)
+LANGUAGES = [
+    {"code": "", "name": "System"},
+    {"code": "en", "name": "English"},
+    {"code": "de", "name": "Deutsch"},
+]
 
 # User config
 GAMESCOPE_INSTALLED = False

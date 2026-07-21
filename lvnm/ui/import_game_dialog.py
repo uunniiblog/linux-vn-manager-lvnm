@@ -201,7 +201,7 @@ class ImportGameDialog(QDialog):
         if current:
             dialog.setDirectory(current)
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter("All Files (*);;Executables (*.exe *.sh *.bin)")
+        dialog.setNameFilter(self.tr("All Files (*);;Executables (*.exe *.sh *.bin)"))
         dialog.setViewMode(QFileDialog.Detail)
         if dialog.exec():
             files = dialog.selectedFiles()
@@ -228,7 +228,7 @@ class ImportGameDialog(QDialog):
             QMessageBox.warning(
                 self,
                 self.tr("Game Already Exists"),
-                self.tr(f"A game named '{name}' already exists in the library.")
+                self.tr("A game named '{name}' already exists in the library.").format(name=name)
             )
             return
 
@@ -258,29 +258,29 @@ class ImportGameDialog(QDialog):
         }
 
         console = ConsoleDialog(self)
-        console.setWindowTitle(self.tr(f"Importing: {name}"))
+        console.setWindowTitle(self.tr("Importing: {name}").format(name=name))
 
         # Runner Tasks
         if not runner_exists:
             console.add_task(
                 lambda logger: self._task_download_runner(logger, runner_type, runner_name, shared_data),
-                {}, f"Downloading runner: {runner_name}"
+                {}, self.tr("Downloading runner: {runner_name}").format(runner_name=runner_name)
             )
             console.add_task(
                 lambda logger: self._task_extract_runner(logger, runner_type, runner_name, shared_data),
-                {}, f"Extracting runner: {runner_name}"
+                {}, self.tr("Extracting runner: {runner_name}").format(runner_name=runner_name)
             )
         else:
             console.add_task(
                 lambda logger: logger(f"Runner '{runner_name}' already installed, skipping download."),
-                {}, "Checking runner"
+                {}, self.tr("Checking runner")
             )
 
         # Prefix Tasks
         if PrefixManager.get_prefix_info(prefix_name):
             console.add_task(
                 lambda logger: logger(f"Prefix '{prefix_name}' already exists, skipping creation."),
-                {}, "Checking prefix"
+                {}, self.tr("Checking prefix")
             )
         else:
             self._setup_prefix_tasks(console, self.prefix_data, runner_type, runner_path)
@@ -294,7 +294,7 @@ class ImportGameDialog(QDialog):
         # Add game task
         console.add_task(
             lambda logger: self._task_create_game(logger, self.game_data, self.prefix_data),
-            {}, f"Registering game: {name}"
+            {}, self.tr("Registering game: {name}").format(name=name)
         )
 
         self._import_env_vars()
@@ -417,7 +417,7 @@ class ImportGameDialog(QDialog):
             else:
                 console.add_task(
                     lambda logger: logger("[WARNING] Skipping font symlink. Not configured in Settings."),
-                    {}, "Fonts"
+                    {}, self.tr("Fonts")
                 )
 
         prefix.dpi = prefix_data.get("dpi", False)

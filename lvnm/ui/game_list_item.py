@@ -313,7 +313,7 @@ class GameListItem(QWidget):
         reply = QMessageBox.question(
             self, 
             self.tr("Confirm Deletion"),
-            self.tr(f"Are you sure you want to delete '{name}'?"),
+            self.tr("Are you sure you want to delete '{}'?").format(name),
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.No
         )
@@ -412,13 +412,13 @@ class GameListItem(QWidget):
         m = (seconds % 3600) // 60
         
         if h > 0:
-            return f"{h}h {m}m"
-        return f"{m}m"
+            return self.tr("{h}h {m}m").format(h=h, m=m)
+        return self.tr("{}m").format(m)
 
 class LogViewerDialog(QDialog):
     def __init__(self, name, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr(f"Execution Logs: {name}"))
+        self.setWindowTitle(self.tr("Execution Logs: {}").format(name))
         self.resize(800, 600)
         self.setModal(False)
         self.runner = None

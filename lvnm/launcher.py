@@ -9,11 +9,23 @@ from logging_manager import setup_logging
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTranslator, QLocale
+import config
 from ui.main_window import MainWindow
 from system_utils import SystemUtils
 from cli_handler import CliHandler
 from cli_controller import CliController
 from settings_manager import SettingsManager
+
+
+def install_translator(app, settings):
+    language = settings.get(config.USER_CONF_LANGUAGE, "")
+    locale = QLocale(language) if language else QLocale.system()
+
+    translator = QTranslator(app)
+    if translator.load(locale, "lvnm", "_", str(config.LOCALE_DIR)):
+        app.installTranslator(translator)
+        return translator
+    return None
 
 def main():
     setproctitle.setproctitle("linux-vn-manager-lvnm")
@@ -45,11 +57,8 @@ def main():
     )
     
     app = QApplication(sys.argv)
-    
-    # TODO
-    translator = QTranslator()
-    if translator.load(QLocale.system(), "lvnm", "_", "locale"):
-        app.installTranslator(translator)
+
+    translator = install_translator(app, settings)
 
     # Load UI size
     zoom = settings.get("ui_zoom", 1.0) # Default to 1.0

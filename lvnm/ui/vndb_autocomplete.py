@@ -253,7 +253,7 @@ class VndbResultWidget(QWidget):
         layout.addWidget(self.lbl_thumb)
         
         text_layout = QVBoxLayout()
-        self.lbl_title = QLabel(vn_data.get("title", "Unknown"))
+        self.lbl_title = QLabel(vn_data.get("title", self.tr("Unknown")))
         self.lbl_title.setStyleSheet("font-weight: bold; font-size: 12px;")
         self.lbl_title.setWordWrap(True)
         

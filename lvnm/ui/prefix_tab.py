@@ -117,8 +117,8 @@ class PrefixTab(QWidget):
         prefix_str = self.get_selected_prefix()
         
         prefix = PrefixManager(prefix_str)
-        confirm = QMessageBox.question(self, self.tr("Delete?"), 
-                                     f"{self.tr('Delete Prefix')} {prefix_str}?")
+        confirm = QMessageBox.question(self, self.tr("Delete?"),
+                                     self.tr("Delete Prefix {}?").format(prefix_str))
         
         if confirm == QMessageBox.Yes:
             try:
@@ -232,7 +232,7 @@ class PrefixTab(QWidget):
             
             # Check if it already exists in JSON
             if PrefixManager.get_prefix_info(name):
-                QMessageBox.warning(self, self.tr("Error"), self.tr(f"Prefix '{name}' already exists."))
+                QMessageBox.warning(self, self.tr("Error"), self.tr("Prefix '{}' already exists.").format(name))
                 return None
                 
             # Instantiate Manager
@@ -240,7 +240,7 @@ class PrefixTab(QWidget):
             
             # Prepare the Console
             console = ConsoleDialog(self)
-            console.setWindowTitle(self.tr(f"Creating Prefix: {name}"))
+            console.setWindowTitle(self.tr("Creating Prefix: {}").format(name))
             
             # Add tasks to queue
             try:
@@ -360,7 +360,7 @@ class EditPrefixDialog(QDialog):
     def __init__(self, prefix_manager, parent=None):
         super().__init__(parent)
         self.manager = prefix_manager
-        self.setWindowTitle(self.tr(f"Edit Prefix: {self.manager.name}"))
+        self.setWindowTitle(self.tr("Edit Prefix: {}").format(self.manager.name))
         self.resize(500, 600)
         self.user_settings = SettingsManager()
 

@@ -107,7 +107,7 @@ class StatsTab(QWidget):
         controls.addWidget(self.refresh_btn)
         layout.addLayout(controls)
 
-        self.info_label = QLabel("Total Playtime: 0h 0m")
+        self.info_label = QLabel(self.tr("Total Playtime: 0h 0m"))
         self.info_label.setStyleSheet("font-size: 13px; font-weight: bold;")
         layout.addWidget(self.info_label)
 
@@ -254,7 +254,7 @@ class StatsTab(QWidget):
             hours = bar_set.at(index) if bar_set is not None else None
             h = int(hours) if hours is not None else 0
             m = int(round((hours - h) * 60)) if hours is not None else 0
-            label = f"{date.strftime('%b %d')}\n{h}h {m}m"
+            label = self.tr("{}\n{}h {}m").format(date.strftime('%b %d'), h, m)
             QToolTip.showText(QCursor.pos(), label, self.ind_chart_view)
         else:
             QToolTip.hideText()
@@ -277,7 +277,7 @@ class StatsTab(QWidget):
             return
         total_seconds, daily_data = self.log_manager.get_stats_for_app(app)
         h, m = int(total_seconds // 3600), int((total_seconds % 3600) // 60)
-        self.info_label.setText(self.tr(f"Total Playtime: {h}h {m}m"))
+        self.info_label.setText(self.tr("Total Playtime: {}h {}m").format(h, m))
         self.render_canvas(daily_data)
 
     def update_global_stats(self):
@@ -291,7 +291,7 @@ class StatsTab(QWidget):
         data = self.log_manager.get_global_summary(timeframe)
         total_seconds = sum(item[1] for item in data)
         h, m = int(total_seconds // 3600), int((total_seconds % 3600) // 60)
-        self.summary_info.setText(self.tr(f"Total time in period: {h}h {m}m"))
+        self.summary_info.setText(self.tr("Total time in period: {}h {}m").format(h, m))
 
         top_data = data[:15]
         top_data.reverse()
