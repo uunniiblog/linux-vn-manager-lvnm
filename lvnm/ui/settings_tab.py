@@ -70,17 +70,6 @@ class SettingsTab(QWidget):
         settings_layout = QFormLayout(settings_group)
         settings_layout.setLabelAlignment(Qt.AlignLeft)
 
-        # Language
-        self.language_combo = QComboBox()
-        self.language_combo.setFixedWidth(200)
-        current_lang = self.user_settings.get(config.USER_CONF_LANGUAGE, "")
-        for i, lang in enumerate(config.LANGUAGES):
-            self.language_combo.addItem(lang["name"], lang["code"])
-            if lang["code"] == current_lang:
-                self.language_combo.setCurrentIndex(i)
-        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
-        settings_layout.addRow(QLabel(self.tr("Language:")), self.language_combo)
-
         # Font Folder
         font_layout = QHBoxLayout()
         self.font_edit = QLineEdit(self.user_settings.get(config.USER_CONF_FONT_FOLDER, ""))
@@ -295,6 +284,17 @@ class SettingsTab(QWidget):
         appearance_group = QGroupBox(self.tr("Appearance"))
         appearance_layout = QFormLayout(appearance_group)
         appearance_layout.setLabelAlignment(Qt.AlignLeft)
+
+        # Language
+        self.language_combo = QComboBox()
+        self.language_combo.setFixedWidth(200)
+        current_lang = self.user_settings.get(config.USER_CONF_LANGUAGE, "")
+        for i, lang in enumerate(config.LANGUAGES):
+            self.language_combo.addItem(lang["name"], lang["code"])
+            if lang["code"] == current_lang:
+                self.language_combo.setCurrentIndex(i)
+        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        appearance_layout.addRow(QLabel(self.tr("Language:")), self.language_combo)
         
         self.theme_combo = QComboBox()
         self.theme_combo.addItems([self.tr("System Default"), self.tr("Light"), self.tr("Dark")])
