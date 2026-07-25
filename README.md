@@ -133,7 +133,7 @@ There will be a button to open a dialog where you can manually select an opened 
 
 The autostart tracking detects the running by searching the pid of the process executed first. Manual tracking directly selects the window ID that the compositor gives so it is more direct and should work better in case there are issues, usually only happens with games running through launchers, or running games in unusual ways like a bat file. Both will store in the same csv file name so saved playing times will be shared between both autostart and manual.
 
-As said above there is an AFK idle detector timer with [swayidle](https://github.com/swaywm/swayidle). Requires manual installation through your distro, doesn't work in gaming mode in the Steam Deck.
+There is an AFK idle detector timer with [swayidle](https://github.com/swaywm/swayidle). Requires manual installation through your distro, doesn't work in gaming mode in the Steam Deck.
 
 With wayland the way of checking focused windows changes based on Desktop implementations, feel free to request PRs here or in the playtimetracker repo for other desktops. An implementation of **DesktopUtilsInterface**, plus adding the desktop to **utils_factory.py** is all it should be needed. Can also use external libraries if it makes it easier.
 
@@ -142,8 +142,7 @@ With wayland the way of checking focused windows changes based on Desktop implem
 In settings you can enable **Savedata Management** which will enable all other settings, if you want to disable it altogether you can also disable this checkbox.
 - **Auto Detect Save**: if enabled will try to find the savedata folder of the game after closing it if the savedata field is still blank.
 - **Manage Savedata**: Opens a dialog with all games to see their current savedata paths. From here you can manually set them or try the auto detect feature, can also copy the saves to another prefix and configure which games you want to sync through Gdrive. Can force a Gdrive sync too. This dialog can also be opened from the sidebar next to the savedata field when Savedata Management is enabled.
-- **Automatically Enable**: Enables Gdrive Sync for all new games automatically, can still disable it for individual games. I recommend to leave it on so the case where you forget to enable it for a game already in Gdrive happens, and thus creating new fresh saves instead of downloading them, potentially giving conflicts, if this happens there should still be a warning in the application letting you choose which ones to keep though.
-- **Automatically enable GDrive**: Enables automatically the checkbox for Gdrive sync for all new and imported games.
+- **Automatically Enable GDrive**: Enables Gdrive Sync for all new games automatically, can still disable it for individual games. I recommend to leave it on so the case where you forget to enable it for a game already in Gdrive happens, and thus creating new fresh saves instead of downloading them, potentially giving conflicts, if this happens there should still be a warning in the application letting you choose which ones to keep though.
 - **Gdrive Client ID and secret**: Authorization tokens for the Google cloud saving setup. Fill them and log in. You need to leave them there for the sync to keep working.
 
 If Gdrive sync is enabled for a game and Savedata Management checkbox is enabled the savedata will sync before and after closing the game in question. It will create a LVNM/[Game} folder in your GDrive where {Game} is the name of the game in the application, if you want to sync the same game between multiple devices make sure they have the same name in the application in all devices. Changing the name of the game will also create a new folder in GDrive and start syncing fresh there, so be careful with that.
@@ -152,7 +151,7 @@ The program will give priority to the latest modified date in case of conflicts,
 
 Auto detect logic is basically a bunch of hardcoded folder names in the game folder and common save location inside the prefix searching by the game name or the original japanese name (needs to have a VNDB id to fetch this first).
 
-To enable Google Sync for save data between multiple devices Add your own Google Cloud client project. Steps explained in the Wiki: https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki/Google-Drive-Cloud-Project-Setup
+To enable Google Sync for save data between multiple devices Add your own Google Cloud client project. Steps explained in the Wiki: https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki/Google-Drive-Cloud-Project-Setup.
 
 ### Workflow -> Avoid Corrupting Savedata
 I believe it should be straightforward and common sense, but worth reading just in case:
@@ -171,7 +170,6 @@ Once you are logged into gdrive you can enable gdrive sync per game. Once enable
 If you change your prefix the savedata path of the game could also change, the application will give a warning when this can happen. To not corrupt the saves you can do one of the two things:
 1. Remove the savedata path from the game -> it will fetch the relative savedata path from gdrive, create it in the new prefix and download the updated savedata there.
 2. Before changing prefix, Open savedata dialog -> Click Copy to button and select the new prefix. It will copy the savedata from actual prefix to the new one.
-
 
 Worst case scenario, files are never permanently deleted. Deleted files will be in the trash folder and updated files can also be restored in file information -> manage versions. 
 If you need to manaully reset the file state of a game, delete the savedata path and save. then delete either GDrive folder or local save files depending what you want to keep. set up the savedata path again and start syncing.
