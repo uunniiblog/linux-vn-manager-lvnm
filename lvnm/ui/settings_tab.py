@@ -654,6 +654,9 @@ class SettingsTab(QWidget):
         software = SystemUtils.get_software_support()
         runtime = SystemUtils.get_runtime_type()
         version_label = sys_data.get('app_version')
+        gamescope_ver = software.get('gamescope_version')
+        umu_ver = software.get('umu_run_version')
+        winetricks_ver = software.get('winetricks_version')
 
         if runtime == "appimage":
             version_label += "  📦 AppImage"
@@ -667,9 +670,9 @@ class SettingsTab(QWidget):
         sysinfo_layout.addRow(QLabel(self.tr("CPU:")), QLabel(sys_data.get('cpu')))
         sysinfo_layout.addRow(QLabel(self.tr("GPU:")), QLabel(sys_data.get('gpu')))
         sysinfo_layout.addRow(QLabel(self.tr("Vulkan Support:")), QLabel(self.check(software.get('vulkan_support'))))
-        sysinfo_layout.addRow(QLabel(self.tr("Gamescope:")), QLabel(self.check(software.get('gamescope'))))
-        sysinfo_layout.addRow(QLabel(self.tr("Umu-run:")), QLabel(self.check(software.get('umu_run'))))
-        sysinfo_layout.addRow(QLabel(self.tr("Winetricks:")), QLabel(self.check(software.get('winetricks'))))
+        sysinfo_layout.addRow(QLabel(self.tr("Gamescope:")), QLabel(self.check_with_version(software.get('gamescope'), gamescope_ver)))
+        sysinfo_layout.addRow(QLabel(self.tr("Umu-run:")), QLabel(self.check_with_version(software.get('umu_run'), umu_ver)))
+        sysinfo_layout.addRow(QLabel(self.tr("Winetricks:")), QLabel(self.check_with_version(software.get('winetricks'), winetricks_ver)))
 
         for pkg, installed in software.get('gstreamer_packages', {}).items():
             sysinfo_layout.addRow(QLabel(f"{pkg}:"), QLabel(self.check(installed)))
@@ -871,6 +874,12 @@ class SettingsTab(QWidget):
 
     def check(self, val): 
         return "✅" if val else "❌"
+
+    def check_with_version(self, installed: bool, version: str | None) -> str:
+        mark = self.check(installed)
+        if installed and version:
+            return f"{mark}  (v{version})"
+        return mark
 
     def browse_font_folder(self):
         folder = QFileDialog.getExistingDirectory(self, self.tr("Select Font Folder"), "")

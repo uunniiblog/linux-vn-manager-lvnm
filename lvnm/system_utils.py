@@ -129,6 +129,10 @@ class SystemUtils:
         clean_env = SystemUtils.get_clean_env()
         appdir = os.environ.get("APPDIR")
 
+        gamescope_path = shutil.which("gamescope")
+        umu_path = SystemUtils.get_tool_path("umu-run")
+        winetricks_path = SystemUtils.get_tool_path("winetricks")
+
         # When running as AppImage, bundled tools are always available (unless build failed)
         # Fall back to system check when running from source/dev
         if appdir:
@@ -141,9 +145,12 @@ class SystemUtils:
 
         support = {
             "vulkan_support": SystemUtils._check_vulkan(clean_env),
-            "gamescope": bool(shutil.which("gamescope")),
+            "gamescope": bool(gamescope_path),
+            "gamescope_version": SystemUtils._get_tool_version(gamescope_path, env=clean_env) if bool(gamescope_path) else None,
             "umu_run": umu_available,
+            "umu_run_version": SystemUtils._get_tool_version(umu_path, env=clean_env) if umu_available else None,
             "winetricks": winetricks_available,
+            "winetricks_version": SystemUtils._get_tool_version(winetricks_path, env=clean_env) if winetricks_available else None,
             "gstreamer_packages": {}
         }
 
@@ -164,6 +171,33 @@ class SystemUtils:
             support["gstreamer_packages"][pkg] = SystemUtils._is_package_installed(pkg)
 
         return support
+
+    @staticmethod
+    def _get_tool_version(tool_path: str, version_flag: str = "--version", env=None) -> str | None:
+        """Runs `tool_path version_flag` and extracts it from the output."""
+        if env is None:
+            env = SystemUtils.get_clean_env()
+        try:
+            result = subprocess.run(
+                [tool_path, version_flag],
+                capture_output=True, text=True, env=env, timeout=5
+            )
+
+            output = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
+            if not output:
+                return None
+            match = re.search(r"\d+(?:\.\d+){1,3}", output)
+            if match:
+                return match.group(0)
+
+            # Winetricks
+            match = re.search(r"\b\d{6,8}\b", output)
+            if match:
+                return match.group(0)
+            return output.splitlines()[0][:40]
+        except Exception as e:
+            logger.debug(f"Failed to get version for {tool_path}: {e}")
+            return None
 
     @staticmethod
     def _check_vulkan(env=None) -> bool:
@@ -206,7 +240,6 @@ class SystemUtils:
         logger.debug("="*50)
         logger.debug(" LVNM SYSTEM DIAGNOSTICS")
         logger.debug("="*50)
-        
         sys_info = SystemUtils.get_system_info()
         logger.debug("--- System Information ---")
         logger.debug(f"App Version : {sys_info['app_version']}")
@@ -219,9 +252,14 @@ class SystemUtils:
         software = SystemUtils.get_software_support()
         logger.debug("--- Software & Compatibility ---")
         logger.debug(f"Vulkan Support : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
-        logger.debug(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}")
-        logger.debug(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}")
-        logger.debug(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}")
+
+        gamescope_ver = f" (v{software['gamescope_version']})" if software.get('gamescope_version') else ""
+        umu_ver = f" (v{software['umu_run_version']})" if software.get('umu_run_version') else ""
+        winetricks_ver = f" (v{software['winetricks_version']})" if software.get('winetricks_version') else ""
+
+        logger.debug(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}{gamescope_ver}")
+        logger.debug(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}{umu_ver}")
+        logger.debug(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}{winetricks_ver}")
 
         logger.debug("--- GStreamer Packages ---")
         for pkg, installed in software['gstreamer_packages'].items():
