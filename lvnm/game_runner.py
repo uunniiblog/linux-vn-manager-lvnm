@@ -86,7 +86,7 @@ class GameRunner:
 
         # Determine runner
         runner_path = Path(self.prefix_info["runner"])
-        is_proton = "proton" in str(runner_path).lower()
+        is_proton = self.prefix_info.get("type") == "proton"
 
         logger.debug(f"is_proton: {is_proton}")
         

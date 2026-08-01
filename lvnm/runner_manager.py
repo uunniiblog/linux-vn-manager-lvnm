@@ -100,7 +100,11 @@ class RunnerManagerInterface:
         proton_exe = path / "files" / "bin" / "wine"
         proton_script = path / "proton"
 
-        return wine_exe.exists() or proton_exe.exists() or proton_script.exists()
+        if wine_exe.exists() or proton_exe.exists() or proton_script.exists():
+            return True
+
+        logger.debug(f"{runner_path} is not a runner path.")
+        return False
             
     @staticmethod
     def get_local_runners(runner_dir, prefixes_data):
@@ -161,7 +165,7 @@ class RunnerManagerInterface:
             for base in runner_dirs
             if base.exists()
             for d in base.iterdir()
-            if d.is_dir()
+            if d.is_dir() and RunnerManagerInterface.is_runner_valid(d)
         ]
         runners.sort(key=RunnerManagerInterface._natural_sort_key, reverse=True)
         return dict(runners)

@@ -93,7 +93,7 @@ class PrefixManager:
         """Physical creation and initialization of the prefix."""
         logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
-        self.type = "proton" if "proton" in str(self.runner_path).lower() else "wine"
+        self.type = "proton" if (self.runner_path / "proton").exists() else "wine"
         self.codecs = codecs
         self.winetricks = ""
         self.dpi = dpi
