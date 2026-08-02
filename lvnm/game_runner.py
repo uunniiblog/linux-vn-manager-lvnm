@@ -286,6 +286,10 @@ class GameRunner:
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless)
         logger.debug(f"Launched PID {self.process.pid} for game {self.game.path}")
 
+        # Apply linux-rt-upscaler
+        if self.settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False) and self.game.rtUpscaler.enabled == "true":
+            self._launch_linux_rt_upscaler()
+
         return True
 
     def _handle_wine(self, runner_path: Path) -> list:
@@ -533,14 +537,7 @@ class GameRunner:
             env = self.env
             env.pop("LD_PRELOAD", None)
 
-            subprocess.Popen(
-                cmd,
-                env=env,
-                cwd=self.game_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
-            )
+            ExecutionManager.run_detached(cmd, env, cwd=self.game_dir, suppress_stdout=False)
         except Exception as e:
             logger.error(f"Failed to launch script {script_path}: {e}")
 
@@ -577,6 +574,32 @@ class GameRunner:
             logger.error(f"_wait_for_game_then_run_script: Game process not found after {max_attempts} attempts. Script NOT launched.")
 
         t = threading.Thread(target=_is_game_running_poll, daemon=True, name="pre_launch_script_wait")
+        t.start()
+
+    def _launch_linux_rt_upscaler(self):
+        """Wait for game to open and runs rt_linux_upscaler over the window title of the game"""
+        logger.debug("_launch_linux_rt_upscaler")
+        utils = get_desktop_utils()
+        process = os.path.basename(self.game.path)
+        upscale_params = self.game.rtUpscaler.parameters
+        
+        def _is_game_running_poll():
+            max_attempts = 20
+            for attempt in range(1, max_attempts + 1):
+                logger.info(f"_wait_for_game_then_run_script: Waiting for game process... attempt {attempt}/{max_attempts}")
+                pid = TimeTrackUtils.get_pid_by_name(process)
+                if pid:
+                    wid, title = utils.find_window_by_pid(pid, process)
+                    if wid and title:
+                        cmd = ["upscale", "-t", title, "--target-delay", "1"] + shlex.split(upscale_params)
+                        logger.info(f"_launch_linux_rt_upscaler: Window detected  '{title}' (WID: {wid}). after {attempt} attempt(s). Launching linux-rt-upscaler: {shlex.join(cmd)}.")
+                        ExecutionManager.run_detached(cmd, self.env, cwd=self.game_dir, suppress_stdout=False)
+                        return
+
+                time.sleep(2)
+            logger.error(f"_launch_linux_rt_upscaler: Game process not found after {max_attempts} attempts. linux-rt-upscaler NOT launched.")
+
+        t = threading.Thread(target=_is_game_running_poll, daemon=True, name="launch_linux_rt_upscaler")
         t.start()
     
     def scrub_appimage_environment(self):

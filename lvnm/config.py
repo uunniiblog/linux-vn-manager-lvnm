@@ -176,6 +176,8 @@ USER_CONF_GLOBAL_VARIABLES = "global_env_var"
 USER_CONF_FONT_FOLDER = "font_folder"
 USER_CONF_GAMESCOPE_ENABLED = "gamescope_enabled"
 USER_CONF_GAMESCOPE_PARAMS = "gamescope_params"
+USER_CONF_RT_UPSCALER_ENABLED = "rt_upscaler_enabled"
+USER_CONF_RT_UPSCALER_PARAMS = "rt_upscaler_params"
 USER_CONF_SAVE_DATA_FOLDER = "save_folder"
 USER_CONF_ONE_GAME_PREFIX = "one_game_one_prefix"
 USER_CONF_LOG_LEVEL = "log_level"
@@ -217,6 +219,7 @@ GAMESCOPE_INSTALLED = False
 VULKAN_INSTALLED = False
 UMU_RUN_INSTALLED = False
 WINETRICKS_INSTALLED = False
+RT_UPSCALING_INSTALLED = False
 
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)

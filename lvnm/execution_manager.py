@@ -3,6 +3,7 @@ import subprocess
 import threading
 import config
 import logging
+import shlex
 from settings_manager import SettingsManager
 
 settings = SettingsManager()
@@ -123,3 +124,46 @@ class ExecutionManager:
             raise subprocess.CalledProcessError(proc.returncode, cmd)
 
         return proc.returncode
+
+    @staticmethod
+    def run_detached(cmd, env, cwd=None, startup_grace=5, suppress_stdout=True):
+        """
+        Launches a fully detached.
+        Catch launch failures.
+        Returns the Popen object  or None ifthe process couldn't even be started.
+        """
+        logger.info(f"Executing (detached): {' '.join(cmd)}")
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                env=env,
+                cwd=cwd,
+                stdout=subprocess.DEVNULL if suppress_stdout else subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to launch detached process '{shlex.join(cmd)}': {e}")
+            return None
+
+        def _log_startup_output(stdout_output, stderr_output):
+            if not suppress_stdout and stdout_output and stdout_output.strip():
+                logger.info(f"Detached process startup output: {stdout_output.strip()}")
+            if stderr_output and stderr_output.strip():
+                logger.debug(f"Detached process startup stderr: {stderr_output.strip()}")
+
+        try:
+            stdout_output, stderr_output = proc.communicate(timeout=startup_grace)
+            _log_startup_output(stdout_output, stderr_output)
+
+            if proc.returncode != 0:
+                logger.error(f"run_detached exited during startup (exit code {proc.returncode}): {(stderr_output or '').strip()}")
+
+        except subprocess.TimeoutExpired as e:
+            # Still running, log whatever startup output was captured before the timeout
+            _log_startup_output(e.stdout, e.stderr)
+
+
+        return proc

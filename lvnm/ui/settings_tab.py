@@ -91,6 +91,20 @@ class SettingsTab(QWidget):
         gs_layout.addWidget(self.gs_checkbox)
         gs_layout.addWidget(self.gs_params)
         settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
+
+        # linux-rt-upscaler
+        upscaler_layout = QHBoxLayout()
+        self.upscaler_checkbox = QCheckBox(self.tr("Enable"))
+        self.upscaler_checkbox.setChecked(self.user_settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False))
+        self.upscaler_params = QLineEdit(self.user_settings.get(config.USER_CONF_RT_UPSCALER_PARAMS, ""))
+        self.upscaler_params.setPlaceholderText(self.tr("Parameters (e.g., --profile 1080p --crop-top 19)"))
+        if not config.RT_UPSCALING_INSTALLED:
+            self.upscaler_checkbox.setDisabled(True)
+            self.upscaler_checkbox.setCheckable(False)
+            self.upscaler_params.setDisabled(True)
+        upscaler_layout.addWidget(self.upscaler_checkbox)
+        upscaler_layout.addWidget(self.upscaler_params)
+        settings_layout.addRow(QLabel(self.tr("linux-rt-upscaler:")), upscaler_layout)
         
         # Global Env Variables
         env_label = QLabel(self.tr("Environment variables:"))
@@ -620,6 +634,7 @@ class SettingsTab(QWidget):
         runtime = SystemUtils.get_runtime_type()
         version_label = sys_data.get('app_version')
         gamescope_ver = software.get('gamescope_version')
+        upscale_ver = software.get('upscale_version')
         umu_ver = software.get('umu_run_version')
         winetricks_ver = software.get('winetricks_version')
 
@@ -636,6 +651,7 @@ class SettingsTab(QWidget):
         sysinfo_layout.addRow(QLabel(self.tr("GPU:")), QLabel(sys_data.get('gpu')))
         sysinfo_layout.addRow(QLabel(self.tr("Vulkan Support:")), QLabel(self.check(software.get('vulkan_support'))))
         sysinfo_layout.addRow(QLabel(self.tr("Gamescope:")), QLabel(self.check_with_version(software.get('gamescope'), gamescope_ver)))
+        sysinfo_layout.addRow(QLabel(self.tr("linux-rt-upscaler:")), QLabel(self.check_with_version(software.get('upscale'), upscale_ver)))
         sysinfo_layout.addRow(QLabel(self.tr("Umu-run:")), QLabel(self.check_with_version(software.get('umu_run'), umu_ver)))
         sysinfo_layout.addRow(QLabel(self.tr("Winetricks:")), QLabel(self.check_with_version(software.get('winetricks'), winetricks_ver)))
 
@@ -677,6 +693,8 @@ class SettingsTab(QWidget):
         self.log_wine_traces.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOGS_WINE, bool(s)))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
+        self.upscaler_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_RT_UPSCALER_ENABLED, bool(s)))
+        self.upscaler_params.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_RT_UPSCALER_PARAMS, t))
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))

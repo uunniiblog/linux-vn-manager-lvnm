@@ -96,6 +96,9 @@ class GameManager:
             if key == "gamescope" and isinstance(value, dict):
                 for gs_key, gs_val in value.items():
                     setattr(current_card.gamescope, gs_key, gs_val)
+            elif key == "rtUpscaler" and isinstance(value, dict):
+                for upscale_key, upscale_val in value.items():
+                    setattr(current_card.rtUpscaler, upscale_key, upscale_val)
             elif hasattr(current_card, attr_key):
                 setattr(current_card, attr_key, value)
         

@@ -231,14 +231,22 @@ class GameSidebar(QFrame):
         # Gamescope
         gs_group = QGroupBox(self.tr("Gamescope"))
         gs_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        gs_form = QFormLayout(gs_group)
+        self.gs_form = QFormLayout(gs_group)
         self.gs_enabled = QCheckBox(self.tr("Enable Gamescope"))
         self.gs_params = QLineEdit()
-        gs_form.addRow(self.gs_enabled)
-        gs_form.addRow(self.tr("Params:"), self.gs_params)
+        self.gs_form.addRow(self.gs_enabled)
+        self.gs_form.addRow(self.tr("Params:"), self.gs_params)
         if not config.GAMESCOPE_INSTALLED:
             self.gs_enabled.setDisabled(True)
             self.gs_params.setDisabled(True)
+
+        # linux-rt-upscaler
+        self.upscale_enabled = QCheckBox(self.tr("Enable linux-rt-upscaler"))
+        self.upscale_params = QLineEdit()
+        self.upscale_params.setPlaceholderText("--profile 1080p --crop-top 19")
+        self.gs_form.addRow(self.upscale_enabled)
+        self.gs_form.addRow(self.tr("Params:"), self.upscale_params)
+
         form.addWidget(gs_group)
 
         # Environment Variables
@@ -434,6 +442,16 @@ class GameSidebar(QFrame):
         self.gs_enabled.setChecked(card.gamescope.enabled == "true")
         self.gs_params.setText(card.gamescope.parameters)
 
+        # linux-rt-upscaler
+        if self.user_settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False):
+            self.gs_form.setRowVisible(self.upscale_enabled, True)
+            self.gs_form.setRowVisible(self.upscale_params, True)
+            self.upscale_enabled.setChecked(card.rtUpscaler.enabled == "true")
+            self.upscale_params.setText(card.rtUpscaler.parameters)
+        else:
+            self.gs_form.setRowVisible(self.upscale_enabled, False)
+            self.gs_form.setRowVisible(self.upscale_params, False)
+
         # Load Prefixes
         self.combo_prefix.blockSignals(True)
         self.combo_prefix.clear()
@@ -569,6 +587,16 @@ class GameSidebar(QFrame):
         
         self.gs_enabled.setChecked(gs_default_enabled)
         self.gs_params.setText(gs_default_params)
+
+        # linux-rt-upscaler
+        if self.user_settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False):
+            self.gs_form.setRowVisible(self.upscale_enabled, True)
+            self.gs_form.setRowVisible(self.upscale_params, True)
+            self.upscale_enabled.setChecked(True)
+            self.upscale_params.setText(self.user_settings.get(config.USER_CONF_RT_UPSCALER_PARAMS, ""))
+        else:
+            self.gs_form.setRowVisible(self.upscale_enabled, False)
+            self.gs_form.setRowVisible(self.upscale_params, False)
 
         # Reload Prefixes to an empty selection
         self.combo_prefix.blockSignals(True)
@@ -761,6 +789,10 @@ class GameSidebar(QFrame):
         # Gamescope
         self.current_game.gamescope.enabled = "true" if self.gs_enabled.isChecked() else "false"
         self.current_game.gamescope.parameters = self.gs_params.text()
+
+        # linux-rt-upscaler
+        self.current_game.rtUpscaler.enabled = "true" if self.upscale_enabled.isChecked() else "false"
+        self.current_game.rtUpscaler.parameters = self.upscale_params.text()
 
         # Execute Save
         if is_new_game:

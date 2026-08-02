@@ -13,6 +13,11 @@ class GameScope:
     parameters: str = ""
 
 @dataclass
+class RtUpscaler:
+    enabled: str = "false"
+    parameters: str = ""
+
+@dataclass
 class GameCard:
     name: str
     path: str
@@ -29,6 +34,7 @@ class GameCard:
     envvar: Dict[str, str] = field(default_factory=dict)
     dlloverride: Dict[str, str] = field(default_factory=dict)
     gamescope: GameScope = field(default_factory=GameScope)
+    rtUpscaler: RtUpscaler = field(default_factory=RtUpscaler)
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     label: str = ""
     pre_launch_args: str = ""
@@ -45,6 +51,9 @@ class GameCard:
         
         gs_data = temp_data.pop("gamescope", {})
         gs = GameScope(**gs_data)
+
+        upsaler_data = temp_data.pop("rtUpscaler", {})
+        upscaler = RtUpscaler(**upsaler_data)
         
         temp_data["umu_gameid"] = temp_data.pop("umu-gameid", "umu-default")
         temp_data["umu_store"] = temp_data.pop("umu-store", "none")
@@ -56,7 +65,7 @@ class GameCard:
         valid_fields = {f.name for f in fields(cls)}
         temp_data = {k: v for k, v in temp_data.items() if k in valid_fields}
                 
-        return cls(name=name, gamescope=gs, **temp_data)
+        return cls(name=name, gamescope=gs, rtUpscaler=upscaler, **temp_data)
 
     def to_dict(self):
         data = asdict(self)

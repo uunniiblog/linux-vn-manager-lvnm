@@ -132,6 +132,7 @@ class SystemUtils:
         gamescope_path = shutil.which("gamescope")
         umu_path = SystemUtils.get_tool_path("umu-run")
         winetricks_path = SystemUtils.get_tool_path("winetricks")
+        upscale_path = shutil.which("upscale")
 
         # When running as AppImage, bundled tools are always available (unless build failed)
         # Fall back to system check when running from source/dev
@@ -151,7 +152,9 @@ class SystemUtils:
             "umu_run_version": SystemUtils._get_tool_version(umu_path, env=clean_env) if umu_available else None,
             "winetricks": winetricks_available,
             "winetricks_version": SystemUtils._get_tool_version(winetricks_path, env=clean_env) if winetricks_available else None,
-            "gstreamer_packages": {}
+            "gstreamer_packages": {},
+            "upscale": bool(upscale_path),
+            "upscale_version": SystemUtils._get_tool_version(upscale_path, env=clean_env) if bool(upscale_path) else None
         }
 
         # Update the config module variables
@@ -159,7 +162,8 @@ class SystemUtils:
             "gamescope": "GAMESCOPE_INSTALLED",
             "vulkan_support": "VULKAN_INSTALLED",
             "umu_run": "UMU_RUN_INSTALLED",
-            "winetricks": "WINETRICKS_INSTALLED"
+            "winetricks": "WINETRICKS_INSTALLED",
+            "upscale": "RT_UPSCALING_INSTALLED"
         }
 
         for support_key, config_var in mapping.items():
@@ -251,15 +255,17 @@ class SystemUtils:
 
         software = SystemUtils.get_software_support()
         logger.debug("--- Software & Compatibility ---")
-        logger.debug(f"Vulkan Support : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
 
         gamescope_ver = f" (v{software['gamescope_version']})" if software.get('gamescope_version') else ""
+        upscale_ver = f" (v{software['upscale_version']})" if software.get('upscale_version') else ""
         umu_ver = f" (v{software['umu_run_version']})" if software.get('umu_run_version') else ""
         winetricks_ver = f" (v{software['winetricks_version']})" if software.get('winetricks_version') else ""
 
-        logger.debug(f"Gamescope      : {'✅ Installed' if software['gamescope'] else '❌ Missing'}{gamescope_ver}")
-        logger.debug(f"Umu-run        : {'✅ Installed' if software['umu_run'] else '❌ Missing'}{umu_ver}")
-        logger.debug(f"Winetricks     : {'✅ Installed' if software['winetricks'] else '❌ Missing'}{winetricks_ver}")
+        logger.debug(f"Vulkan Support       : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
+        logger.debug(f"Gamescope            : {'✅ Installed' if software['gamescope'] else '❌ Missing'}{gamescope_ver}")
+        logger.debug(f"linux-rt-upscaler    : {'✅ Installed' if software['upscale'] else '❌ Missing'}{upscale_ver}")
+        logger.debug(f"Umu-run              : {'✅ Installed' if software['umu_run'] else '❌ Missing'}{umu_ver}")
+        logger.debug(f"Winetricks           : {'✅ Installed' if software['winetricks'] else '❌ Missing'}{winetricks_ver}")
 
         logger.debug("--- GStreamer Packages ---")
         for pkg, installed in software['gstreamer_packages'].items():

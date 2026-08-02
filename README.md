@@ -193,6 +193,7 @@ Tools used and inspiration:
 - wine: https://www.winehq.org/
 - Kron4ek wine builds: https://github.com/Kron4ek/Wine-Builds
 - Gamescope: https://github.com/ValveSoftware/gamescope
+- linux-rt-upscaler: https://github.com/baronsmv/linux-rt-upscaler
 - Winetricks: https://github.com/Winetricks/winetricks/
 - Codecs script: Used to install codecs: https://github.com/b-fission/vn_winestuff/
 - swayidle: Used for idle/afk detection: https://github.com/swaywm/swayidle
