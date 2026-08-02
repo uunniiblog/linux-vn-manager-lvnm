@@ -498,7 +498,10 @@ class GameSidebar(QFrame):
         
         if dialog.exec():
             new_vars = dialog.get_vars()
+            new_global_states = dialog.get_global_states()
+
             self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, new_vars)
+            self.user_settings.set(config.USER_CONF_GLOBAL_VARIABLES, new_global_states)
 
             # Clean ghost variables from game database
             new_keys = [var["key"] for var in new_vars]

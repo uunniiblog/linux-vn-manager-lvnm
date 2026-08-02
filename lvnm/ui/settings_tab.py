@@ -93,14 +93,16 @@ class SettingsTab(QWidget):
         settings_layout.addRow(QLabel(self.tr("Gamescope:")), gs_layout)
         
         # Global Env Variables
-        env_label = QLabel(self.tr("Global Env variables:"))
-        env_label.setToolTip(self.tr("These environment variables will be automatically selected when adding a new game.\n They will also be automatically applied from the 'Run in Prefix' dialog."))
-        settings_layout.addRow(
-            env_label,
-            self._build_env_var_widget()
-        )
+        env_label = QLabel(self.tr("Environment variables:"))
+        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
+        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
+        self.manage_env_btn.clicked.connect(self._open_env_manager)
+        env_btn_layout = QHBoxLayout()
+        env_btn_layout.addWidget(self.manage_env_btn)
+        env_btn_layout.addStretch()
+        settings_layout.addRow(env_label, env_btn_layout)
 
-        # --- Added SteamGridDB API Key Section ---
+        # Added SteamGridDB API Key Section
         sgdb_container = QHBoxLayout()
         initial_key = self.user_settings.get(config.USER_CONF_SGDB_API_KEY, "")
         self.sgdb_key_edit, secret_layout = self._create_secret_field(initial_key)
@@ -162,42 +164,6 @@ class SettingsTab(QWidget):
             vars_list = config.ENV_VARIABLES
             self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, vars_list)
         return vars_list
-    
-    def _build_env_var_widget(self):
-        """Builds the collapsible env var checkbox grid."""
-        self.env_var_container = QWidget()
-        self.env_var_main_layout = QVBoxLayout(self.env_var_container)
-        self.env_var_main_layout.setContentsMargins(0, 0, 0, 0)
-        self.env_var_main_layout.setSpacing(4)
-
-        # Widget to hold the dynamic grid
-        self.env_grid_widget = QWidget()
-        self.env_var_main_layout.addWidget(self.env_grid_widget)
-
-        # Control Buttons Layer
-        btn_layout = QHBoxLayout()
-        self.env_expand_btn = QPushButton(self.tr("Show more..."))
-        self.env_expand_btn.setFlat(True)
-        self.env_expand_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
-        self.env_expand_btn.setCursor(Qt.PointingHandCursor)
-        self.env_expand_btn.clicked.connect(self._toggle_env_extra)
-        
-        self.manage_env_btn = QPushButton(self.tr("Manage Environment Variables"))
-        self.manage_env_btn.setFlat(True)
-        self.manage_env_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px;")
-        self.manage_env_btn.setCursor(Qt.PointingHandCursor)
-        self.manage_env_btn.clicked.connect(self._open_env_manager)
-
-        btn_layout.addWidget(self.env_expand_btn)
-        btn_layout.addWidget(self.manage_env_btn)
-        btn_layout.addStretch()
-        
-        self.env_var_main_layout.addLayout(btn_layout)
-
-        # Populate the grid initially
-        self._refresh_env_grid()
-
-        return self.env_var_container
 
     def _open_env_manager(self):
         """Opens the dialog to add/remove/edit environment variables."""
@@ -212,7 +178,10 @@ class SettingsTab(QWidget):
         dialog = EnvVarManagerDialog(current_vars, self)
         if dialog.exec():
             new_vars = dialog.get_vars()
+            new_global_states = dialog.get_global_states()
+
             self.user_settings.set(config.USER_CONF_ENV_VARIABLE_LIST, new_vars)
+            self.user_settings.set(config.USER_CONF_GLOBAL_VARIABLES, new_global_states)
 
             # Clean ghost variables
             current_keys = [var["key"] for var in new_vars]
@@ -417,16 +386,12 @@ class SettingsTab(QWidget):
 
         # Savedata dialog
         self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
-        self.manage_savedata_btn.setFlat(True)
-        self.manage_savedata_btn.setStyleSheet("text-align: left; margin-left: 5px; color: palette(link); padding: 4px 10px; margin-top: 0.7em")
         self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
         self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
-
         manage_row = QHBoxLayout()
-        manage_row.setContentsMargins(0, 0, 0, 0)
         manage_row.addWidget(self.manage_savedata_btn)
         manage_row.addStretch()
-        savedata_layout.addRow(manage_row)
+        savedata_layout.addRow(QLabel(self.tr("Manage savedata:")), manage_row)
 
         # Separator for Gdrive section
         header_widget = QWidget()
