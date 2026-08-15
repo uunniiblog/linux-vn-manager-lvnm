@@ -165,5 +165,13 @@ class ExecutionManager:
             # Still running, log whatever startup output was captured before the timeout
             _log_startup_output(e.stdout, e.stderr)
 
+            # Reap this process once it eventually exits, otherwise linux-rt-upscaler stays as a ghost process open until the launcher is closed
+            def _reap():
+                try:
+                    proc.wait()
+                except Exception:
+                    pass
+            threading.Thread(target=_reap, daemon=True, name=f"reap-{proc.pid}").start()
+
 
         return proc
