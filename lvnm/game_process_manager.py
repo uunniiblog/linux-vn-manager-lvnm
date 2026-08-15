@@ -4,11 +4,12 @@ from typing import Callable
 from datetime import datetime
 from PySide6.QtCore import QObject, Signal, QTimer
 from game_manager import GameManager
-from game_runner import GameRunner
 from timetracker.tracking_controller import TrackingController
 from savedata_manager import SavedataManager
 from timetracker.log_manager import TrackingSyncWorker
 from timetracker.log_manager import LogManager
+from launchers.launcher_factory import create_launcher
+from launchers.launcher_base_game import LauncherBaseGame
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class GameProcessManager(QObject):
         self.monitor_timer.timeout.connect(self._check_active_runners)
         self.monitor_timer.start(1000)
 
-        self._exit_hooks: list[Callable[[str, GameRunner], None]] = [
+        self._exit_hooks: list[Callable[[str, LauncherBaseGame], None]] = [
             self._capture_final_log,
             self._run_exit_script,
             self._stop_tracking_hook,
@@ -61,7 +62,7 @@ class GameProcessManager(QObject):
 
         try:
             game_card = GameManager.get_game(name)
-            runner = GameRunner(name)
+            runner = create_launcher(name)
             if runner.run():
                 self.active_runners[name] = runner
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
@@ -126,7 +127,7 @@ class GameProcessManager(QObject):
             tracker.stop_tracking()
             self.active_trackers.pop(name, None) 
 
-    def register_exit_hook(self, hook: Callable[[str, GameRunner], None]):
+    def register_exit_hook(self, hook: Callable[[str, LauncherBaseGame], None]):
         """Allows other components to plug into the game-exit lifecycle"""
         self._exit_hooks.append(hook)
 

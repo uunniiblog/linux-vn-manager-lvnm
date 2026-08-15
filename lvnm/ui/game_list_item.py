@@ -11,7 +11,7 @@ from pathlib import Path
 from game_manager import GameManager
 from system_utils import SystemUtils
 from game_process_manager import GameProcessManager
-from game_runner import GameRunner
+from launchers.launcher_wine_game import LauncherWineGame
 from timetracker.log_manager import LogManager
 from settings_manager import SettingsManager
 
@@ -285,7 +285,7 @@ class GameListItem(QWidget):
             self.add_to_steam()
 
     def open_texthooker(self, texthooker_path):
-        runner = GameRunner("texthook")
+        runner = LauncherWineGame("texthook")
         if texthooker_path:
             try:
                 runner.run_texthooker(texthooker_path, self.game_card.prefix, gamescope=self.game_card.gamescope, target_exe_path=self.game_card.path)
@@ -334,14 +334,14 @@ class GameListItem(QWidget):
             QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_in_prefix(self, command: str):
-        runner = GameRunner("UtilityMode")
+        runner = LauncherWineGame("UtilityMode")
         try:
             runner.run_in_prefix(command, self.game_card.prefix)
         except RuntimeError as e:
             QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_bash(self):
-        runner = GameRunner("UtilityMode")
+        runner = LauncherWineGame("UtilityMode")
         try:
             runner.open_terminal(self.game_card.prefix)
         except RuntimeError as e:

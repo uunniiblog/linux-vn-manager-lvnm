@@ -14,7 +14,7 @@ from game_manager import GameManager
 from ui.console_dialog import ConsoleDialog
 from settings_manager import SettingsManager
 from runner_manager import RunnerManagerInterface
-from game_runner import GameRunner
+from launchers.launcher_wine_game import LauncherWineGame
 from system_utils import SystemUtils
 
 logger = logging.getLogger(__name__)
@@ -292,7 +292,7 @@ class PrefixTab(QWidget):
         if not prefix_name:
             logger.debug("No prefix selected for utility.")
             return
-        runner = GameRunner("UtilityMode")
+        runner = LauncherWineGame("UtilityMode")
         runner.run_in_prefix(command, prefix_name)
 
     def run_bash_utility(self):
@@ -300,7 +300,7 @@ class PrefixTab(QWidget):
         if not prefix_name:
             logger.debug("No prefix selected for utility.")
             return
-        runner = GameRunner("UtilityMode")
+        runner = LauncherWineGame("UtilityMode")
         runner.open_terminal(prefix_name)
 
     def browse_files(self):

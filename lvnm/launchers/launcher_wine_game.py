@@ -18,41 +18,20 @@ from settings_manager import SettingsManager
 from timetracker.utils_factory import get_desktop_utils
 from timetracker.system_utils import SystemUtils as TimeTrackUtils
 from timetracker.x11_utils import X11Utils
+from launchers.launcher_base_game import LauncherBaseGame
 
 logger = logging.getLogger(__name__)
 
-class GameRunner:
-    PREFIXES_DATA = Path(config.PREFIXES_DATA)
-    GAME_DATA = Path(config.GAMES_DATA)
+class LauncherWineGame(LauncherBaseGame):
+    #PREFIXES_DATA = Path(config.PREFIXES_DATA)
+    #GAME_DATA = Path(config.GAMES_DATA)
 
     def __init__(self, name: str, card_override: GameCard = None, is_steam=False):
+        super().__init__(name, card_override)
         self.settings = SettingsManager()
-        self.name = name
-        self.game: GameCard = card_override
-        self.prefix_info: dict = None
-        self.env: dict = {}
-        self.cmd: list = []
         self.is_steam = is_steam
-        self.logs = deque(maxlen=2000)
         self.umu_path = None
-        
-        # Track running
-        self.process = None 
-
-    def load_data(self):
-        """Loads game and prefix data into the instance."""
-        # Only fetch from the json if we didn't provide a card manually
-        if not self.game:
-            self.game = self._get_game_card(self.name)
-
-        if not self.game:
-            raise ValueError(f"Game '{self.name}' not found in registry.")
-
-        self.prefix_info = self._get_prefix_info(self.game.prefix)
-        if not self.prefix_info:
-            raise ValueError(f"Prefix for {self.name} not found.")
-        if not self.game.path or not os.path.isfile(self.game.path):
-            raise ValueError(f"Path for {self.name} not found.")
+        self.is_proton = False
 
     def prepare_environment(self):
         """Builds the environment and the final command list."""
@@ -272,6 +251,7 @@ class GameRunner:
         try:
             # Only prepare if we haven't already
             if not self.cmd or not self.env:
+                logger.debug("Calling self.prepare_environment()")
                 self.prepare_environment()
         except Exception as e:
             logging.error(f"Preparation failed: {e}")
@@ -315,22 +295,6 @@ class GameRunner:
         self.umu_path = SystemUtils.get_tool_path("umu-run")
         
         return [self.umu_path, self.game.path]
-
-    def _get_game_card(self, name: str):
-        if not GameRunner.GAME_DATA.exists():
-            return None
-        with open(GameRunner.GAME_DATA, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if name in data:
-                return GameCard.from_dict(name, data[name])
-        return None
-
-    def _get_prefix_info(self, prefix_name: str):
-        if not GameRunner.PREFIXES_DATA.exists():
-            return None
-        with open(GameRunner.PREFIXES_DATA, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get(prefix_name)
 
     def is_running(self) -> bool:
         """Checks if the specific game is active."""
@@ -516,30 +480,6 @@ class GameRunner:
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
             raise RuntimeError(f"Failed to open terminal: {e}")
-    
-    def run_external_script(self, script_path: str):
-        """
-        Executes a script in a fully detached state.
-        """
-        if not script_path or not os.path.exists(script_path.split()[0]):
-            return
-
-        logger.info(f"Executing external script: {script_path}")
-        
-        try:
-            # Launch detached
-            cmd = ["bash"] + shlex.split(script_path)
-            logger.debug(f"run_external_script raw input : '{script_path}'")
-            logger.debug(f"run_external_script shlex tokens: {shlex.split(script_path)}")
-            logger.debug(f"run_external_script final cmd  : {cmd}")
-
-            # Remove LD_PRELOAD to avoid issues with steam. Should not be needed for scripts
-            env = self.env
-            env.pop("LD_PRELOAD", None)
-
-            ExecutionManager.run_detached(cmd, env, cwd=self.game_dir, suppress_stdout=False)
-        except Exception as e:
-            logger.error(f"Failed to launch script {script_path}: {e}")
 
     def _wait_for_game_then_run_script(self, script_path: str):
         """
@@ -620,14 +560,6 @@ class GameRunner:
             logger.debug(f"Removing LD_LIBRARY_PATH: {self.env.get('LD_LIBRARY_PATH')}")
             self.env.pop("LD_LIBRARY_PATH")
         return var
-    
-    def _add_log_line(self, line):
-        """Callback used by ExecutionManager"""
-        self.logs.append(f"{datetime.today().strftime('%Y-%m-%d %H:%M:%S')} - {line}")
-
-    def get_full_log(self):
-        """Returns the entire buffer as a single string for a UI text box"""
-        return "\n".join(self.logs)
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""

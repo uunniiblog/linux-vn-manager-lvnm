@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings, QByteArray, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QAction, QActionGroup
 from game_manager import GameManager
-from game_runner import GameRunner
 from prefix_manager import PrefixManager
 from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
@@ -17,6 +16,7 @@ from ui.import_game_dialog import ImportGameDialog
 from model.game_card import GameCard
 from settings_manager import SettingsManager
 from timetracker.log_manager import LogManager
+from launchers.launcher_wine_game import LauncherWineGame
 
 logger = logging.getLogger(__name__)
 
@@ -471,8 +471,8 @@ class RunInPrefixDialog(QDialog):
         logger.debug(f"Running in Prefix: {exe_path} in {prefix_name}")
 
         try:
-            # Instantiate GameRunner with our dummy card
-            runner = GameRunner("Temp_Installer")
+            # Instantiate LauncherWineGame with dummy card
+            runner = LauncherWineGame("Temp_Installer")
             runner.run_in_prefix(exe_path, prefix_name)
         except Exception as e:
             logger.error(f"[Error] Failed to run in prefix: {e}")

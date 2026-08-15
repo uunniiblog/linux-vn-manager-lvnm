@@ -5,7 +5,7 @@ import signal
 import config
 from datetime import datetime
 from PySide6.QtCore import QObject, QCoreApplication, QTimer, QEventLoop
-from game_runner import GameRunner
+from launchers.launcher_factory import create_launcher
 from game_manager import GameManager
 from settings_manager import SettingsManager
 from timetracker.tracking_controller import TrackingController
@@ -36,7 +36,7 @@ class CliController(QObject):
         sys.exit(0)
 
     def headless_run(self, game, is_steam=False):
-        runner = GameRunner(game, is_steam=is_steam)
+        runner = create_launcher(game, is_steam=is_steam)
         runner.load_data()
         
         if not runner.is_running():
@@ -126,7 +126,7 @@ class CliController(QObject):
             logger.info(f"Launch of '{game_name}' cancelled during pre-launch sync.")
             return
 
-        runner = GameRunner(game_card)
+        runner = create_launcher(game_card)
         runner.game = game_card
 
         def kill_handler(signum, frame):
