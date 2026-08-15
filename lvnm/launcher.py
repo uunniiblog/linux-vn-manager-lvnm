@@ -47,6 +47,9 @@ def main():
     log_level = settings.get("log_level", "info")
     setup_logging(log_level)
 
+    # Auto reap child processes
+    signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+
     # Cli
     cli = CliHandler()
     args = cli.parse()

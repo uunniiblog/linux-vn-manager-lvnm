@@ -586,7 +586,7 @@ class GameRunner:
         def _is_game_running_poll():
             max_attempts = 20
             for attempt in range(1, max_attempts + 1):
-                logger.info(f"_wait_for_game_then_run_script: Waiting for game process... attempt {attempt}/{max_attempts}")
+                logger.info(f"_launch_linux_rt_upscaler: Waiting for game process... attempt {attempt}/{max_attempts}")
                 pid = TimeTrackUtils.get_pid_by_name(process)
                 if pid:
                     wid, title = utils.find_window_by_pid(pid, process)
