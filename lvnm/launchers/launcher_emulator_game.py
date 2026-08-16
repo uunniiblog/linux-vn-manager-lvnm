@@ -1,9 +1,12 @@
 import shlex
 import config
+import re
 from pathlib import Path
 from system_utils import SystemUtils
 from execution_manager import ExecutionManager
 from launchers.launcher_base_game import LauncherBaseGame
+
+PS3_TITLE_ID_PATTERN = re.compile(r"^[A-Z]{4}\d{5}$")
 
 class LauncherEmulatorGame(LauncherBaseGame):
     def prepare_environment(self):
@@ -20,6 +23,7 @@ class LauncherEmulatorGame(LauncherBaseGame):
         # RPCS3 settings
         if emulator_type == config.EMULATION_PS3:
             extra_args = ["--no-gui"] + extra_args
+            game_path = self._resolve_ps3_boot_arg(self.game.path)
 
         self.cmd = [emulator_path] + extra_args + [self.game.path]
         self.game_dir = str(Path(emulator_path).parent)
@@ -55,3 +59,10 @@ class LauncherEmulatorGame(LauncherBaseGame):
             raise ValueError(f"Prefix for {self.name} not found.")
         if not self.game.path:
             raise ValueError(f"Path for {self.name} not found.")
+    
+    def _resolve_ps3_boot_arg(self, game_path: str) -> str:
+        """'BLJM61043' -> '%RPCS3_GAMEID%:BLJM61043'"""
+        stripped = game_path.strip()
+        if PS3_TITLE_ID_PATTERN.match(stripped):
+            return f"%RPCS3_GAMEID%:{stripped}"
+        return game_path
