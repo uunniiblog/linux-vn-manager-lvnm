@@ -52,6 +52,7 @@ class SettingsTab(QWidget):
         main_layout.addWidget(self._build_timetracking_group())
         main_layout.addWidget(self._build_savedata_group())
         main_layout.addWidget(self._build_texthooking_group())
+        main_layout.addWidget(self._build_emulation_group())
         main_layout.addWidget(self._build_directories_group())
         main_layout.addWidget(self._build_sysinfo_group())
         main_layout.addWidget(self._build_about_group())
@@ -549,6 +550,79 @@ class SettingsTab(QWidget):
 
         return texthooker_group
 
+    def _build_emulation_group(self):
+        emulation_group = QGroupBox(self.tr("Emulation"))
+        emulation_layout = QFormLayout(emulation_group)
+        emulation_layout.setLabelAlignment(Qt.AlignLeft)
+
+        # Retrieve current settings
+        emulation_settings = self.user_settings.get(config.USER_CONF_EMULATION, {})
+
+        emulator_definitions = [
+            (
+                self.tr("PSX"),
+                config.USER_CONF_EMULATION_PSX_PATH,
+                config.USER_CONF_EMULATION_PSX_CONFIG,
+                self.tr("/path/to/duckstation.AppImage or duckstation-qt"),
+            ),
+            (
+                self.tr("PS2"),
+                config.USER_CONF_EMULATION_PS2_PATH,
+                config.USER_CONF_EMULATION_PS2_CONFIG,
+                self.tr("/path/to/pcsx2.AppImage or pcsx2-qt"),
+            ),
+            (
+                self.tr("PS3"),
+                config.USER_CONF_EMULATION_PS3_PATH,
+                config.USER_CONF_EMULATION_PS3_CONFIG,
+                self.tr("/path/to/rpcs3.AppImage or rpcs3"),
+            ),
+            (
+                self.tr("Switch"),
+                config.USER_CONF_EMULATION_SWITCH_PATH,
+                config.USER_CONF_EMULATION_SWITCH_CONFIG,
+                self.tr("/path/to/emulator.AppImage or process"),
+            ),
+        ]
+
+        self.emulation_widgets = {}
+
+        for i, (display_name, path_key, cli_key, path_placeholder) in enumerate(emulator_definitions):
+            # if i > 0:
+            #     divider = QFrame()
+            #     divider.setFrameShape(QFrame.HLine)
+            #     divider.setFrameShadow(QFrame.Sunken)
+            #     emulation_layout.addRow(divider)
+
+            emulation_layout.addRow(QLabel(f"<b>{display_name}</b>"))
+
+            # Path or Command
+            path_row = QHBoxLayout()
+            path_edit = QLineEdit(emulation_settings.get(path_key, ""))
+            path_edit.setPlaceholderText(path_placeholder)
+            browse_btn = QPushButton(self.tr("Browse..."))
+            path_row.addWidget(path_edit)
+            path_row.addWidget(browse_btn)
+            emulation_layout.addRow(QLabel(self.tr("Path or Command:")), path_row)
+
+            # CLI / config parameters
+            config_edit = QLineEdit(emulation_settings.get(cli_key, ""))
+            config_edit.setPlaceholderText(self.tr("-fullscreen -batch"))
+            emulation_layout.addRow(QLabel(self.tr("Config:")), config_edit)
+
+            browse_btn.clicked.connect(lambda _checked=False, e=path_edit: self.browse_emulator_path(e))
+            path_edit.textChanged.connect(
+                lambda text, k=path_key: self.save_nested_setting(config.USER_CONF_EMULATION, k, text)
+            )
+            config_edit.textChanged.connect(
+                lambda text, k=cli_key: self.save_nested_setting(config.USER_CONF_EMULATION, k, text)
+            )
+
+            self.emulation_widgets[path_key] = path_edit
+            self.emulation_widgets[cli_key] = config_edit
+
+        return emulation_group
+
     def _build_directories_group(self):
         directories_group = QGroupBox(self.tr("Directories"))
         directories_layout = QFormLayout(directories_group)
@@ -878,6 +952,16 @@ class SettingsTab(QWidget):
         )
         if file_path:
             self.texthooker_edit.setText(file_path)
+
+    def browse_emulator_path(self, target_edit):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("Select Emulator Executable"),
+            "",
+            self.tr("Executables (*.AppImage);;All Files (*)")
+        )
+        if file_path:
+            target_edit.setText(file_path)
 
     def _check_for_updates(self):
         """Background thread search update"""

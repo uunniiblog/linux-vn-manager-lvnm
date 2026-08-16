@@ -20,6 +20,7 @@ from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from savedata_manager import SavedataManager
 from game_process_manager import GameProcessManager
+from emulation_manager import EmulationManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
@@ -455,7 +456,7 @@ class GameSidebar(QFrame):
         # Load Prefixes
         self.combo_prefix.blockSignals(True)
         self.combo_prefix.clear()
-        self.prefixes = PrefixManager.get_prefix_json()
+        self.prefixes = self._get_all_prefixes()
         self.combo_prefix.addItems(self.prefixes.keys())
 
         if card.prefix in self.prefixes:
@@ -601,7 +602,7 @@ class GameSidebar(QFrame):
         # Reload Prefixes to an empty selection
         self.combo_prefix.blockSignals(True)
         self.combo_prefix.clear()
-        self.prefixes = PrefixManager.get_prefix_json()
+        self.prefixes = self._get_all_prefixes()
         self.combo_prefix.addItems(self.prefixes.keys())
         self.combo_prefix.setCurrentIndex(-1) # No selection initially
         self.prefix_warning.setVisible(False)
@@ -962,12 +963,14 @@ class GameSidebar(QFrame):
             self.gdrive_sync_checkbox.setChecked(updated_card.gdrive)
             self.update_savedata_visibility()
             
+    def _get_all_prefixes(self) -> dict:
+        """Real wine/proton prefixes plus any configured emulator 'virtual' prefixes."""
+        return {**PrefixManager.get_prefix_json(), **EmulationManager.get_virtual_prefixes()}
+
 
     def refresh_prefix_combo(self):
-        """Refreshes the prefix list and retains the current selection."""
-        from prefix_manager import PrefixManager
-        
-        self.prefixes = PrefixManager.get_prefix_json()
+        """Refreshes the prefix list and retains the current selection."""        
+        self.prefixes = self._get_all_prefixes()
         current_selection = self.combo_prefix.currentText()
         
         # Block signals so clear() doesn't trigger on_prefix_changed and wipe env vars

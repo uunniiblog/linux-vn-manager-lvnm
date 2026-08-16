@@ -2,17 +2,16 @@ import os
 import json
 import shlex
 import logging
+import config
 from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import datetime
 from collections import deque
-
-import config
 from model.game_card import GameCard
 from execution_manager import ExecutionManager
+from emulation_manager import EmulationManager
 
 logger = logging.getLogger(__name__)
-
 
 class LauncherBaseGame(ABC):
     PREFIXES_DATA = Path(config.PREFIXES_DATA)
@@ -61,11 +60,11 @@ class LauncherBaseGame(ABC):
         return None
 
     def _get_prefix_info(self, prefix_name: str):
-        if not self.PREFIXES_DATA.exists():
-            return None
-        with open(self.PREFIXES_DATA, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get(prefix_name)
+        real = {}
+        if self.PREFIXES_DATA.exists():
+            with open(self.PREFIXES_DATA, "r", encoding="utf-8") as f:
+                real = json.load(f)
+        return {**real, **EmulationManager.get_virtual_prefixes()}.get(prefix_name)
 
     def apply_gamescope(self, cmd: list) -> list:
         """Wraps a command with gamescope if enabled on the game card. Shared by all launcher types."""

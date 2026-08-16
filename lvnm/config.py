@@ -206,6 +206,21 @@ USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES = "gdrive_all_games"
 USER_CONF_LOG_TO_FILE = "log_to_file"
 USER_CONF_LOGS_WINE = "log_wine"
 USER_CONF_LANGUAGE = "language"
+USER_CONF_EMULATION = "emulation_management"
+USER_CONF_EMULATION_PSX_PATH = "psx_path"
+USER_CONF_EMULATION_PSX_CONFIG = "psx_config"
+USER_CONF_EMULATION_PS2_PATH = "ps2_path"
+USER_CONF_EMULATION_PS2_CONFIG = "ps2_config"
+USER_CONF_EMULATION_PS3_PATH = "ps3_path"
+USER_CONF_EMULATION_PS3_CONFIG = "ps3_config"
+USER_CONF_EMULATION_SWITCH_PATH = "switch_path"
+USER_CONF_EMULATION_SWITCH_CONFIG = "switch_config"
+
+# Emulation
+EMULATION_PSX = "emulation-psx"
+EMULATION_PS2 = "emulation-ps2"
+EMULATION_PS3 = "emulation-ps3"
+EMULATION_SWITCH = "emulation-switch"
 
 # Available UI languages ("" = follow system locale)
 LANGUAGES = [
