@@ -965,8 +965,8 @@ class GameSidebar(QFrame):
             
     def _get_all_prefixes(self) -> dict:
         """Real wine/proton prefixes plus any configured emulator 'virtual' prefixes."""
-        return {**PrefixManager.get_prefix_json(), **EmulationManager.get_virtual_prefixes()}
-
+        reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))
+        return {**reversed_prefixes, **EmulationManager.get_virtual_prefixes()}
 
     def refresh_prefix_combo(self):
         """Refreshes the prefix list and retains the current selection."""        

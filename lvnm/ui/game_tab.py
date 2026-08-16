@@ -425,7 +425,7 @@ class RunInPrefixDialog(QDialog):
         self.combo_prefix = QComboBox()
         prefixes = PrefixManager.get_prefix_json()
         if prefixes:
-            self.combo_prefix.addItems(prefixes.keys())
+            self.combo_prefix.addItems(reversed(prefixes.keys()))
         form.addRow(self.tr("Prefix:"), self.combo_prefix)
 
         layout.addLayout(form)
