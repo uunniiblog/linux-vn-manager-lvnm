@@ -126,7 +126,7 @@ class CliController(QObject):
             logger.info(f"Launch of '{game_name}' cancelled during pre-launch sync.")
             return
 
-        runner = create_launcher(game_card)
+        runner = create_launcher(game_name, card_override=game_card)
         runner.game = game_card
 
         def kill_handler(signum, frame):
