@@ -250,7 +250,7 @@ class GameTab(QWidget):
                 group_cards.sort(key=lambda c: (c.prefix.lower(), c.name.lower()))
             elif sort_pref == "playtime":
                 # Sort by total playtime
-                group_cards.sort(key=lambda c: log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(c.path)), reverse=True)
+                group_cards.sort(key=lambda c: log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(c)), reverse=True)
             else: 
                 # Default: Latest
                 group_cards.sort(key=lambda c: c.last_played if c.last_played else "0", reverse=True)

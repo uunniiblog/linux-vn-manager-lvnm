@@ -220,7 +220,7 @@ class CliController(QObject):
         )]
 
         if tracking_enabled and self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False):
-            self.tracking_file = LogManager().get_log_name_from_path(game_card.path)
+            self.tracking_file = LogManager().get_log_name_from_path(game_card)
             steps.append(TrackingSyncStep(game_card.path, f"Syncing time tracking data..."))
 
         return self._run_sync_pipeline_blocking(steps)

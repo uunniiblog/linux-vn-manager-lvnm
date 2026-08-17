@@ -41,3 +41,8 @@ class EmulationManager:
     @staticmethod
     def get_prefix_info(display_name: str) -> dict:
         return EmulationManager.get_virtual_prefixes().get(display_name)
+
+    @staticmethod
+    def get_emulator_prefixes() -> list[str]:
+        """Returns a list of display names ['PSX', 'PS2', 'PS3', 'PSP', 'Switch']."""
+        return [display_name for display_name, _, _, _ in EMULATOR_DEFINITIONS]

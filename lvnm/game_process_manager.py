@@ -105,7 +105,7 @@ class GameProcessManager(QObject):
         if is_emulated:
             # The tracked OS process is the emulator binary in this case
             emulator_path = runner.prefix_info["path"]
-            log_name = runner.prefix_info["type"] + "_" + name
+            log_name = game_card.prefix + "_" + name
             tracking = TrackingController(None, emulator_path, save_interval=save_interval, afk_timer=afk_timer, emulator_hint=game_card.path, log_name=log_name)
         else:
             tracking = TrackingController(None, game_card.path, save_interval=save_interval, afk_timer=afk_timer)

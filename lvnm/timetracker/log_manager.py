@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from settings_manager import SettingsManager
+from emulation_manager import EmulationManager
 from gdrive_manager import GdriveManager
 from PySide6.QtCore import QThread, Signal, QObject
 
@@ -277,8 +278,23 @@ class LogManager(QObject):
         sorted_data = sorted(summary.items(), key=lambda x: x[1], reverse=True)
         return [(app, seconds, titles.get(app, app)) for app, seconds in sorted_data]
 
-    def get_log_name_from_path(self, path):
-        """Extracts Process Name and byte size from file path"""
+    def get_log_name_from_path(self, path_or_game, prefix="", name=""):
+        """
+        Gets log name
+        emulated: {prefix}_{name}
+        wine: Extracts Process Name and byte size from file path
+        """
+        # Extract attributes if a game_card object was passed directly
+        if hasattr(path_or_game, "path"):
+            path = path_or_game.path
+            prefix = getattr(path_or_game, "prefix", "")
+            name = getattr(path_or_game, "name", "")
+        else:
+            path = path_or_game
+
+        if prefix in EmulationManager.get_emulator_prefixes() and name:
+            return f"{prefix}_{name}"
+
         if not path or not os.path.exists(path):
             return ""
         return f"{os.path.basename(path)}_{os.path.getsize(path)}"
