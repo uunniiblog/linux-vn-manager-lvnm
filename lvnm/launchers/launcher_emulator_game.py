@@ -1,10 +1,15 @@
 import shlex
+import os
+import signal
 import config
 import re
+import logging
 from pathlib import Path
 from system_utils import SystemUtils
 from execution_manager import ExecutionManager
 from launchers.launcher_base_game import LauncherBaseGame
+
+logger = logging.getLogger(__name__)
 
 PS3_TITLE_ID_PATTERN = re.compile(r"^[A-Z]{4}\d{5}$")
 
@@ -33,6 +38,7 @@ class LauncherEmulatorGame(LauncherBaseGame):
     def run(self, is_headless=False):
         self.load_data()
         self.prepare_environment()
+        self._log_run_command()
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False,cwd=self.game_dir, log_callback=self._add_log_line,detached=not is_headless)
         return True
 
@@ -43,7 +49,8 @@ class LauncherEmulatorGame(LauncherBaseGame):
 
     def stop(self, running_prefix_count=1):
         if self.process:
-            self.process.terminate()
+            pgid = os.getpgid(self.process.pid)
+            os.killpg(pgid, signal.SIGKILL)
 
     def load_data(self):
         """Loads game and prefix data into the instance."""
@@ -66,3 +73,30 @@ class LauncherEmulatorGame(LauncherBaseGame):
         if PS3_TITLE_ID_PATTERN.match(stripped):
             return f"%RPCS3_GAMEID%:{stripped}"
         return game_path
+
+    def _log_run_command(self):
+        """Logs the final configuration right before execution."""
+        logger.debug("" + "="*60)
+        logger.debug(f"LAUNCHING:     {self.name}")
+        logger.debug("="*60)
+        logger.debug(f"Game Path:     {self.game.path}")
+        logger.debug(f"Emulator Path: {self.prefix_info["path"]}")
+        logger.debug(f"Emulator Type: {self.prefix_info["type"]}")
+        
+        logger.debug("Environment Variables:")
+        for var in self.env:
+            logger.debug(f"   {var:<18}: {self.env[var]}")
+        
+        if self.game.envvar:
+            logger.debug("Custom Vars:")
+            for k, v in self.game.envvar.items():
+                logger.debug(f"   {k:<18}: {v}")
+
+        logger.debug("Gamescope:")
+        logger.debug(f"   Enabled:         {self.game.gamescope.enabled}")
+        if self.game.gamescope.enabled.lower() == "true":
+            logger.debug(f"   Parameters:      {self.game.gamescope.parameters}")
+
+        logger.debug("Execution Command:")
+        logger.debug(f"   {' '.join(self.cmd)}")
+        logger.debug("="*60)
