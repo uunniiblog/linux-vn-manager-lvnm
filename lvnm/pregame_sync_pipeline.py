@@ -79,8 +79,8 @@ class SavedataSyncStep:
 class TrackingSyncStep:
     """Syncs a game's time-tracking log with Google Drive before launch."""
 
-    def __init__(self, game_path: str, label: str):
-        self.game_path = game_path
+    def __init__(self, game, label: str):
+        self.game = game
         self.label = label
         self._on_success = None
         self._on_failure = None
@@ -91,16 +91,16 @@ class TrackingSyncStep:
         manager = LogManager.get_instance()
         manager.gdrive_sync_succeeded.connect(self._handle_succeeded)
         manager.gdrive_sync_failed.connect(self._handle_failed)
-        manager.start_gdrive_sync(self.game_path)
+        manager.start_gdrive_sync(self.game)
 
-    def _handle_succeeded(self, app_name, result):
-        if app_name != self.game_path:
+    def _handle_succeeded(self, game, result):
+        if game != self.game:
             return
         self._disconnect()
         self._on_success()
 
-    def _handle_failed(self, app_name, error_message):
-        if app_name != self.game_path:
+    def _handle_failed(self, game, error_message):
+        if game != self.game:
             return
         self._disconnect()
         self._on_failure(error_message)

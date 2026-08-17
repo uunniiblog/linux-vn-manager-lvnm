@@ -660,7 +660,7 @@ class GameSidebar(QFrame):
             if self.timetracker_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False) and self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and game_to_start.gdrive:
                 self._pending_tracking_path = game_to_start.path
                 steps.append(TrackingSyncStep(
-                    game_to_start.path,
+                    game_to_start,
                     self.tr("Syncing time tracking data...")
                 ))
  

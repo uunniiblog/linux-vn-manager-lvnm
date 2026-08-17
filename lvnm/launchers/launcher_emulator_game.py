@@ -28,7 +28,7 @@ class LauncherEmulatorGame(LauncherBaseGame):
         # RPCS3 settings
         if emulator_type == config.EMULATION_PS3:
             extra_args = ["--no-gui"] + extra_args
-            game_path = self._resolve_ps3_boot_arg(self.game.path)
+            self.game_path = self._resolve_ps3_boot_arg(self.game.path)
 
         self.cmd = [emulator_path] + extra_args + [self.game.path]
         self.game_dir = str(Path(emulator_path).parent)
@@ -49,8 +49,11 @@ class LauncherEmulatorGame(LauncherBaseGame):
 
     def stop(self, running_prefix_count=1):
         if self.process:
-            pgid = os.getpgid(self.process.pid)
-            os.killpg(pgid, signal.SIGKILL)
+            try:
+                pgid = os.getpgid(self.process.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
     def load_data(self):
         """Loads game and prefix data into the instance."""

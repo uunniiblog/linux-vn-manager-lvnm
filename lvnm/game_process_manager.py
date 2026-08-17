@@ -185,4 +185,4 @@ class GameProcessManager(QObject):
         game = GameManager.get_game(name)
         if game and game.gdrive:
             SavedataManager.get_instance().start_gdrive_sync(name, game.to_dict())
-            LogManager.get_instance().start_gdrive_sync(game.path)
+            LogManager.get_instance().start_gdrive_sync(game)

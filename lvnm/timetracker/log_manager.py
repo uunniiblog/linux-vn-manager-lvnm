@@ -16,8 +16,8 @@ class LogManager(QObject):
     _instance = None
 
     # Signals for the UI
-    gdrive_sync_succeeded = Signal(str, dict)
-    gdrive_sync_failed = Signal(str, str)
+    gdrive_sync_succeeded = Signal(object, dict)
+    gdrive_sync_failed = Signal(object, str)
 
     def __init__(self):
         super().__init__()
@@ -299,7 +299,7 @@ class LogManager(QObject):
             return ""
         return f"{os.path.basename(path)}_{os.path.getsize(path)}"
 
-    def sync_tracking_to_gdrive(self, app_name: str) -> dict:
+    def sync_tracking_to_gdrive(self, game_or_path: str) -> dict:
         """
         Syncs a single time-tracking CSV log file with Google Drive.
         If the remote file is newer, it downloads it. 
@@ -312,9 +312,9 @@ class LogManager(QObject):
             logger.info("sync_tracking_to_gdrive skipped")
             return {"status": "skipped", "reason": "not configured"}
 
-        log_file = self.get_log_name_from_path(app_name)
+        log_file = self.get_log_name_from_path(game_or_path)
         if log_file is None:
-            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': log_file is empty. )")
+            logger.error(f"Error syncing tracking log to GDrive for '{game_or_path}': log_file is empty. )")
             return {"status": "skipped", "reason": "log_file is empty"}
 
         logger.debug(f"Starting sync for {log_file}")
@@ -364,49 +364,51 @@ class LogManager(QObject):
             logger.info(f"Tracking sync for '{log_file}' completed with status: {result.get('status')}")
             return result
         except Exception as e:
-            logger.error(f"Error syncing tracking log to GDrive for '{app_name}': {e}", exc_info=True)
-            raise RuntimeError(f"Error syncing tracking log to GDrive for '{app_name}': {e}")
+            logger.error(f"Error syncing tracking log to GDrive for '{game_or_path}': {e}", exc_info=True)
+            raise RuntimeError(f"Error syncing tracking log to GDrive for '{game_or_path}': {e}")
 
 
-    def start_gdrive_sync(self, app_name: str):
+    def start_gdrive_sync(self, game_or_path):
         """
         Runs the tracking-log Gdrive sync for `app_name` in a background thread
         """
+        worker_key = getattr(game_or_path, "name", str(game_or_path))
+
         # Prevent launching duplicate threads for the same app
-        if app_name in self._gdrive_sync_workers:
+        if worker_key in self._gdrive_sync_workers:
             logger.warning(f"Tracking sync already in progress for '{app_name}'. Skipping duplicate request.")
             return
  
-        worker = TrackingSyncWorker(app_name)
+        worker = TrackingSyncWorker(game_or_path)
         worker.sync_succeeded.connect(self._on_gdrive_sync_succeeded)
         worker.sync_failed.connect(self._on_gdrive_sync_failed)
-        worker.finished.connect(lambda: self._gdrive_sync_workers.pop(app_name, None))
+        worker.finished.connect(lambda: self._gdrive_sync_workers.pop(worker_key, None))
  
-        self._gdrive_sync_workers[app_name] = worker
+        self._gdrive_sync_workers[worker_key] = worker
         worker.start()
  
-    def _on_gdrive_sync_succeeded(self, app_name: str, result: dict):
-        logger.info(f"Tracking sync completed for '{app_name}': {result.get('status')}")
-        self.gdrive_sync_succeeded.emit(app_name, result)
+    def _on_gdrive_sync_succeeded(self, game_or_path, result: dict):
+        logger.info(f"Tracking sync completed for '{game_or_path}': {result.get('status')}")
+        self.gdrive_sync_succeeded.emit(game_or_path, result)
  
-    def _on_gdrive_sync_failed(self, app_name: str, error_message: str):
-        self.gdrive_sync_failed.emit(app_name, error_message)
+    def _on_gdrive_sync_failed(self, game_or_path, error_message: str):
+        self.gdrive_sync_failed.emit(game_or_path, error_message)
 
 
 class TrackingSyncWorker(QThread):
     """Runs LogManager.sync_tracking_to_gdrive() in a background thread."""
-    sync_succeeded = Signal(str, dict)
-    sync_failed = Signal(str, str)
+    sync_succeeded = Signal(object, dict)
+    sync_failed = Signal(object, str)
  
-    def __init__(self, app_name: str):
+    def __init__(self, game_or_path):
         super().__init__()
-        self.app_name = app_name
+        self.game_or_path = game_or_path
  
     def run(self):
         try:
             manager = LogManager()
-            result = manager.sync_tracking_to_gdrive(self.app_name)
-            self.sync_succeeded.emit(self.app_name, result)
+            result = manager.sync_tracking_to_gdrive(self.game_or_path)
+            self.sync_succeeded.emit(self.game_or_path, result)
         except Exception as e:
-            logger.error(f"Error syncing tracking log to GDrive for '{self.app_name}': {e}", exc_info=True)
-            self.sync_failed.emit(self.app_name, str(e))
+            logger.error(f"Error syncing tracking log to GDrive for '{self.game_or_path}': {e}", exc_info=True)
+            self.sync_failed.emit(self.game_or_path, str(e))
