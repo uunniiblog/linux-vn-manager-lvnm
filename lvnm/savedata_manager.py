@@ -213,6 +213,11 @@ class SavedataManager(QObject):
         game_og_name = game_data.get("ogtitle", "")
         game_path = game_data.get("path", "")
         prefix_name = game_data.get("prefix", "")
+        prefix_info = PrefixManager.get_prefix_info(prefix_name)
+
+        if not prefix_info:
+            logging.warning(f"Prefix '{prefix_name}' not found for '{game_name}'. Cannot search prefix.")
+            return None
 
         if not game_path:
             logging.warning(f"No game path set for '{game_name}'. Cannot auto-detect savedata.")
@@ -231,11 +236,6 @@ class SavedataManager(QObject):
                     return str(child)
 
         # Search inside the prefix
-        prefix_info = PrefixManager.get_prefix_info(prefix_name)
-        if not prefix_info:
-            logging.warning(f"Prefix '{prefix_name}' not found for '{game_name}'. Cannot search prefix.")
-            return None
-
         prefix_path = Path(prefix_info.get("path", ""))
         if not prefix_path.exists():
             logging.warning(f"Prefix path does not exist: {prefix_path}")
