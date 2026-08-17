@@ -704,7 +704,7 @@ class GameSidebar(QFrame):
             dialog.setDirectory(current_path.strip())
         
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter(self.tr("All Files (*);;Executables (*.exe *.sh *.bin)"))
+        dialog.setNameFilter(self.tr("All Files (*)"))
         dialog.setViewMode(QFileDialog.Detail)
 
         if dialog.exec():

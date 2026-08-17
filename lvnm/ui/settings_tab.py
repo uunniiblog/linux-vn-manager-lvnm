@@ -578,6 +578,12 @@ class SettingsTab(QWidget):
                 self.tr("/path/to/rpcs3.AppImage or rpcs3"),
             ),
             (
+                self.tr("PSP"),
+                config.USER_CONF_EMULATION_PSP_PATH,
+                config.USER_CONF_EMULATION_PSP_CONFIG,
+                self.tr("/path/to/emulator.AppImage or process"),
+            ),
+            (
                 self.tr("Switch"),
                 config.USER_CONF_EMULATION_SWITCH_PATH,
                 config.USER_CONF_EMULATION_SWITCH_CONFIG,

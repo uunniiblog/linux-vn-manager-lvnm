@@ -213,6 +213,8 @@ USER_CONF_EMULATION_PS2_PATH = "ps2_path"
 USER_CONF_EMULATION_PS2_CONFIG = "ps2_config"
 USER_CONF_EMULATION_PS3_PATH = "ps3_path"
 USER_CONF_EMULATION_PS3_CONFIG = "ps3_config"
+USER_CONF_EMULATION_PSP_PATH = "psp_path"
+USER_CONF_EMULATION_PSP_CONFIG = "psp_config"
 USER_CONF_EMULATION_SWITCH_PATH = "switch_path"
 USER_CONF_EMULATION_SWITCH_CONFIG = "switch_config"
 
@@ -220,6 +222,7 @@ USER_CONF_EMULATION_SWITCH_CONFIG = "switch_config"
 EMULATION_PSX = "emulation-psx"
 EMULATION_PS2 = "emulation-ps2"
 EMULATION_PS3 = "emulation-ps3"
+EMULATION_PSP = "emulation-psp"
 EMULATION_SWITCH = "emulation-switch"
 
 # Available UI languages ("" = follow system locale)
