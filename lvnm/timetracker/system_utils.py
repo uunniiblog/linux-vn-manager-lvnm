@@ -1,5 +1,6 @@
 import subprocess
 import os
+import re
 import ntpath
 import shutil
 import time
@@ -116,6 +117,26 @@ class SystemUtils:
             return raw.replace(b'\x00', b' ').decode('utf-8', errors='surrogateescape')
         except:
             return ""
+
+    @staticmethod
+    def get_pids_by_name(process_name, cmdline_hint=None):
+        """Returns ALL pids matching the search pattern"""
+        filename = os.path.basename(process_name).lower()
+        my_pid = str(os.getpid())
+        pattern = cmdline_hint.lower() if cmdline_hint else filename
+        pattern = re.escape(pattern)
+        logger.debug(f"get_pids_by_name pattern: {pattern} (hint={cmdline_hint}, filename={filename})")
+        try:
+            output = subprocess.check_output(["pgrep", "-f", "-i", pattern], text=True, env={**os.environ, "LC_ALL": "C.UTF-8"})
+            pids = output.strip().splitlines()
+            valid_pids = [p for p in pids if p != my_pid]
+            return valid_pids
+        except subprocess.CalledProcessError:
+            logger.error(f"pgrep failed for {pattern}.")
+            return []
+        except Exception as e:
+            logger.error(f"Error finding PIDs for {pattern}: {e}")
+            return []
 
     @staticmethod
     def get_app_name_from_pid(pid):

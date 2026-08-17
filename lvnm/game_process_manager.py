@@ -69,7 +69,7 @@ class GameProcessManager(QObject):
 
                 # Initialize Time tracking if enabled
                 if timetracker_settings.get("timetracking", False) and timetracker_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False):
-                    self.start_timetracker(name, game_card.path, timetracker_settings)
+                    self.start_timetracker(name, game_card, timetracker_settings)
 
                 # Notify the UI
                 self.game_started.emit(name)
@@ -91,7 +91,7 @@ class GameProcessManager(QObject):
             )
             runner.stop(prefix_count)
 
-    def start_timetracker(self, name: str, exe_path: str, timetracker_settings: dict) -> TrackingController:
+    def start_timetracker(self, name: str, game_card, timetracker_settings: dict) -> TrackingController:
         """Creates a tracker manually if one doesn't exist."""
         if name in self.active_trackers:
             return self.active_trackers[name]
@@ -99,7 +99,16 @@ class GameProcessManager(QObject):
         save_interval = timetracker_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 0)
         afk_timer = timetracker_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)
         
-        tracking = TrackingController(None, exe_path, save_interval=save_interval, afk_timer=afk_timer)
+        runner = self.active_runners.get(name)
+        is_emulated = bool(runner and runner.prefix_info.get("type", "").startswith("emulation-"))
+
+        if is_emulated:
+            # The tracked OS process is the emulator binary in this case
+            emulator_path = runner.prefix_info["path"]
+            log_name = runner.prefix_info["type"] + "_" + name
+            tracking = TrackingController(None, emulator_path, save_interval=save_interval, afk_timer=afk_timer, emulator_hint=game_card.path, log_name=log_name)
+        else:
+            tracking = TrackingController(None, game_card.path, save_interval=save_interval, afk_timer=afk_timer)
         
         # Route tracking stats to signal
         tracking.stats_received.connect(lambda stats, n=name: self.tracking_updated.emit(n, stats))

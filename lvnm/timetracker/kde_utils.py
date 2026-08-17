@@ -144,15 +144,25 @@ class KdeUtils(DesktopUtilsInterface):
 
     def find_window_by_pid(self, target_pid, target_process_path):
         """
-        Returns (window_id, window_title) for a specific PID and process path.
+        Returns (window_id, window_title) for a specific PID or 
+        an iterable of candidate PIDs.
         """
         self._refresh_cache()
-        target_pid = str(target_pid)
+
+        if isinstance(target_pid, (list, set, tuple)):
+            target_pids = {str(p) for p in target_pid}
+        else:
+            target_pids = {str(target_pid)}
+
         filename = os.path.basename(target_process_path).lower()
-        
-        # Games opened by wine or proton have one of these three classes given by kwin
+
+        # Direct PID match for all windows
+        for wid, info in self._window_cache.items():
+            if str(info.get('pid')) in target_pids:
+                return wid, info.get('name')
+
+        # Old Fallback for wrappers
         trusted_classes = ['gamescope', 'steam_app_default', filename]
-        
         candidates = [
             (wid, info) for wid, info in self._window_cache.items()
             if info.get('class', '').lower() in trusted_classes 
@@ -160,16 +170,8 @@ class KdeUtils(DesktopUtilsInterface):
             or info.get('class', '').lower().endswith('.exe')
         ]
 
-        # Double check in our list in case of multiple games
         for wid, info in candidates:
             w_pid = str(info.get('pid'))
-            
-            # First check directly by pid
-            if w_pid == target_pid:
-                return wid, info.get('name')
-
-            # Second check for gamescope/wrappers
-            # If gamescope wrapper check by cmdline since gamescope passes the path of the game as argument
             w_cmdline = TimeTrackUtils.get_full_cmdline(w_pid)
             if filename in w_cmdline.lower():
                 logger.debug(f"Validated {filename} inside wrapper {info.get('class')}")

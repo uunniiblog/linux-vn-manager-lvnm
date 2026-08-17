@@ -85,7 +85,11 @@ class X11Utils(DesktopUtilsInterface):
         Returns (window_id, window_title) for a specific PID and process path.
         Includes handling for Gamescope/Wine/Proton wrappers.
         """
-        target_pid = str(target_pid)
+        if isinstance(target_pid, (list, set, tuple)):
+            target_pids = {str(p) for p in target_pid}
+        else:
+            target_pids = {str(target_pid)}
+
         filename = os.path.basename(target_process_path).lower()
         all_ids = self.get_all_window_ids()
 
@@ -96,7 +100,7 @@ class X11Utils(DesktopUtilsInterface):
             logger.debug(f"{wid} - {w_pid} - {w_name}")
 
             # First check directly by pid
-            if w_pid == target_pid:
+            if w_pid in target_pids:
                 return wid, w_name
 
             # Second check for gamescope/wrappers via cmdline

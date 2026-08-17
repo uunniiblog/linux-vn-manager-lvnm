@@ -41,7 +41,6 @@ class GameSidebar(QFrame):
         self.current_game: Optional[GameCard] = None
         self.prefixes = None
         self.is_running = None
-        self.runner = None
         self.active_controller = None
         self._pending_pipeline = None
         self._pending_savedata_name = None
@@ -1051,7 +1050,7 @@ class GameSidebar(QFrame):
         # Create a tracker when there isn't one for the game
         if not tracker or not tracker.tracker:
             logger.warning(f"No active tracker found for {name}. Creating one.")
-            tracker = self.process_manager.start_timetracker(name, self.current_game.path, self.timetracker_settings)
+            tracker = self.process_manager.start_timetracker(name, self.current_game, self.timetracker_settings)
 
         dialog = TimetrackerDialog(tracker.tracker)
         result = dialog.exec()

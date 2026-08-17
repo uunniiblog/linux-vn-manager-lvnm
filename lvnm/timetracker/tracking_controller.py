@@ -9,16 +9,25 @@ logger = logging.getLogger(__name__)
 class TrackingController(QObject):
     stats_received = Signal(dict)
 
-    def __init__(self, main_window, process_path, save_interval=3, afk_timer=0):
+    def __init__(self, main_window, process_path, save_interval=3, afk_timer=0, emulator_hint=None, log_name=None):
         super().__init__()
         self.window = main_window # TODO: maybe raise visual error if tracking failed
         self.tracker = TrackerService()
         self.auto_timer = None
         self.target_process = os.path.basename(process_path)
-        self.log_file_name = f"{os.path.basename(process_path)}_{os.path.getsize(process_path)}"
         self.save_interval = save_interval
         self.afk_timer = afk_timer
         self.launch_attemps = 0
+        # For emulated games, process path points to the emulator's binary
+        self.emulator_hint = emulator_hint
+
+        # For windows games use the process + file size
+        # For emulated games platform + entry name
+        if log_name:
+            self.log_file_name = log_name
+        else:
+            self.log_file_name = f"{os.path.basename(process_path)}_{os.path.getsize(process_path)}"
+
 
     def start_auto_tracking(self):
         logger.info(f"Auto-tracking enabled for: {self.target_process}")
@@ -39,17 +48,16 @@ class TrackingController(QObject):
         logger.debug(f"_attempt_auto_launch {self.launch_attemps}/20...")
         
         utils = self.tracker.desktop_utils
-        pid = SystemUtils.get_pid_by_name(self.target_process)
+        pids = SystemUtils.get_pids_by_name(self.target_process, cmdline_hint=self.emulator_hint)
         
-        if not pid:
+        if not pids:
             logger.warning(f"PID not found. Attempt {self.launch_attemps}/20...")
             return 
 
-        logger.debug(f"Detected PID: {pid}. Looking for Window ID...")
+        logger.debug(f"Detected PIDs: {pids}. Looking for Window ID...")
         
-        wid, title = utils.find_window_by_pid(pid, self.target_process)
+        wid, title = utils.find_window_by_pid(pids, self.target_process)
         logger.debug(f"wid {wid}, title {title}")
-
         
         if title and wid:
             self.auto_timer.stop()

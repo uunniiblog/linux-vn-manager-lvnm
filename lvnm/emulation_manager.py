@@ -13,7 +13,6 @@ EMULATOR_DEFINITIONS = [
     ("Switch", config.USER_CONF_EMULATION_SWITCH_PATH, config.USER_CONF_EMULATION_SWITCH_CONFIG, config.EMULATION_SWITCH),
 ]
 
-
 class EmulationManager:
     """Create fake virtual prefixes for any emulator that has a path configured in Settings."""
 
