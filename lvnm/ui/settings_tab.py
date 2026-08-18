@@ -148,7 +148,7 @@ class SettingsTab(QWidget):
                     "Requires an app restart to take effect.")
         )
 
-        self.log_wine_traces = QCheckBox(self.tr("Show Wine logs in application logs"))
+        self.log_wine_traces = QCheckBox(self.tr("Show game logs in application logs"))
         self.log_wine_traces.setChecked(self.user_settings.get(config.USER_CONF_LOGS_WINE, True))
         self.log_wine_traces.setToolTip(
             self.tr("Show Wine logs in system logs and write to file if enabled.\nRegardless of this setting you can right click show logs for any game.")

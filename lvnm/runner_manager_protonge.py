@@ -49,13 +49,15 @@ class RunnerManagerProtonGE(RunnerManagerInterface):
         if not data:
             raise ValueError(f"No data found in {url}")
 
-        # GE asset is simply {tag}.tar.gz
-        target_name = f"{tag}.tar.gz"
         assets = {a["name"]: a for a in data.get("assets", [])}
 
-        if target_name not in assets:
-            logger.error(f"Could not find {target_name} in release assets.")
-            raise ValueError(f"Could not find {target_name} in release assets.")
+        # Newer GE-Proton releases (11-4+) add suffix x86_64
+        candidate_names = [f"{tag}-x86_64.tar.gz", f"{tag}.tar.gz"]
+        target_name = next((name for name in candidate_names if name in assets), None)
+
+        if not target_name:
+            logger.error(f"Could not find a x86_64 tarball for {tag} in release assets. Tried: {candidate_names}")
+            raise ValueError(f"Could not find a downloadable tar.gz for {tag} in release assets.")
 
         target_asset = assets[target_name]
         download_url = target_asset["browser_download_url"]
