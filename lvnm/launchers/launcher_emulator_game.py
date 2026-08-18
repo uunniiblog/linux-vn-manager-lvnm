@@ -33,13 +33,31 @@ class LauncherEmulatorGame(LauncherBaseGame):
         self.cmd = [emulator_path] + extra_args + [self.game.path]
         self.game_dir = str(Path(emulator_path).parent)
 
+        # Apply game arguments
+        self.cmd = self.apply_game_arguments(self.cmd)
+        # Apply pre launch arguments
+        self.cmd = self.apply_pre_launch_args(self.cmd)
+        # Apply Gamescope Wrapper
         self.cmd = self.apply_gamescope(self.cmd)
 
     def run(self, is_headless=False):
         self.load_data()
         self.prepare_environment()
+
+        # Script
+        if self.game.pre_launch_script_wait and self.game.pre_launch_script.strip():
+            self._wait_for_process_then_run_script(self.game.pre_launch_script.strip(), os.path.basename(self.prefix_info["path"]), cmdline_hint=self.game.path)
+        elif self.game.pre_launch_script.strip():
+            self.run_external_script(self.game.pre_launch_script.strip())
+
+        # Run game
         self._log_run_command()
         self.process = ExecutionManager.run(self.cmd, self.env, wait=False,cwd=self.game_dir, log_callback=self._add_log_line,detached=not is_headless)
+
+        # Apply linux-rt-upscaler
+        if self.settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False) and self.game.rtUpscaler.enabled == "true":
+            self._launch_linux_rt_upscaler(os.path.basename(self.prefix_info["path"]), cmdline_hint=self.game.path)
+
         return True
 
     def is_running(self):

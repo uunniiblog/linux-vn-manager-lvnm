@@ -3,21 +3,11 @@ import signal
 import json
 import config
 import subprocess
-import shutil
-import shlex
-import threading
-import time
 import logging
 from pathlib import Path
-from datetime import datetime
-from collections import deque
 from model.game_card import GameCard, GameScope
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
-from settings_manager import SettingsManager
-from timetracker.utils_factory import get_desktop_utils
-from timetracker.system_utils import SystemUtils as TimeTrackUtils
-from timetracker.x11_utils import X11Utils
 from launchers.launcher_base_game import LauncherBaseGame
 
 logger = logging.getLogger(__name__)
@@ -28,7 +18,6 @@ class LauncherWineGame(LauncherBaseGame):
 
     def __init__(self, name: str, card_override: GameCard = None, is_steam=False):
         super().__init__(name, card_override)
-        self.settings = SettingsManager()
         self.is_steam = is_steam
         self.umu_path = None
         self.is_proton = False
@@ -79,20 +68,12 @@ class LauncherWineGame(LauncherBaseGame):
         if not self.cmd:
             raise RuntimeError("Failed to build launch command.")
 
-        if self.game.arguments.strip():
-            extra_args = shlex.split(self.game.arguments.strip(), posix=False)
-            self.cmd += extra_args
-
+        # Apply game arguments
+        self.cmd = self.apply_game_arguments(self.cmd)
         # Apply pre launch arguments
-        if self.game.pre_launch_args.strip():
-            # self.cmd = [self.game.pre_launch_args.strip()] + self.cmd
-            pre_args = shlex.split(self.game.pre_launch_args.strip())
-            self.cmd = pre_args + self.cmd
-
+        self.cmd = self.apply_pre_launch_args(self.cmd)
         # Apply Gamescope Wrapper
-        if self.game.gamescope.enabled.lower() == "true":
-            gs_params = self.game.gamescope.parameters.split()
-            self.cmd = ["gamescope"] + gs_params + ["--"] + self.cmd
+        self.cmd = self.apply_gamescope(self.cmd)
 
     def run_in_prefix(self, exe_path: str, prefix_name: str):
         """
@@ -258,7 +239,7 @@ class LauncherWineGame(LauncherBaseGame):
             raise RuntimeError(f"Preparation failed: {e}")
 
         if self.game.pre_launch_script_wait and self.game.pre_launch_script.strip():
-            self._wait_for_game_then_run_script(self.game.pre_launch_script.strip())
+            self._wait_for_process_then_run_script(self.game.pre_launch_script.strip(), os.path.basename(self.game.path))
         elif self.game.pre_launch_script.strip():
             self.run_external_script(self.game.pre_launch_script.strip())
 
@@ -268,7 +249,7 @@ class LauncherWineGame(LauncherBaseGame):
 
         # Apply linux-rt-upscaler
         if self.settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False) and self.game.rtUpscaler.enabled == "true":
-            self._launch_linux_rt_upscaler()
+            self._launch_linux_rt_upscaler(os.path.basename(self.game.path))
 
         return True
 
@@ -480,67 +461,6 @@ class LauncherWineGame(LauncherBaseGame):
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
             raise RuntimeError(f"Failed to open terminal: {e}")
-
-    def _wait_for_game_then_run_script(self, script_path: str):
-        """
-        Spawns a background thread that polls until the game window is detected before calling run_external_script
-        20 attemps to grab the pid and window id. If wayland game and x11 utils then use /proc fallback
-        """
-        utils = get_desktop_utils()
-        process = os.path.basename(self.game.path)
-        is_proton_wayland = self.env.get("PROTON_ENABLE_WAYLAND") == "1"
-        def _is_game_running_poll():
-            max_attempts = 20
-            for attempt in range(1, max_attempts + 1):
-                logger.info(f"_wait_for_game_then_run_script: Waiting for game process... attempt {attempt}/{max_attempts}")
-                if is_proton_wayland and isinstance(utils, X11Utils):
-                    if self.is_running():
-                        logger.info(f"_wait_for_game_then_run_script: Game process detected after {attempt} attempt(s).")
-                        time.sleep(2)
-                        self.run_external_script(script_path)
-                        return
-                else:
-                    pid = TimeTrackUtils.get_pid_by_name(process)
-                    if pid:
-                        wid, title = utils.find_window_by_pid(pid, process)
-                        if wid and title:
-                            logger.info(f"_wait_for_game_then_run_script: Window detected  '{title}' (WID: {wid}). after {attempt} attempt(s). Launching script.")
-                            # headroom
-                            time.sleep(0.5)                        
-                            self.run_external_script(script_path)
-                            return
-
-                time.sleep(2)
-            logger.error(f"_wait_for_game_then_run_script: Game process not found after {max_attempts} attempts. Script NOT launched.")
-
-        t = threading.Thread(target=_is_game_running_poll, daemon=True, name="pre_launch_script_wait")
-        t.start()
-
-    def _launch_linux_rt_upscaler(self):
-        """Wait for game to open and runs rt_linux_upscaler over the window title of the game"""
-        logger.debug("_launch_linux_rt_upscaler")
-        utils = get_desktop_utils()
-        process = os.path.basename(self.game.path)
-        upscale_params = self.game.rtUpscaler.parameters
-        
-        def _is_game_running_poll():
-            max_attempts = 20
-            for attempt in range(1, max_attempts + 1):
-                logger.info(f"_launch_linux_rt_upscaler: Waiting for game process... attempt {attempt}/{max_attempts}")
-                pid = TimeTrackUtils.get_pid_by_name(process)
-                if pid:
-                    wid, title = utils.find_window_by_pid(pid, process)
-                    if wid and title:
-                        cmd = ["upscale", "-t", title, "--target-delay", "1"] + shlex.split(upscale_params)
-                        logger.info(f"_launch_linux_rt_upscaler: Window detected  '{title}' (WID: {wid}). after {attempt} attempt(s). Launching linux-rt-upscaler: {shlex.join(cmd)}.")
-                        ExecutionManager.run_detached(cmd, self.env, cwd=self.game_dir, suppress_stdout=False)
-                        return
-
-                time.sleep(2)
-            logger.error(f"_launch_linux_rt_upscaler: Game process not found after {max_attempts} attempts. linux-rt-upscaler NOT launched.")
-
-        t = threading.Thread(target=_is_game_running_poll, daemon=True, name="launch_linux_rt_upscaler")
-        t.start()
     
     def scrub_appimage_environment(self):
         """Remove APPIMAGE ENVIRONMENT when running a game"""
