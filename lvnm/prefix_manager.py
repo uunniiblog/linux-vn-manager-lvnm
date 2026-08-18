@@ -14,6 +14,7 @@ from model.prefix import Prefix
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
 from settings_manager import SettingsManager
+from emulation_manager import EmulationManager
 
 logger = logging.getLogger(__name__)
 
@@ -600,3 +601,19 @@ class PrefixManager:
 
         except Exception as e:
             logger.error(f"Failed to relocate metadata paths: {e}")
+
+    @staticmethod
+    def get_all_prefixes() -> dict:
+        """Real wine/proton prefixes plus virtual emulator prefixes merged."""
+        reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))
+        return {**reversed_prefixes, **EmulationManager.get_virtual_prefixes()}
+
+    @staticmethod
+    def get_prefix_type(prefix_name: str) -> str | None:
+        """Resolves a prefix name to its type real or virtual."""
+        return PrefixManager.get_all_prefixes().get(prefix_name, {}).get("type")
+
+    @staticmethod
+    def is_wine_game(game_card) -> bool:
+        """True if this game's prefix is an actual wine/proton prefix."""
+        return PrefixManager.get_prefix_type(game_card.prefix) in ("wine", "proton")

@@ -14,6 +14,8 @@ EMULATOR_DEFINITIONS = [
     ("Switch", config.USER_CONF_EMULATION_SWITCH_PATH, config.USER_CONF_EMULATION_SWITCH_CONFIG, config.EMULATION_SWITCH),
 ]
 
+EMULATOR_DISPLAY_NAMES = frozenset(display_name for display_name, _, _, _ in EMULATOR_DEFINITIONS)
+
 class EmulationManager:
     """Create fake virtual prefixes for any emulator that has a path configured in Settings."""
 
@@ -45,4 +47,9 @@ class EmulationManager:
     @staticmethod
     def get_emulator_prefixes() -> list[str]:
         """Returns a list of display names ['PSX', 'PS2', 'PS3', 'PSP', 'Switch']."""
-        return [display_name for display_name, _, _, _ in EMULATOR_DEFINITIONS]
+        return list(EMULATOR_DISPLAY_NAMES)
+    
+    @staticmethod
+    def is_emulated_game(game_card) -> bool:
+        """Unused: True if this game's prefix is a virtual emulator prefix"""
+        return game_card.prefix in EMULATOR_DISPLAY_NAMES

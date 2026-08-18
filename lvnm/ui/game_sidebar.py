@@ -20,7 +20,6 @@ from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
 from savedata_manager import SavedataManager
 from game_process_manager import GameProcessManager
-from emulation_manager import EmulationManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
@@ -964,8 +963,7 @@ class GameSidebar(QFrame):
             
     def _get_all_prefixes(self) -> dict:
         """Real wine/proton prefixes plus any configured emulator 'virtual' prefixes."""
-        reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))
-        return {**reversed_prefixes, **EmulationManager.get_virtual_prefixes()}
+        return PrefixManager.get_all_prefixes()
 
     def refresh_prefix_combo(self):
         """Refreshes the prefix list and retains the current selection."""        

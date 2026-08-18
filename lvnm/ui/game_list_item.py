@@ -12,6 +12,7 @@ from game_manager import GameManager
 from system_utils import SystemUtils
 from game_process_manager import GameProcessManager
 from launchers.launcher_wine_game import LauncherWineGame
+from prefix_manager import PrefixManager
 from timetracker.log_manager import LogManager
 from settings_manager import SettingsManager
 
@@ -176,15 +177,17 @@ class GameListItem(QWidget):
         """Creates and shows the right-click menu"""
         menu = QMenu(self)
 
+        is_wine = PrefixManager.is_wine_game(self.game_card)
         th_settings = self.user_settings.get(config.USER_CONF_TEXTHOOKER, {})
+        is_running = self.process_manager.is_game_running(self.game_card.name)
         
-        is_running = self.process_manager.is_game_running(self.game_card.name)        
         if is_running:
             act_run_stop = menu.addAction(self.tr("Stop Game"))
         else:
             act_run_stop = menu.addAction(self.tr("Run Game"))
 
-        if th_settings.get("enabled", False):
+        act_texthook = None
+        if th_settings.get("enabled", False) and is_wine:
             act_texthook = menu.addAction(self.tr("Open texthooker"))
 
         act_log = menu.addAction(self.tr("Show Logs"))
@@ -210,13 +213,16 @@ class GameListItem(QWidget):
         act_add_label = label_menu.addAction(self.tr("Add new label..."))
 
         menu.addSeparator()
+        act_regedit = act_winecfg = act_winefile = act_cmd = act_bash = None
+        if is_wine:
+            wine_menu = menu.addMenu(self.tr("Wine Features"))
+            act_regedit = wine_menu.addAction(self.tr("Open Regedit"))
+            act_winecfg = wine_menu.addAction(self.tr("Open Winecfg"))
+            act_winefile = wine_menu.addAction(self.tr("Open Winefile"))
+            act_cmd = wine_menu.addAction(self.tr("Open windows cmd"))
+            act_bash = wine_menu.addAction(self.tr("Open Bash Terminal"))
+            menu.addSeparator()
 
-        act_regedit = menu.addAction(self.tr("Open Regedit"))
-        act_winecfg = menu.addAction(self.tr("Open Winecfg"))
-        act_winefile = menu.addAction(self.tr("Open Winefile"))
-        act_cmd = menu.addAction(self.tr("Open windows cmd"))
-        act_bash = menu.addAction(self.tr("Open Bash Terminal"))
-        menu.addSeparator()
         act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
         act_steam = menu.addAction(self.tr("Steam Shortcut"))
         menu.addSeparator()
@@ -225,6 +231,8 @@ class GameListItem(QWidget):
         act_del = menu.addAction(self.tr("Delete"))
 
         action = menu.exec(event.globalPos())
+        if action is None:
+            return
 
         if action == act_run_stop:
             if is_running:
@@ -232,7 +240,7 @@ class GameListItem(QWidget):
             else:
                 self.requestRun.emit(self.game_card)
 
-        elif th_settings.get("enabled", False) and action == act_texthook:
+        elif action == act_texthook:
             self.open_texthooker(th_settings.get("path"))
         
         elif action == act_log:
