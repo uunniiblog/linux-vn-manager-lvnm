@@ -38,6 +38,8 @@ It bundles umu and winetricks so it runs smoothly in the Steam Deck.
 
 Check Settings tab to enable optional stuff like timetracking, gdrive sync, automatic fonts, etc.
 
+For emulated games add the appimage or cli command to launch for each emulator platform in settings, and then select the platform in the prefix combo, details: https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki/Emulation
+
 For a complete list of all options in the application check the wiki: https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki#how-to-use
 
 ## Import games
