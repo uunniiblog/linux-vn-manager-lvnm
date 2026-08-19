@@ -6,6 +6,7 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
  - Run VNs or any games with proton and wine.
  - Download proton-ge and wine (normal and wow64 builds) runners directly from the application.
  - Create and manage prefixes with video codecs and winetricks easily from interface.
+ - Emulated games for some platforms.
  - Game management to test games easily in all diferent prefixes with useful environment variables for VNs.
  - Real time tracking support to have an accurate play count (Check Timetracking section for details).
  - VNDB and SteamgridDB api integration to get covers images, hero layouts and direct links.
@@ -184,7 +185,7 @@ To log in in a Steam Deck if you don't want to log in with your google's account
 
 ## Planned
 - New UI toggle for handheld/tv mode with controller support. I believe there isn't a pure pyside6 library to help with this though, so probably will take a while.
-- Native games and emulators: I want to get this working too at some point.
+- Native games and ~~emulators~~ (Emulators kinda works now): I want to get this working too at some point.
 - Any suggestion or bugs feel free to open an issue.
 
 ## Tools and Credits
