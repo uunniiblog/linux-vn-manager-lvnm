@@ -6,10 +6,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings, QByteArray
 import config
 from ui.game_tab import GameTab
-from ui.prefix_tab import PrefixTab
-from ui.runner_tab import RunnerTab
-from ui.stats_tab import StatsTab
-from ui.settings_tab import SettingsTab
 from ui.theme_manager import ThemeManager
 
 class MainWindow(QMainWindow):
@@ -101,12 +97,16 @@ class MainWindow(QMainWindow):
             if index == 0:
                 new_tab = GameTab()
             elif index == 1:
+                from ui.prefix_tab import PrefixTab
                 new_tab = PrefixTab()
             elif index == 2:
+                from ui.runner_tab import RunnerTab
                 new_tab = RunnerTab()
             elif index == 3:
+                from ui.stats_tab import StatsTab
                 new_tab = StatsTab(self.theme_manager)
             elif index == 4:
+                from ui.settings_tab import SettingsTab
                 new_tab = SettingsTab(self.theme_manager)
 
             if new_tab:

@@ -6,14 +6,13 @@ import setproctitle
 import ssl
 import certifi
 from logging_manager import setup_logging
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTranslator, QLocale
+from PySide6.QtCore import Qt, QTimer, QTranslator, QLocale
 import config
 from ui.main_window import MainWindow
 from system_utils import SystemUtils
 from cli_handler import CliHandler
-from cli_controller import CliController
+#from cli_controller import CliController
 from settings_manager import SettingsManager
 
 
@@ -69,10 +68,11 @@ def main():
 
     # Launch UI
     if len(sys.argv) == 1:
-        SystemUtils.print_diagnostic_report()
         window = MainWindow()
         window.show()
+        QTimer.singleShot(0, SystemUtils.print_diagnostic_report)
     else:
+        from cli_controller import CliController
         controller = CliController()
         controller.handle_args(args)
     

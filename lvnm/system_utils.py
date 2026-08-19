@@ -241,37 +241,38 @@ class SystemUtils:
     @staticmethod
     def print_diagnostic_report():
         """Helper to print a nicely formatted console report."""
-        logger.debug("="*50)
-        logger.debug(" LVNM SYSTEM DIAGNOSTICS")
-        logger.debug("="*50)
-        sys_info = SystemUtils.get_system_info()
-        logger.debug("--- System Information ---")
-        logger.debug(f"App Version : {sys_info['app_version']}")
-        logger.debug(f"OS          : {sys_info['os']}")
-        logger.debug(f"Kernel      : {sys_info['kernel']}")
-        logger.debug(f"Desktop     : {sys_info['desktop_environment']} ({sys_info['session_type']})")
-        logger.debug(f"CPU         : {sys_info['cpu']}")
-        logger.debug(f"GPU         : {sys_info['gpu']}")
+        if SettingsManager().get(config.USER_CONF_LOG_LEVEL, "INFO").upper() == "DEBUG":
+            logger.debug("="*50)
+            logger.debug(" LVNM SYSTEM DIAGNOSTICS")
+            logger.debug("="*50)
+            sys_info = SystemUtils.get_system_info()
+            logger.debug("--- System Information ---")
+            logger.debug(f"App Version : {sys_info['app_version']}")
+            logger.debug(f"OS          : {sys_info['os']}")
+            logger.debug(f"Kernel      : {sys_info['kernel']}")
+            logger.debug(f"Desktop     : {sys_info['desktop_environment']} ({sys_info['session_type']})")
+            logger.debug(f"CPU         : {sys_info['cpu']}")
+            logger.debug(f"GPU         : {sys_info['gpu']}")
 
-        software = SystemUtils.get_software_support()
-        logger.debug("--- Software & Compatibility ---")
+            software = SystemUtils.get_software_support()
+            logger.debug("--- Software & Compatibility ---")
 
-        gamescope_ver = f" (v{software['gamescope_version']})" if software.get('gamescope_version') else ""
-        upscale_ver = f" (v{software['upscale_version']})" if software.get('upscale_version') else ""
-        umu_ver = f" (v{software['umu_run_version']})" if software.get('umu_run_version') else ""
-        winetricks_ver = f" (v{software['winetricks_version']})" if software.get('winetricks_version') else ""
+            gamescope_ver = f" (v{software['gamescope_version']})" if software.get('gamescope_version') else ""
+            upscale_ver = f" (v{software['upscale_version']})" if software.get('upscale_version') else ""
+            umu_ver = f" (v{software['umu_run_version']})" if software.get('umu_run_version') else ""
+            winetricks_ver = f" (v{software['winetricks_version']})" if software.get('winetricks_version') else ""
 
-        logger.debug(f"Vulkan Support       : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
-        logger.debug(f"Gamescope            : {'✅ Installed' if software['gamescope'] else '❌ Missing'}{gamescope_ver}")
-        logger.debug(f"linux-rt-upscaler    : {'✅ Installed' if software['upscale'] else '❌ Missing'}{upscale_ver}")
-        logger.debug(f"Umu-run              : {'✅ Installed' if software['umu_run'] else '❌ Missing'}{umu_ver}")
-        logger.debug(f"Winetricks           : {'✅ Installed' if software['winetricks'] else '❌ Missing'}{winetricks_ver}")
+            logger.debug(f"Vulkan Support       : {'✅ Yes' if software['vulkan_support'] else '❌ No'}")
+            logger.debug(f"Gamescope            : {'✅ Installed' if software['gamescope'] else '❌ Missing'}{gamescope_ver}")
+            logger.debug(f"linux-rt-upscaler    : {'✅ Installed' if software['upscale'] else '❌ Missing'}{upscale_ver}")
+            logger.debug(f"Umu-run              : {'✅ Installed' if software['umu_run'] else '❌ Missing'}{umu_ver}")
+            logger.debug(f"Winetricks           : {'✅ Installed' if software['winetricks'] else '❌ Missing'}{winetricks_ver}")
 
-        logger.debug("--- GStreamer Packages ---")
-        for pkg, installed in software['gstreamer_packages'].items():
-            status = "✅" if installed else "❌"
-            logger.debug(f"{status} {pkg}")
-        logger.debug("="*50)
+            logger.debug("--- GStreamer Packages ---")
+            for pkg, installed in software['gstreamer_packages'].items():
+                status = "✅" if installed else "❌"
+                logger.debug(f"{status} {pkg}")
+            logger.debug("="*50)
 
     @staticmethod
     def get_latest_release_info() -> tuple[str, str]:
