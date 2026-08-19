@@ -4,22 +4,22 @@
 <context>
     <name>AddLabelDialog</name>
     <message>
-        <location filename="../ui/game_list_item.py" line="499"/>
+        <location filename="../ui/game_list_item.py" line="507"/>
         <source>Add New Label</source>
         <translation>Add New Label</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="506"/>
+        <location filename="../ui/game_list_item.py" line="514"/>
         <source>Enter label name...</source>
         <translation>Enter label name...</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="511"/>
+        <location filename="../ui/game_list_item.py" line="519"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="512"/>
+        <location filename="../ui/game_list_item.py" line="520"/>
         <source>Accept</source>
         <translation>Accept</translation>
     </message>
@@ -574,151 +574,156 @@ They will also be automatically applied from the &apos;Run in Prefix&apos; dialo
 <context>
     <name>GameListItem</name>
     <message>
-        <location filename="../ui/game_list_item.py" line="135"/>
+        <location filename="../ui/game_list_item.py" line="136"/>
         <source>Never</source>
         <translation>Never</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="183"/>
+        <location filename="../ui/game_list_item.py" line="185"/>
         <source>Stop Game</source>
         <translation>Stop Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="185"/>
+        <location filename="../ui/game_list_item.py" line="187"/>
         <source>Run Game</source>
         <translation>Run Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="188"/>
+        <location filename="../ui/game_list_item.py" line="191"/>
         <source>Open texthooker</source>
         <translation>Open texthooker</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="190"/>
+        <location filename="../ui/game_list_item.py" line="193"/>
         <source>Show Logs</source>
         <translation>Show Logs</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="191"/>
+        <location filename="../ui/game_list_item.py" line="194"/>
         <source>Open Sidebar</source>
         <translation>Open Sidebar</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="192"/>
+        <location filename="../ui/game_list_item.py" line="195"/>
         <source>Browse Files</source>
         <translation>Browse Files</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="193"/>
+        <location filename="../ui/game_list_item.py" line="196"/>
         <source>Refresh List</source>
         <translation>Refresh List</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="195"/>
+        <location filename="../ui/game_list_item.py" line="198"/>
         <source>Label</source>
         <translation>Label</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="210"/>
+        <location filename="../ui/game_list_item.py" line="213"/>
         <source>Add new label...</source>
         <translation>Add new label...</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="214"/>
+        <location filename="../ui/game_list_item.py" line="218"/>
+        <source>Wine Features</source>
+        <translation>Wine Features</translation>
+    </message>
+    <message>
+        <location filename="../ui/game_list_item.py" line="219"/>
         <source>Open Regedit</source>
         <translation>Open Regedit</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="215"/>
+        <location filename="../ui/game_list_item.py" line="220"/>
         <source>Open Winecfg</source>
         <translation>Open Winecfg</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="216"/>
+        <location filename="../ui/game_list_item.py" line="221"/>
         <source>Open Winefile</source>
         <translation>Open Winefile</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="217"/>
+        <location filename="../ui/game_list_item.py" line="222"/>
         <source>Open windows cmd</source>
         <translation>Open windows cmd</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="218"/>
+        <location filename="../ui/game_list_item.py" line="223"/>
         <source>Open Bash Terminal</source>
         <translation>Open Bash Terminal</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="220"/>
+        <location filename="../ui/game_list_item.py" line="226"/>
         <source>Desktop Shortcut</source>
         <translation>Desktop Shortcut</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="221"/>
+        <location filename="../ui/game_list_item.py" line="227"/>
         <source>Steam Shortcut</source>
         <translation>Steam Shortcut</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="223"/>
+        <location filename="../ui/game_list_item.py" line="229"/>
         <source>Export</source>
         <translation>Export</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="224"/>
+        <location filename="../ui/game_list_item.py" line="230"/>
         <source>Duplicate</source>
         <translation>Duplicate</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="225"/>
+        <location filename="../ui/game_list_item.py" line="231"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="293"/>
-        <location filename="../ui/game_list_item.py" line="296"/>
-        <location filename="../ui/game_list_item.py" line="309"/>
-        <location filename="../ui/game_list_item.py" line="327"/>
-        <location filename="../ui/game_list_item.py" line="334"/>
-        <location filename="../ui/game_list_item.py" line="341"/>
-        <location filename="../ui/game_list_item.py" line="348"/>
-        <location filename="../ui/game_list_item.py" line="354"/>
-        <location filename="../ui/game_list_item.py" line="377"/>
-        <location filename="../ui/game_list_item.py" line="379"/>
+        <location filename="../ui/game_list_item.py" line="301"/>
+        <location filename="../ui/game_list_item.py" line="304"/>
+        <location filename="../ui/game_list_item.py" line="317"/>
+        <location filename="../ui/game_list_item.py" line="335"/>
+        <location filename="../ui/game_list_item.py" line="342"/>
+        <location filename="../ui/game_list_item.py" line="349"/>
+        <location filename="../ui/game_list_item.py" line="356"/>
+        <location filename="../ui/game_list_item.py" line="362"/>
+        <location filename="../ui/game_list_item.py" line="385"/>
+        <location filename="../ui/game_list_item.py" line="387"/>
         <source>Error</source>
         <translation>Error</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="296"/>
+        <location filename="../ui/game_list_item.py" line="304"/>
         <source>Texthooker path missing. Set it up in settings.</source>
         <translation>Texthooker path missing. Set it up in settings.</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="315"/>
+        <location filename="../ui/game_list_item.py" line="323"/>
         <source>Confirm Deletion</source>
         <translation>Confirm Deletion</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="316"/>
+        <location filename="../ui/game_list_item.py" line="324"/>
         <source>Are you sure you want to delete &apos;{}&apos;?</source>
         <translation>Are you sure you want to delete &apos;{}&apos;?</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="364"/>
+        <location filename="../ui/game_list_item.py" line="372"/>
         <source>Save shortcut as</source>
         <translation>Save shortcut as</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="366"/>
+        <location filename="../ui/game_list_item.py" line="374"/>
         <source>Desktop Entry (*.desktop)</source>
         <translation>Desktop Entry (*.desktop)</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="415"/>
+        <location filename="../ui/game_list_item.py" line="423"/>
         <source>{h}h {m}m</source>
         <translation>{h}h {m}m</translation>
     </message>
     <message>
-        <location filename="../ui/game_list_item.py" line="416"/>
+        <location filename="../ui/game_list_item.py" line="424"/>
         <source>{}m</source>
         <translation>{}m</translation>
     </message>
@@ -726,139 +731,139 @@ They will also be automatically applied from the &apos;Run in Prefix&apos; dialo
 <context>
     <name>GameSidebar</name>
     <message>
-        <location filename="../ui/game_sidebar.py" line="111"/>
+        <location filename="../ui/game_sidebar.py" line="110"/>
         <location filename="../ui/game_sidebar.py" line="1116"/>
         <source>Start Game</source>
         <translation>Start Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="133"/>
+        <location filename="../ui/game_sidebar.py" line="132"/>
         <source>Time Tracking</source>
         <translation>Time Tracking</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="146"/>
+        <location filename="../ui/game_sidebar.py" line="145"/>
         <source>Session Length:</source>
         <translation>Session Length:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="147"/>
+        <location filename="../ui/game_sidebar.py" line="146"/>
         <source>Session Playtime:</source>
         <translation>Session Playtime:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="148"/>
+        <location filename="../ui/game_sidebar.py" line="147"/>
         <source>Total Playtime:</source>
         <translation>Total Playtime:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="149"/>
+        <location filename="../ui/game_sidebar.py" line="148"/>
         <source>Manually Select Tracking Window</source>
         <translation>Manually Select Tracking Window</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="156"/>
+        <location filename="../ui/game_sidebar.py" line="155"/>
         <source>Edit Game</source>
         <translation>Edit Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="218"/>
+        <location filename="../ui/game_sidebar.py" line="217"/>
         <source>Sync this game&apos;s savedata to Google Drive</source>
         <translation>Sync this game&apos;s savedata to Google Drive</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="220"/>
+        <location filename="../ui/game_sidebar.py" line="219"/>
         <source>Name:</source>
         <translation>Name:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="221"/>
+        <location filename="../ui/game_sidebar.py" line="220"/>
         <source>Path:</source>
         <translation>Path:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="222"/>
+        <location filename="../ui/game_sidebar.py" line="221"/>
         <source>Prefix:</source>
         <translation>Prefix:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="224"/>
+        <location filename="../ui/game_sidebar.py" line="223"/>
         <source>VNDB:</source>
         <translation>VNDB:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="225"/>
+        <location filename="../ui/game_sidebar.py" line="224"/>
         <source>Savedata:</source>
         <translation>Savedata:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="232"/>
+        <location filename="../ui/game_sidebar.py" line="231"/>
         <source>Gamescope</source>
         <translation>Gamescope</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="235"/>
+        <location filename="../ui/game_sidebar.py" line="234"/>
         <source>Enable Gamescope</source>
         <translation>Enable Gamescope</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="238"/>
-        <location filename="../ui/game_sidebar.py" line="248"/>
+        <location filename="../ui/game_sidebar.py" line="237"/>
+        <location filename="../ui/game_sidebar.py" line="247"/>
         <source>Params:</source>
         <translation>Params:</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="244"/>
+        <location filename="../ui/game_sidebar.py" line="243"/>
         <source>Enable linux-rt-upscaler</source>
         <translation>Enable linux-rt-upscaler</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="253"/>
+        <location filename="../ui/game_sidebar.py" line="252"/>
         <source>Environment Variables</source>
         <translation>Environment Variables</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="261"/>
+        <location filename="../ui/game_sidebar.py" line="260"/>
         <source>Manage Environment Variables</source>
         <translation>Manage Environment Variables</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="272"/>
+        <location filename="../ui/game_sidebar.py" line="271"/>
         <source>Advanced Settings</source>
         <translation>Advanced Settings</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="288"/>
+        <location filename="../ui/game_sidebar.py" line="287"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="293"/>
+        <location filename="../ui/game_sidebar.py" line="292"/>
         <source>Export</source>
         <translation>Export</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="297"/>
+        <location filename="../ui/game_sidebar.py" line="296"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="302"/>
+        <location filename="../ui/game_sidebar.py" line="301"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="343"/>
+        <location filename="../ui/game_sidebar.py" line="342"/>
         <source>Gdrive Syncing...</source>
         <translation>Gdrive Syncing...</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="364"/>
+        <location filename="../ui/game_sidebar.py" line="363"/>
         <source>Savedata Cloud Sync Failed</source>
         <translation>Savedata Cloud Sync Failed</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="365"/>
+        <location filename="../ui/game_sidebar.py" line="364"/>
         <source>Background save backup failed for &apos;{name}&apos;:
 {error_message}
 
@@ -869,82 +874,86 @@ You can sync the data manually from settings.</source>
 You can sync the data manually from settings.</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="368"/>
+        <location filename="../ui/game_sidebar.py" line="367"/>
         <source>Gdrive synced error {}</source>
         <translation>Gdrive synced error {}</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="376"/>
+        <location filename="../ui/game_sidebar.py" line="375"/>
         <source>Gdrive synced successfully</source>
         <translation>Gdrive synced successfully</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="384"/>
+        <location filename="../ui/game_sidebar.py" line="383"/>
         <source>Timetracking Cloud Sync Failed</source>
         <translation>Timetracking Cloud Sync Failed</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="385"/>
+        <location filename="../ui/game_sidebar.py" line="384"/>
         <source>Background timetracking backup failed for {app_name}:
 {error_message}</source>
         <translation>Background timetracking backup failed for {app_name}:
 {error_message}</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="467"/>
+        <location filename="../ui/game_sidebar.py" line="466"/>
         <source>⚠ Warning: Prefix &apos;{}&apos; not found!</source>
         <translation>⚠ Warning: Prefix &apos;{}&apos; not found!</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="566"/>
+        <location filename="../ui/game_sidebar.py" line="565"/>
         <source>New Game</source>
         <translation>New Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="656"/>
+        <location filename="../ui/game_sidebar.py" line="655"/>
         <source>Syncing save data with Google Drive...</source>
         <translation>Syncing save data with Google Drive...</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="664"/>
+        <location filename="../ui/game_sidebar.py" line="663"/>
         <source>Syncing time tracking data...</source>
         <translation>Syncing time tracking data...</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="679"/>
-        <location filename="../ui/game_sidebar.py" line="695"/>
-        <location filename="../ui/game_sidebar.py" line="758"/>
-        <location filename="../ui/game_sidebar.py" line="908"/>
+        <location filename="../ui/game_sidebar.py" line="678"/>
+        <location filename="../ui/game_sidebar.py" line="694"/>
+        <location filename="../ui/game_sidebar.py" line="757"/>
+        <location filename="../ui/game_sidebar.py" line="907"/>
         <source>Error</source>
         <translation>Error</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="700"/>
+        <location filename="../ui/game_sidebar.py" line="699"/>
         <source>Select Game Executable</source>
         <translation>Select Game Executable</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="707"/>
-        <source>All Files (*);;Executables (*.exe *.sh *.bin)</source>
-        <translation>All Files (*);;Executables (*.exe *.sh *.bin)</translation>
+        <location filename="../ui/game_sidebar.py" line="706"/>
+        <source>All Files (*)</source>
+        <translation>All Files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="729"/>
+        <source>All Files (*);;Executables (*.exe *.sh *.bin)</source>
+        <translation type="vanished">All Files (*);;Executables (*.exe *.sh *.bin)</translation>
+    </message>
+    <message>
+        <location filename="../ui/game_sidebar.py" line="728"/>
         <source>Select Savedata Folder</source>
         <translation>Select Savedata Folder</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="759"/>
+        <location filename="../ui/game_sidebar.py" line="758"/>
         <source>A name for the game is needed.</source>
         <translation>A name for the game is needed.</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="767"/>
+        <location filename="../ui/game_sidebar.py" line="766"/>
         <source>Warning</source>
         <translation>Warning</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="768"/>
+        <location filename="../ui/game_sidebar.py" line="767"/>
         <source>Prefix or Path data are missing, it can be added later.
 
  Are you sure you want to continue?</source>
@@ -953,12 +962,12 @@ You can sync the data manually from settings.</translation>
  Are you sure you want to continue?</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="840"/>
+        <location filename="../ui/game_sidebar.py" line="839"/>
         <source>Prefix Changed</source>
         <translation>Prefix Changed</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="842"/>
+        <location filename="../ui/game_sidebar.py" line="841"/>
         <source>This game&apos;s savedata lives inside its prefix, and Gdrive sync is enabled.
 
 Your existing saves won&apos;t be deleted. But the game will create fresh saves at the new prefix location.
@@ -975,32 +984,32 @@ If you want to bring them along use use &apos;Copy to...&apos; in Manage Savedat
 Alternatively: Remove the savedata path field from the game to automatically fill it from the actual Gdrive sync info into the new prefix.</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="878"/>
+        <location filename="../ui/game_sidebar.py" line="877"/>
         <source>Saved!</source>
         <translation>Saved!</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="897"/>
+        <location filename="../ui/game_sidebar.py" line="896"/>
         <source>Confirm Deletion</source>
         <translation>Confirm Deletion</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="898"/>
+        <location filename="../ui/game_sidebar.py" line="897"/>
         <source>Are you sure you want to delete &apos;{}&apos;?</source>
         <translation>Are you sure you want to delete &apos;{}&apos;?</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="924"/>
+        <location filename="../ui/game_sidebar.py" line="923"/>
         <source>Export Game</source>
         <translation>Export Game</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="927"/>
+        <location filename="../ui/game_sidebar.py" line="926"/>
         <source>JSON Files (*.json)</source>
         <translation>JSON Files (*.json)</translation>
     </message>
     <message>
-        <location filename="../ui/game_sidebar.py" line="942"/>
+        <location filename="../ui/game_sidebar.py" line="941"/>
         <source>Failed to export</source>
         <translation>Failed to export</translation>
     </message>
@@ -1302,7 +1311,7 @@ Alternatively: Remove the savedata path field from the game to automatically fil
 <context>
     <name>LogViewerDialog</name>
     <message>
-        <location filename="../ui/game_list_item.py" line="421"/>
+        <location filename="../ui/game_list_item.py" line="429"/>
         <source>Execution Logs: {}</source>
         <translation>Execution Logs: {}</translation>
     </message>
@@ -1310,27 +1319,27 @@ Alternatively: Remove the savedata path field from the game to automatically fil
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="44"/>
+        <location filename="../ui/main_window.py" line="40"/>
         <source>Games</source>
         <translation>Games</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="45"/>
+        <location filename="../ui/main_window.py" line="41"/>
         <source>Prefixes</source>
         <translation>Prefixes</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="46"/>
+        <location filename="../ui/main_window.py" line="42"/>
         <source>Runners</source>
         <translation>Runners</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="47"/>
+        <location filename="../ui/main_window.py" line="43"/>
         <source>Statistics</source>
         <translation>Statistics</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="48"/>
+        <location filename="../ui/main_window.py" line="44"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
@@ -1759,50 +1768,51 @@ Overwrite it?</translation>
 <context>
     <name>SettingsTab</name>
     <message>
-        <location filename="../ui/settings_tab.py" line="69"/>
+        <location filename="../ui/settings_tab.py" line="70"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="280"/>
+        <location filename="../ui/settings_tab.py" line="281"/>
         <source>Language:</source>
         <translation>Language:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="76"/>
+        <location filename="../ui/settings_tab.py" line="77"/>
         <source>Select folder to symlink fonts...</source>
         <translation>Select folder to symlink fonts...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="77"/>
-        <location filename="../ui/settings_tab.py" line="543"/>
-        <location filename="../ui/settings_tab.py" line="589"/>
+        <location filename="../ui/settings_tab.py" line="78"/>
+        <location filename="../ui/settings_tab.py" line="544"/>
+        <location filename="../ui/settings_tab.py" line="609"/>
+        <location filename="../ui/settings_tab.py" line="669"/>
         <source>Browse...</source>
         <translation>Browse...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="80"/>
+        <location filename="../ui/settings_tab.py" line="81"/>
         <source>Font Folder:</source>
         <translation>Font Folder:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="84"/>
-        <location filename="../ui/settings_tab.py" line="97"/>
-        <location filename="../ui/settings_tab.py" line="316"/>
-        <location filename="../ui/settings_tab.py" line="389"/>
-        <location filename="../ui/settings_tab.py" line="396"/>
-        <location filename="../ui/settings_tab.py" line="534"/>
+        <location filename="../ui/settings_tab.py" line="85"/>
+        <location filename="../ui/settings_tab.py" line="98"/>
+        <location filename="../ui/settings_tab.py" line="317"/>
+        <location filename="../ui/settings_tab.py" line="390"/>
+        <location filename="../ui/settings_tab.py" line="397"/>
+        <location filename="../ui/settings_tab.py" line="535"/>
         <source>Enable</source>
         <translation>Enable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="87"/>
+        <location filename="../ui/settings_tab.py" line="88"/>
         <source>Parameters (e.g., -W 1920 -H 1080)</source>
         <translation>Parameters (e.g., -W 1920 -H 1080)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="93"/>
-        <location filename="../ui/settings_tab.py" line="653"/>
+        <location filename="../ui/settings_tab.py" line="94"/>
+        <location filename="../ui/settings_tab.py" line="733"/>
         <source>Gamescope:</source>
         <translation>Gamescope:</translation>
     </message>
@@ -1817,397 +1827,467 @@ Overwrite it?</translation>
  They will also be automatically applied from the &apos;Run in Prefix&apos; dialog.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="123"/>
+        <location filename="../ui/settings_tab.py" line="124"/>
         <source>Enter your API key...</source>
         <translation>Enter your API key...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="129"/>
+        <location filename="../ui/settings_tab.py" line="130"/>
         <source>Open SteamGridDB API settings in browser</source>
         <translation>Open SteamGridDB API settings in browser</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="133"/>
+        <location filename="../ui/settings_tab.py" line="134"/>
         <source>SteamGridDB API Key:</source>
         <translation>SteamGridDB API Key:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="143"/>
+        <location filename="../ui/settings_tab.py" line="144"/>
         <source>Write logging to file</source>
         <translation>Write logging to file</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="146"/>
+        <location filename="../ui/settings_tab.py" line="147"/>
         <source>Writes application logs to ~/.local/share/lvnm/timetracker_test.log
 Requires an app restart to take effect.</source>
         <translation>Writes application logs to ~/.local/share/lvnm/timetracker_test.log
 Requires an app restart to take effect.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="150"/>
         <source>Show Wine logs in application logs</source>
-        <translation>Show Wine logs in application logs</translation>
+        <translation type="vanished">Show Wine logs in application logs</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="153"/>
+        <location filename="../ui/settings_tab.py" line="154"/>
         <source>Show Wine logs in system logs and write to file if enabled.
 Regardless of this setting you can right click show logs for any game.</source>
         <translation>Show Wine logs in system logs and write to file if enabled.
 Regardless of this setting you can right click show logs for any game.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="161"/>
+        <location filename="../ui/settings_tab.py" line="162"/>
         <source>Log Level:</source>
         <translation>Log Level:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="170"/>
+        <location filename="../ui/settings_tab.py" line="171"/>
         <source>Language Changed</source>
         <translation>Language Changed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="171"/>
+        <location filename="../ui/settings_tab.py" line="172"/>
         <source>The language change will take effect after restarting the application.</source>
         <translation>The language change will take effect after restarting the application.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="836"/>
+        <location filename="../ui/settings_tab.py" line="916"/>
         <source>Show more...</source>
         <translation>Show more...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="111"/>
+        <location filename="../ui/settings_tab.py" line="112"/>
         <source>Manage Environment Variables</source>
         <translation>Manage Environment Variables</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="100"/>
+        <location filename="../ui/settings_tab.py" line="101"/>
         <source>Parameters (e.g., --profile 1080p --crop-top 19)</source>
         <translation>Parameters (e.g., --profile 1080p --crop-top 19)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="107"/>
-        <location filename="../ui/settings_tab.py" line="654"/>
+        <location filename="../ui/settings_tab.py" line="108"/>
+        <location filename="../ui/settings_tab.py" line="734"/>
         <source>linux-rt-upscaler:</source>
         <translation>linux-rt-upscaler:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="110"/>
+        <location filename="../ui/settings_tab.py" line="111"/>
         <source>Environment variables:</source>
         <translation>Environment variables:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="267"/>
+        <location filename="../ui/settings_tab.py" line="151"/>
+        <source>Show game logs in application logs</source>
+        <translation>Show game logs in application logs</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="268"/>
         <source>Appearance</source>
         <translation>Appearance</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="283"/>
+        <location filename="../ui/settings_tab.py" line="284"/>
         <source>System Default</source>
         <translation>System Default</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="283"/>
+        <location filename="../ui/settings_tab.py" line="284"/>
         <source>Light</source>
         <translation>Light</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="283"/>
+        <location filename="../ui/settings_tab.py" line="284"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="289"/>
+        <location filename="../ui/settings_tab.py" line="290"/>
         <source>Theme:</source>
         <translation>Theme:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="298"/>
+        <location filename="../ui/settings_tab.py" line="299"/>
         <source>UI Zoom:</source>
         <translation>UI Zoom:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="303"/>
+        <location filename="../ui/settings_tab.py" line="304"/>
         <source>Timetracker</source>
         <translation>Timetracker</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="310"/>
+        <location filename="../ui/settings_tab.py" line="311"/>
         <source>In Desktops other than KDE it only works through XWayland. Check github for details.</source>
         <translation>In Desktops other than KDE it only works through XWayland. Check github for details.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="318"/>
+        <location filename="../ui/settings_tab.py" line="319"/>
         <source>Enable timetracking:</source>
         <translation>Enable timetracking:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="326"/>
+        <location filename="../ui/settings_tab.py" line="327"/>
         <source>minutes (requires swayidle)</source>
         <translation>minutes (requires swayidle)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="331"/>
+        <location filename="../ui/settings_tab.py" line="332"/>
         <source>AFK Idle Timer:</source>
         <translation>AFK Idle Timer:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="340"/>
+        <location filename="../ui/settings_tab.py" line="341"/>
         <source>minutes</source>
         <translation>minutes</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="345"/>
+        <location filename="../ui/settings_tab.py" line="346"/>
         <source>Periodic Save Interval:</source>
         <translation>Periodic Save Interval:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="349"/>
+        <location filename="../ui/settings_tab.py" line="350"/>
         <source>Automatically Start Time Tracking When Game Launches</source>
         <translation>Automatically Start Time Tracking When Game Launches</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="351"/>
+        <location filename="../ui/settings_tab.py" line="352"/>
         <source>Auto Start</source>
         <translation>Auto Start</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="355"/>
+        <location filename="../ui/settings_tab.py" line="356"/>
         <source>Automatically sync timetracker files for games with Gdrive savedata sync enabled</source>
         <translation>Automatically sync timetracker files for games with Gdrive savedata sync enabled</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="357"/>
+        <location filename="../ui/settings_tab.py" line="358"/>
         <source>Gdrive sync</source>
         <translation>Gdrive sync</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="381"/>
+        <location filename="../ui/settings_tab.py" line="382"/>
         <source>Savedata Management</source>
         <translation>Savedata Management</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="391"/>
+        <location filename="../ui/settings_tab.py" line="392"/>
         <source>Savedata management:</source>
         <translation>Savedata management:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="394"/>
+        <location filename="../ui/settings_tab.py" line="395"/>
         <source>Auto Detect Save:</source>
         <translation>Auto Detect Save:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="395"/>
-        <location filename="../ui/settings_tab.py" line="398"/>
+        <location filename="../ui/settings_tab.py" line="396"/>
+        <location filename="../ui/settings_tab.py" line="399"/>
         <source>Automatically tries to auto detect the save data folder for the game after closing the game if it hasn&apos;t been set</source>
         <translation>Automatically tries to auto detect the save data folder for the game after closing the game if it hasn&apos;t been set</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="402"/>
+        <location filename="../ui/settings_tab.py" line="403"/>
         <source>Manage Savedata</source>
         <translation>Manage Savedata</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="408"/>
+        <location filename="../ui/settings_tab.py" line="409"/>
         <source>Manage savedata:</source>
         <translation>Manage savedata:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="415"/>
+        <location filename="../ui/settings_tab.py" line="416"/>
         <source>Google Drive Options</source>
         <translation>Google Drive Options</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="429"/>
+        <location filename="../ui/settings_tab.py" line="430"/>
         <source>Automatically enable:</source>
         <translation>Automatically enable:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="430"/>
-        <location filename="../ui/settings_tab.py" line="433"/>
+        <location filename="../ui/settings_tab.py" line="431"/>
+        <location filename="../ui/settings_tab.py" line="434"/>
         <source>Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts</source>
         <translation>Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="431"/>
+        <location filename="../ui/settings_tab.py" line="432"/>
         <source>Automatically enables GDrive Sync for all new games (Recommended)</source>
         <translation>Automatically enables GDrive Sync for all new games (Recommended)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="437"/>
+        <location filename="../ui/settings_tab.py" line="438"/>
         <source>Gdrive Client ID:</source>
         <translation>Gdrive Client ID:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="442"/>
+        <location filename="../ui/settings_tab.py" line="443"/>
         <source>Gdrive Client Secret:</source>
         <translation>Gdrive Client Secret:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="447"/>
+        <location filename="../ui/settings_tab.py" line="448"/>
         <source>Gdrive Account:</source>
         <translation>Gdrive Account:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="512"/>
+        <location filename="../ui/settings_tab.py" line="513"/>
         <source>Show/Hide</source>
         <translation>Show/Hide</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="526"/>
+        <location filename="../ui/settings_tab.py" line="527"/>
         <source>Texthooker</source>
         <translation>Texthooker</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="536"/>
+        <location filename="../ui/settings_tab.py" line="537"/>
         <source>Enable texthooking:</source>
         <translation>Enable texthooking:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="541"/>
+        <location filename="../ui/settings_tab.py" line="542"/>
         <source>Select texthooker executable (e.g., Textractor.exe)...</source>
         <translation>Select texthooker executable (e.g., Textractor.exe)...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="548"/>
+        <location filename="../ui/settings_tab.py" line="549"/>
         <source>Texthooker Path:</source>
         <translation>Texthooker Path:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="553"/>
+        <location filename="../ui/settings_tab.py" line="554"/>
+        <source>Emulation</source>
+        <translation>Emulation</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="563"/>
+        <source>PSX</source>
+        <translation>PSX</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="566"/>
+        <source>/path/to/duckstation.AppImage or duckstation-qt</source>
+        <translation>/path/to/duckstation.AppImage or duckstation-qt</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="569"/>
+        <source>PS2</source>
+        <translation>PS2</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="572"/>
+        <source>/path/to/pcsx2.AppImage or pcsx2-qt</source>
+        <translation>path/to/pcsx2.AppImage or pcsx2-qt</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="575"/>
+        <source>PS3</source>
+        <translation>PS3</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="578"/>
+        <source>/path/to/rpcs3.AppImage or rpcs3</source>
+        <translation>/path/to/rpcs3.AppImage or rpcs3</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="581"/>
+        <source>PSP</source>
+        <translation>PSP</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="584"/>
+        <location filename="../ui/settings_tab.py" line="590"/>
+        <source>/path/to/emulator.AppImage or process</source>
+        <translation>/path/to/emulator.AppImage or process</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="587"/>
+        <source>Switch</source>
+        <translation>Switch</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="612"/>
+        <source>Path or Command:</source>
+        <translation>Path or Command</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="616"/>
+        <source>-fullscreen -batch</source>
+        <translation>-fullscreen -batch</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="617"/>
+        <source>Config:</source>
+        <translation>Config:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="633"/>
         <source>Directories</source>
         <translation>Directories</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="557"/>
-        <location filename="../ui/settings_tab.py" line="794"/>
+        <location filename="../ui/settings_tab.py" line="637"/>
+        <location filename="../ui/settings_tab.py" line="874"/>
         <source>Folder configuration paths. Changing the folder will move all current files in the folder to the new selected folder.
 Use an empty folder if modifying them. Restart the application after changing any of them.</source>
         <translation>Folder configuration paths. Changing the folder will move all current files in the folder to the new selected folder.
 Use an empty folder if modifying them. Restart the application after changing any of them.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="568"/>
+        <location filename="../ui/settings_tab.py" line="648"/>
         <source>Prefixes Dir:</source>
         <translation>Prefixes Dir:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="569"/>
+        <location filename="../ui/settings_tab.py" line="649"/>
         <source>Wine Runners Dir:</source>
         <translation>Wine Runners Dir:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="570"/>
+        <location filename="../ui/settings_tab.py" line="650"/>
         <source>Proton Runners Dir:</source>
         <translation>Proton Runners Dir:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="571"/>
+        <location filename="../ui/settings_tab.py" line="651"/>
         <source>Covers Dir:</source>
         <translation>Covers Dir:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="572"/>
+        <location filename="../ui/settings_tab.py" line="652"/>
         <source>Timetrack Logs Dir:</source>
         <translation>Timetrack Logs Dir:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="586"/>
+        <location filename="../ui/settings_tab.py" line="666"/>
         <source>Select folder...</source>
         <translation>Select folder...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="606"/>
+        <location filename="../ui/settings_tab.py" line="686"/>
         <source>Delete all covers in this folder</source>
         <translation>Delete all covers in this folder</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="628"/>
+        <location filename="../ui/settings_tab.py" line="708"/>
         <source>System Info</source>
         <translation>System Info</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="646"/>
+        <location filename="../ui/settings_tab.py" line="726"/>
         <source>LVNM Version:</source>
         <translation>LVNM Version:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="647"/>
+        <location filename="../ui/settings_tab.py" line="727"/>
         <source>OS:</source>
         <translation>OS:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="648"/>
+        <location filename="../ui/settings_tab.py" line="728"/>
         <source>Kernel:</source>
         <translation>Kernel:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="649"/>
+        <location filename="../ui/settings_tab.py" line="729"/>
         <source>Desktop:</source>
         <translation>Desktop:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="650"/>
+        <location filename="../ui/settings_tab.py" line="730"/>
         <source>CPU:</source>
         <translation>CPU:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="651"/>
+        <location filename="../ui/settings_tab.py" line="731"/>
         <source>GPU:</source>
         <translation>GPU:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="652"/>
+        <location filename="../ui/settings_tab.py" line="732"/>
         <source>Vulkan Support:</source>
         <translation>Vulkan Support:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="655"/>
+        <location filename="../ui/settings_tab.py" line="735"/>
         <source>Umu-run:</source>
         <translation>Umu-run:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="656"/>
+        <location filename="../ui/settings_tab.py" line="736"/>
         <source>Winetricks:</source>
         <translation>Winetricks:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="664"/>
+        <location filename="../ui/settings_tab.py" line="744"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="669"/>
+        <location filename="../ui/settings_tab.py" line="749"/>
         <source>LVNM version:</source>
         <translation>LVNM version:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="673"/>
+        <location filename="../ui/settings_tab.py" line="753"/>
         <source>Github:</source>
         <translation>Github:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="678"/>
+        <location filename="../ui/settings_tab.py" line="758"/>
         <source>Wineprefixes guide:</source>
         <translation>Wineprefixes guide:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="735"/>
+        <location filename="../ui/settings_tab.py" line="815"/>
         <source>No Folder</source>
         <translation>No Folder</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="735"/>
+        <location filename="../ui/settings_tab.py" line="815"/>
         <source>No covers folder is currently set.</source>
         <translation>No covers folder is currently set.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="740"/>
+        <location filename="../ui/settings_tab.py" line="820"/>
         <source>Delete Covers</source>
         <translation>Delete Covers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="742"/>
+        <location filename="../ui/settings_tab.py" line="822"/>
         <source>This will permanently delete all .jpg and .png files in:
 {}
 
@@ -2218,25 +2298,25 @@ This action cannot be undone. Continue?</source>
 This action cannot be undone. Continue?</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="755"/>
-        <location filename="../ui/settings_tab.py" line="782"/>
-        <location filename="../ui/settings_tab.py" line="1019"/>
-        <location filename="../ui/settings_tab.py" line="1033"/>
+        <location filename="../ui/settings_tab.py" line="835"/>
+        <location filename="../ui/settings_tab.py" line="862"/>
+        <location filename="../ui/settings_tab.py" line="1109"/>
+        <location filename="../ui/settings_tab.py" line="1123"/>
         <source>Error</source>
         <translation>Error</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="764"/>
+        <location filename="../ui/settings_tab.py" line="844"/>
         <source>Select Folder for {}</source>
         <translation>Select Folder for {}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="771"/>
+        <location filename="../ui/settings_tab.py" line="851"/>
         <source>Move files?</source>
         <translation>Move files?</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="772"/>
+        <location filename="../ui/settings_tab.py" line="852"/>
         <source>Do you want to move your data from:
 {old_path}
 
@@ -2255,99 +2335,109 @@ to:
 Not moving the data will reset all the data for the new folder.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="782"/>
+        <location filename="../ui/settings_tab.py" line="862"/>
         <source>Failed to move some files. Check logs.</source>
         <translation>Failed to move some files. Check logs.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="792"/>
+        <location filename="../ui/settings_tab.py" line="872"/>
         <source>Folder configuration is locked while a game is running.</source>
         <translation>Folder configuration is locked while a game is running.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="836"/>
+        <location filename="../ui/settings_tab.py" line="916"/>
         <source>Show less</source>
         <translation>Show less</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="868"/>
+        <location filename="../ui/settings_tab.py" line="948"/>
         <source>Select Font Folder</source>
         <translation>Select Font Folder</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="875"/>
+        <location filename="../ui/settings_tab.py" line="955"/>
         <source>Select Texthooker Executable</source>
         <translation>Select Texthooker Executable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="877"/>
+        <location filename="../ui/settings_tab.py" line="957"/>
         <source>Executables (*.exe);;All Files (*)</source>
         <translation>Executables (*.exe);;All Files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="899"/>
+        <location filename="../ui/settings_tab.py" line="965"/>
+        <source>Select Emulator Executable</source>
+        <translation>Select Emulator Executable</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="967"/>
+        <source>Executables (*.AppImage);;All Files (*)</source>
+        <translation>Executables (*.AppImage);;All Files (*)</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_tab.py" line="989"/>
         <source>Missing Credentials</source>
         <translation>Missing Credentials</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="900"/>
+        <location filename="../ui/settings_tab.py" line="990"/>
         <source>Please enter both the Google Client ID and Client Secret before signing in.</source>
         <translation>Please enter both the Google Client ID and Client Secret before signing in.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="907"/>
-        <location filename="../ui/settings_tab.py" line="1002"/>
+        <location filename="../ui/settings_tab.py" line="997"/>
+        <location filename="../ui/settings_tab.py" line="1092"/>
         <source>Sign in to Google Drive</source>
         <translation>Sign in to Google Drive</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="911"/>
+        <location filename="../ui/settings_tab.py" line="1001"/>
         <source>Requesting device code...</source>
         <translation>Requesting device code...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="915"/>
+        <location filename="../ui/settings_tab.py" line="1005"/>
         <source>Copy</source>
         <translation>Copy</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="956"/>
+        <location filename="../ui/settings_tab.py" line="1046"/>
         <source>Enter this code at the link below:</source>
         <translation>Enter this code at the link below:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="966"/>
-        <location filename="../ui/settings_tab.py" line="996"/>
+        <location filename="../ui/settings_tab.py" line="1056"/>
+        <location filename="../ui/settings_tab.py" line="1086"/>
         <source>Connected</source>
         <translation>Connected</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="966"/>
+        <location filename="../ui/settings_tab.py" line="1056"/>
         <source>Successfully signed in to Google Drive.</source>
         <translation>Successfully signed in to Google Drive.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="970"/>
+        <location filename="../ui/settings_tab.py" line="1060"/>
         <source>Sign-in Failed</source>
         <translation>Sign-in Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="974"/>
+        <location filename="../ui/settings_tab.py" line="1064"/>
         <source>Timed Out</source>
         <translation>Timed Out</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="974"/>
+        <location filename="../ui/settings_tab.py" line="1064"/>
         <source>Sign-in timed out. Please try again.</source>
         <translation>Sign-in timed out. Please try again.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="997"/>
+        <location filename="../ui/settings_tab.py" line="1087"/>
         <source>Log out</source>
         <translation>Log out</translation>
     </message>
     <message>
-        <location filename="../ui/settings_tab.py" line="1001"/>
+        <location filename="../ui/settings_tab.py" line="1091"/>
         <source>Not connected</source>
         <translation>Not connected</translation>
     </message>
