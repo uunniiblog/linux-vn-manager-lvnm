@@ -26,15 +26,16 @@ class GamescopeUtils(DesktopUtilsInterface):
         return pid_str
 
     def find_window_by_pid(self, target_pid, target_process_path):
-        target_pid_str = str(target_pid)
+        if isinstance(target_pid, (list, set, tuple)):
+            candidates = [str(p) for p in target_pid]
+        else:
+            candidates = [str(target_pid)]
         
-        # Check if the process folder exists in /proc
-        if os.path.exists(f"/proc/{target_pid_str}"):
-            logger.debug(f"{target_pid_str} exists")
-            name = self.get_window_name(target_pid_str)
-            return target_pid_str, name
+        # Check if the process folder exists in /proc       
+        for pid_str in candidates:
+            if os.path.exists(f"/proc/{pid_str}"):
+                logger.debug(f"{pid_str} exists")
+                name = self.get_window_name(pid_str)
+                return pid_str, name
         
-        return None, None
-        
-        return None, None
-        
+        return None, None        
