@@ -10,6 +10,7 @@ import json
 import config
 import logging
 import urllib.request
+import threading
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
@@ -124,6 +125,26 @@ class SystemUtils:
         return info
 
     @staticmethod
+    def init_software_config():
+        """Fill system info"""
+        appdir = os.environ.get("APPDIR")
+
+        if appdir:
+            tools_dir = Path(appdir) / "usr" / "bin" / "tools"
+            umu_available = (tools_dir / "umu-run").exists()
+            winetricks_available = (tools_dir / "winetricks").exists()
+        else:
+            umu_available = bool(shutil.which("umu-run"))
+            winetricks_available = bool(shutil.which("winetricks"))
+
+        # Update the config module variables
+        config.GAMESCOPE_INSTALLED = bool(shutil.which("gamescope"))
+        config.VULKAN_INSTALLED = SystemUtils._check_vulkan(SystemUtils.get_clean_env())
+        config.UMU_RUN_INSTALLED = umu_available
+        config.WINETRICKS_INSTALLED = winetricks_available
+        config.RT_UPSCALING_INSTALLED = bool(shutil.which("upscale"))
+
+    @staticmethod
     def get_software_support() -> dict:
         """Checks for necessary binaries, tools, and libraries."""
         clean_env = SystemUtils.get_clean_env()
@@ -156,19 +177,6 @@ class SystemUtils:
             "upscale": bool(upscale_path),
             "upscale_version": SystemUtils._get_tool_version(upscale_path, env=clean_env) if bool(upscale_path) else None
         }
-
-        # Update the config module variables
-        mapping = {
-            "gamescope": "GAMESCOPE_INSTALLED",
-            "vulkan_support": "VULKAN_INSTALLED",
-            "umu_run": "UMU_RUN_INSTALLED",
-            "winetricks": "WINETRICKS_INSTALLED",
-            "upscale": "RT_UPSCALING_INSTALLED"
-        }
-
-        for support_key, config_var in mapping.items():
-            is_supported = support.get(support_key, False)
-            setattr(config, config_var, is_supported)
 
         # Check all GStreamer packages
         for pkg in SystemUtils.GSTREAMER_PACKAGES:
@@ -241,7 +249,7 @@ class SystemUtils:
     @staticmethod
     def print_diagnostic_report():
         """Helper to print a nicely formatted console report."""
-        if SettingsManager().get(config.USER_CONF_LOG_LEVEL, "INFO").upper() == "DEBUG":
+        def run_diagnostic():
             logger.debug("="*50)
             logger.debug(" LVNM SYSTEM DIAGNOSTICS")
             logger.debug("="*50)
@@ -273,6 +281,8 @@ class SystemUtils:
                 status = "✅" if installed else "❌"
                 logger.debug(f"{status} {pkg}")
             logger.debug("="*50)
+
+        threading.Thread(target=run_diagnostic, daemon=True).start()
 
     @staticmethod
     def get_latest_release_info() -> tuple[str, str]:

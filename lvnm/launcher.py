@@ -68,6 +68,7 @@ def main():
 
     # Launch UI
     if len(sys.argv) == 1:
+        SystemUtils.init_software_config()
         window = MainWindow()
         window.show()
         QTimer.singleShot(0, SystemUtils.print_diagnostic_report)
