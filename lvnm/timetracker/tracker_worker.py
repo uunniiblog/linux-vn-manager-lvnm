@@ -41,6 +41,7 @@ class TrackerWorker(QThread):
         self.refresh_interval = int(refresh_interval)
         self.save_interval = int(save_interval) * 60
         self.afk_timer = int(afk_timer) * 60
+        self.existence_interval = 60.5
         
         self.running = True
         self.session_line_exists = False
@@ -62,13 +63,14 @@ class TrackerWorker(QThread):
             if self.target_window_id in all_ids:
                 return True
 
-            # Looks up if new PID exists
-            new_pid = SystemUtils.get_pid_by_name(self.process_name)
+            # Looks up if new PIDs exist
+            new_pid = SystemUtils.get_pids_by_name(self.process_name)
             #print(f'new_pid {new_pid}')
             if new_pid:
-                new_wid = self.utils.find_window_by_pid(new_pid)
+                new_wid = self.utils.find_window_by_pid(new_pid, self.process_name)
                 # print(f'new_wid {new_wid}')
                 if new_wid and new_wid[0]:
+                    logger.info(f"New tracking window found for {self.app_name} - {self.process_name} - {self.target_window_id}")
                     self.target_window_id = str(new_wid[0])
                     return True
 
@@ -107,7 +109,8 @@ class TrackerWorker(QThread):
         last_save_time = last_tick
 
         # Check if windows exists
-        last_existence_check = 0 
+        last_existence_check = 0
+        last_afk_check = 0
         window_currently_open = True
 
         # Accumulator for sub-second precision
@@ -120,7 +123,7 @@ class TrackerWorker(QThread):
             accumulator += delta
 
             # Afk Check (Every 4.5 seconds)
-            if now - last_existence_check >= 4.5:
+            if now - last_afk_check >= 4.5:
                 # AFK check
                 is_afk, idle_time = SystemUtils.get_afk_status()
 
@@ -131,7 +134,12 @@ class TrackerWorker(QThread):
                     logger.debug("Status: Resumed (Back from AFK)")
                     was_afk = False
 
-                last_existence_check = now
+                last_afk_check = now
+
+            # Existence check (Every minute)
+            if now - last_existence_check >= self.existence_interval:
+                 self.is_window_open()
+                 last_existence_check = now
                 
             # Increment timer every second if focused and not AFK
             if accumulator >= 1.0:
