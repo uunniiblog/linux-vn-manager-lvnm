@@ -23,11 +23,6 @@ class TrackerWorker(QThread):
         self.process_name = process_name
         self.log_file_name = log_file
 
-        # Lock to guard target_window_id since it's now written by the existence-check thread and read by the main tracking loop
-        self._target_lock = threading.Lock()
-        self._stop_event = threading.Event()
-        self._existence_thread = None
-
         # Find executable
         if self.target_window_id and not self.process_name:
             logger.debug(f"Start Manually tracking for {window_id}")
@@ -56,19 +51,11 @@ class TrackerWorker(QThread):
         self.total_playtime = 0
         self.session_playtime = 0
         self.session_start = datetime.datetime.now()
-        
-    def _get_target_window_id(self):
-        with self._target_lock:
-            return self.target_window_id
-
-    def _set_target_window_id(self, value):
-        with self._target_lock:
-            self.target_window_id = value
     
     def is_window_open(self):
         """
         Checks if any open window matches the target window id.
-        If not search by process name until new PID is found.
+        If not search by process name to find the new PID and WID.
         """
         try:
             # Get all IDs again
@@ -94,7 +81,7 @@ class TrackerWorker(QThread):
 
     def is_game_focused(self):
         """ Checks if target ID is focused """
-        target_id = self._get_target_window_id()
+        target_id = self.target_window_id
         if not target_id:
             return False
 
@@ -102,17 +89,6 @@ class TrackerWorker(QThread):
         #print(f"active_id: {active_id}")
         #print(f"self.target_window_id: {self.target_window_id}")
         return str(active_id) == str(self.target_window_id)
-
-    def _existence_check_worker(self):
-        """Periodically checks window existence."""
-        while not self._stop_event.is_set():
-            try:
-                self.is_window_open()
-            except Exception as e:
-                logger.error(f"Existence check thread error: {e}")
-
-            # Interrupt instant instead of waiting out the full 60s interval on shutdown
-            self._stop_event.wait(self.existence_interval)
     
     def run(self):
         """ Main loop logic to calculate active window focus """
@@ -125,14 +101,6 @@ class TrackerWorker(QThread):
         # Launch swayidle afk detection
         if self.afk_timer > 0:
             SystemUtils.start_afk_daemon(self.afk_timer)
-
-        # Start the existence check on a different thread
-        self._existence_thread = threading.Thread(
-            target=self._existence_check_worker,
-            name=f"existence-check-{self.app_name}",
-            daemon=True
-        )
-        self._existence_thread.start()
         
         was_afk = False
         is_afk = False
@@ -141,6 +109,7 @@ class TrackerWorker(QThread):
         last_log_update = last_tick
         last_save_time = last_tick
         last_afk_check = 0
+        last_existence_check = 0
         window_currently_open = True
 
         # Accumulator for sub-second precision
@@ -165,6 +134,11 @@ class TrackerWorker(QThread):
                     was_afk = False
 
                 last_afk_check = now
+
+            # Existence check (Every minute)
+            if now - last_existence_check >= self.existence_interval:
+                window_currently_open = self.is_window_open()
+                last_existence_check = time.monotonic()
                 
             # Increment timer every second if focused and not AFK
             if accumulator >= 1.0:
@@ -233,11 +207,6 @@ class TrackerWorker(QThread):
 
     def stop(self):
         self.running = False
-        # Stop the existence worker
-        self._stop_event.set()
-        if self._existence_thread and self._existence_thread.is_alive():
-            self._existence_thread.join(timeout=2.0)
-
 
 class GamescopeWorker(TrackerWorker):
     def __init__(self, target_pid, app_name, process_name, desktop_utils, log_file, refresh_interval=60, save_interval=3, afk_timer=0):

@@ -14,7 +14,6 @@ from timetracker.desktop_utils_interface import DesktopUtilsInterface
 
 logger = logging.getLogger(__name__)
 
-
 class KwinNotifier(QObject):
     """Receives push events from the persistent KWin script via DBus."""
     def __init__(self):
@@ -31,38 +30,35 @@ class KwinNotifier(QObject):
     @Slot(str)
     def ActiveWindowChanged(self, window_id):
         """DBus slot triggered when KWin changes focus to a different window."""
-        logger.debug(f"[Notifier] ActiveWindowChanged window_id={window_id}")
         with self._lock:
             # Empty string from KWin signifies no window is currently focused.
             self.active_window_id = window_id or None
+            name = self.window_cache.get(window_id, {}).get("name", "Unknown")
+            logger.debug(f"[KWinScript] ActiveWindowChanged window_id={window_id} name={name}")
 
     @Slot(str, str, str, str)
     def WindowAdded(self, wid, pid, w_class, name):
         """DBus slot triggered when a new window is created and meets size criteria."""
-        logger.debug(f"[Notifier] WindowAdded wid={wid} pid={pid} class={w_class} name={name}")
+        logger.debug(f"[KWinScript] WindowAdded wid={wid} pid={pid} class={w_class} name={name}")
         with self._lock:
             self.window_cache[wid] = {"pid": pid, "class": w_class, "name": name}
 
     @Slot(str)
     def WindowRemoved(self, wid):
         """DBus slot triggered when a window is closed in KWin."""
-        logger.debug(f"[Notifier] WindowRemoved wid={wid}")
         with self._lock:
             # Safely remove window metadata without throwing KeyError if missing.
-            self.window_cache.pop(wid, None)
+            info = self.window_cache.pop(wid, None)
+            name = info.get("name", "Unknown") if info else "Unknown"
+            logger.debug(f"[KWinScript] WindowRemoved window_id={wid} name={name}")
 
     @Slot(str, str)
     def WindowCaptionChanged(self, wid, name):
         """DBus slot triggered when an existing window updates its title."""
-        logger.debug(f"[Notifier] WindowCaptionChanged wid={wid} name={name}")
+        logger.debug(f"[KWinScript] WindowCaptionChanged wid={wid} name={name}")
         with self._lock:
             if wid in self.window_cache:
                 self.window_cache[wid]["name"] = name
-
-    @Slot(str)
-    def ScriptDiagnostic(self, message):
-        """DBus slot for receiving console logging/diagnostics directly from the JS script."""
-        logger.debug(f"[KWinScript] {message}")
 
     def get_active(self):
         """Retrieves the currently active window ID safely after processing pending events."""
@@ -109,13 +105,7 @@ _KWIN_SCRIPT_JS = """
 print("TIMETRACKER_SCRIPT_ALIVE");
 
 function report(msg) {
-    var formatted = "[TIMETRACKER_JS] " + msg;
-    print(formatted);
-    try {
-        callDBus("%(service)s", "%(path)s", "", "ScriptDiagnostic", String(msg));
-    } catch (e) {
-        print("[TIMETRACKER_JS] DBus report failed: " + e);
-    }
+    print("[TIMETRACKER_JS] " + msg);
 }
 
 function emitAdded(w) {
@@ -131,7 +121,6 @@ function emitAdded(w) {
         var cap = w.caption ? String(w.caption) : "";
 
         callDBus("%(service)s", "%(path)s", "", "WindowAdded", windowId, processId, resClass, cap);
-        report("Emitted WindowAdded: " + resClass + " (" + windowId + ")");
     } catch (e) {
         report("ERROR in emitAdded: " + e);
     }
