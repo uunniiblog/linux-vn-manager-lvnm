@@ -63,6 +63,11 @@ class SystemUtils:
         clean_env.pop("PYTHONHOME", None)
         clean_env.pop("PYTHONPATH", None)
         clean_env.pop("_PYI_ARCHIVE_FILE", None)
+        # Qt plugin env vars leaked
+        clean_env.pop("QT_PLUGIN_PATH", None)
+        clean_env.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+        clean_env.pop("QT_QPA_PLATFORM", None)
+        clean_env.pop("QT_QPA_FONTDIR", None)
 
         appdir = os.environ.get("APPDIR")
         if appdir:
