@@ -33,14 +33,21 @@ Releases over here: https://github.com/uunniiblog/linux-vn-manager-lvnm/releases
 It bundles umu and winetricks so it runs smoothly in the Steam Deck.
 
 ## Flatpak prototype
+Download the .flatpak from: https://github.com/uunniiblog/linux-vn-manager-lvnm/releases
+
+Install with `flatpak install --user LVNM-x86_64.flatpak`
+
+It bundles umu, winetricks, gamescope, GStreamer libraries and linux-rt-upscaler so all external tools the launcher uses are usable.
+Recommended for read only systems.
+
+It uses the shared location: `~/.local/share/lvnm`.
+
 Flatpak build local testing:
 
 ```bash
 ./flatpak/build-local.sh
 flatpak run io.github.uunniiblog.lvnm
 ```
-
-It uses the shared location: `~/.local/share/lvnm`.
 
 ## How to use
 1. Runner tab -> Download wine and proton runners.

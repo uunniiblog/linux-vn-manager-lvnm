@@ -1,0 +1,74 @@
+name: Build LVNM Releases
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appimage:
+    uses: ./.github/workflows/build-appimage.yml
+
+  flatpak:
+    uses: ./.github/workflows/build-flatpak.yml
+
+  publish-release:
+    needs: [appimage, flatpak]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum LVNM-x86_64.AppImage LVNM-x86_64.flatpak > SHA256SUMS
+
+      - name: Set Release Variables
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "TAG_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
+            echo "RELEASE_NAME=LVNM ${{ github.ref_name }}" >> "$GITHUB_ENV"
+            echo "IS_PRERELEASE=false" >> "$GITHUB_ENV"
+          else
+            echo "TAG_NAME=continuous" >> "$GITHUB_ENV"
+            echo "RELEASE_NAME=Continuous Build" >> "$GITHUB_ENV"
+            echo "IS_PRERELEASE=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Move Continuous Tag
+        if: github.ref_type == 'branch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f continuous
+          git push -f origin continuous
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.RELEASE_NAME }}
+          body: |
+            Automated build for commit: ${{ github.sha }}
+            Download the AppImage or Flatpak bundle below.
+          files: |
+            LVNM-x86_64.AppImage
+            LVNM-x86_64.flatpak
+            SHA256SUMS
+          draft: false
+          prerelease: ${{ env.IS_PRERELEASE == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

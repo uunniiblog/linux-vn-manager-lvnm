@@ -61,6 +61,7 @@ finish-args:
   - --filesystem=/mnt
   - --filesystem=/run/media
   - --talk-name=org.kde.KWin
+  - --talk-name=org.freedesktop.Flatpak
   - --env=LD_LIBRARY_PATH=/app/lib/i386-linux-gnu/codecs-extra/lib:/app/lib:/app/lib/i386-linux-gnu:/usr/lib/x86_64-linux-gnu/codecs-extra/lib:/usr/lib/i386-linux-gnu/codecs-extra/lib
   - --env=PATH=/app/bin:/usr/bin:/app/lib/extensions/vulkan/gamescope/bin:/usr/lib/extensions/vulkan/gamescope/bin
   - --env=GST_PLUGIN_SYSTEM_PATH=/app/lib/gstreamer-1.0:/app/lib32/gstreamer-1.0:/app/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/app/lib/i386-linux-gnu/gstreamer-1.0:/usr/lib/extensions/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/gstreamer-1.0:/usr/lib/i386-linux-gnu/gstreamer-1.0
@@ -115,6 +116,7 @@ modules:
         - --share=network
     build-commands:
       - pip3 install --no-cache-dir --prefix=/app -r requirements-flatpak.txt
+      - /app/bin/upscale --version | grep -Fqx 'upscale 1.1.3'
     sources:
       - type: file
         path: requirements-flatpak.txt

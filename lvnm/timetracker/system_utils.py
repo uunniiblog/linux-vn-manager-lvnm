@@ -138,8 +138,13 @@ class SystemUtils:
         pattern = cmdline_hint.lower() if cmdline_hint else filename
         pattern = re.escape(pattern)
         logger.debug(f"get_pids_by_name pattern: {pattern} (hint={cmdline_hint}, filename={filename})")
+
+        cmd = ["pgrep", "-f", "-i", pattern]
+        if SystemUtils._runtime_type == "flatpak":
+            cmd = ["flatpak-spawn", "--host"] + cmd
+
         try:
-            output = subprocess.check_output(["pgrep", "-f", "-i", pattern], text=True, env={**os.environ, "LC_ALL": "C.UTF-8"})
+            output = subprocess.check_output(cmd, text=True, env={**os.environ, "LC_ALL": "C.UTF-8"})
             pids = output.strip().splitlines()
             valid_pids = [p for p in pids if p != my_pid]
             return valid_pids
