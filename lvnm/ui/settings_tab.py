@@ -22,29 +22,6 @@ from gdrive_manager import GdriveManager, GdriveDeviceFlowWorker
 
 logger = logging.getLogger(__name__)
 
-
-class SystemInfoWorker(QThread):
-    results_ready = Signal(dict, dict)
-
-    def run(self):
-        try:
-            system_info = SystemUtils.get_system_info()
-            software_info = SystemUtils.get_software_support()
-            self.results_ready.emit(system_info, software_info)
-        except Exception:
-            logger.exception("Failed to load Settings system information")
-            self.results_ready.emit({}, {})
-
-
-class UpdateCheckWorker(QThread):
-    results_ready = Signal(str, str)
-
-    def run(self):
-        tag, url = SystemUtils.get_latest_release_info()
-        if tag and url:
-            self.results_ready.emit(tag, url)
-
-
 class SettingsTab(QWidget):
     CONFIG_FILE = config.USER_SETTINGS
 
@@ -1193,3 +1170,24 @@ class SettingsTab(QWidget):
                 self.tr("Error"),
                 self.tr(str(e))
             )
+
+class SystemInfoWorker(QThread):
+    results_ready = Signal(dict, dict)
+
+    def run(self):
+        try:
+            system_info = SystemUtils.get_system_info()
+            software_info = SystemUtils.get_software_support()
+            self.results_ready.emit(system_info, software_info)
+        except Exception:
+            logger.exception("Failed to load Settings system information")
+            self.results_ready.emit({}, {})
+
+
+class UpdateCheckWorker(QThread):
+    results_ready = Signal(str, str)
+
+    def run(self):
+        tag, url = SystemUtils.get_latest_release_info()
+        if tag and url:
+            self.results_ready.emit(tag, url)
