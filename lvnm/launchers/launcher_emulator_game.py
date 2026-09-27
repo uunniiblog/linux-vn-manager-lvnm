@@ -17,6 +17,8 @@ class LauncherEmulatorGame(LauncherBaseGame):
     def prepare_environment(self):
         self.env = SystemUtils.get_clean_env()
 
+        self._restore_flatpak_host_xdg_paths()
+
         # Add user-defined environment variables
         for key, val in self.game.envvar.items():
             self.env[key] = val
@@ -24,6 +26,8 @@ class LauncherEmulatorGame(LauncherBaseGame):
         emulator_path = self.prefix_info["path"]
         emulator_type = self.prefix_info["type"]
         extra_args = shlex.split(self.prefix_info.get("config", ""))
+
+        self._enable_flatpak_appimage_fallback(emulator_path)
 
         # RPCS3 settings
         if emulator_type == config.EMULATION_PS3:
@@ -39,6 +43,8 @@ class LauncherEmulatorGame(LauncherBaseGame):
         self.cmd = self.apply_pre_launch_args(self.cmd)
         # Apply Gamescope Wrapper
         self.cmd = self.apply_gamescope(self.cmd)
+        # Apply flatpak-spawn if flatpak
+        self.cmd = self._wrap_flatpak_host_command(self.cmd, emulator_path)
 
     def run(self, is_headless=False):
         self.load_data()
@@ -121,3 +127,76 @@ class LauncherEmulatorGame(LauncherBaseGame):
         logger.debug("Execution Command:")
         logger.debug(f"   {' '.join(self.cmd)}")
         logger.debug("="*60)
+
+    def _wrap_flatpak_host_command(self, cmd: list, emulator_path: str) -> list:
+        """Run non AppImage emulator commands outside the Flatpak sandbox."""
+        if SystemUtils.get_runtime_type() != "flatpak" or self._is_appimage(emulator_path):
+            return cmd
+
+        home = self.env.get("HOME", str(Path.home()))
+        emulator = Path(emulator_path)
+        host_working_dir = str(emulator.parent) if emulator.is_absolute() else home
+
+        host_cmd = [
+            "flatpak-spawn",
+            "--host",
+            "--watch-bus",
+            f"--directory={host_working_dir}",
+        ]
+        for key, value in self.game.envvar.items():
+            host_cmd.append(f"--env={key}={value}")
+
+        self.game_dir = home
+        logger.info("Using host command for emulator: %s", emulator_path)
+        return host_cmd + cmd
+
+    def _restore_flatpak_host_xdg_paths(self):
+        """Let sandboxed emulators reuse their existing host profiles."""
+        if SystemUtils.get_runtime_type() != "flatpak":
+            return
+
+        home = self.env.get("HOME")
+        if not home:
+            logger.warning("Cannot restore host emulator config paths: HOME is not set")
+            return
+
+        host_xdg_paths = {
+            "XDG_CONFIG_HOME": ("HOST_XDG_CONFIG_HOME", ".config"),
+            "XDG_DATA_HOME": ("HOST_XDG_DATA_HOME", ".local/share"),
+            "XDG_CACHE_HOME": ("HOST_XDG_CACHE_HOME", ".cache"),
+            "XDG_STATE_HOME": ("HOST_XDG_STATE_HOME", ".local/state"),
+        }
+        for xdg_variable, (host_variable, default_path) in host_xdg_paths.items():
+            self.env[xdg_variable] = self.env.get(host_variable) or str(Path(home) / default_path)
+
+        logger.info("Using host XDG directories for emulator configuration and data")
+
+    def _enable_flatpak_appimage_fallback(self, emulator_path: str):
+        """Run AppImage emulators without FUSE when LVNM is sandboxed."""
+        if SystemUtils.get_runtime_type() != "flatpak" or not self._is_appimage(emulator_path):
+            return
+
+        # Flatpak does not expose the FUSE mount helper/device to the sandbox.
+        # Extract to a temporary directory and running from there instead.
+        self.env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+        logger.info("Using AppImage extract-and-run fallback for emulator: %s", emulator_path)
+
+    @staticmethod
+    def _is_appimage(executable: str) -> bool:
+        path = Path(executable)
+        if path.suffix.casefold() == ".appimage":
+            return True
+
+        try:
+            with path.open("rb") as executable_file:
+                header = executable_file.read(11)
+        except (OSError, TypeError, ValueError):
+            return False
+
+        # AppImage embeds "AI" and its format version in the ELF header.
+        return (
+            len(header) >= 11
+            and header[:4] == b"\x7fELF"
+            and header[8:10] == b"AI"
+            and header[10] in (1, 2)
+        )
