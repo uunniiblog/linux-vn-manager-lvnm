@@ -116,10 +116,17 @@ modules:
         - --share=network
     build-commands:
       - pip3 install --no-cache-dir --prefix=/app -r requirements-flatpak.txt
+      - install -d /app/libexec/linux-rt-upscaler
+      - mv /app/bin/upscale /app/libexec/linux-rt-upscaler/upscale
+      - mv /app/bin/upscale-gui /app/libexec/linux-rt-upscaler/upscale-gui
+      - install -Dm755 linux-rt-upscaler-wrapper.sh /app/bin/upscale
+      - ln -s upscale /app/bin/upscale-gui
       - /app/bin/upscale --version | grep -Fqx 'upscale 1.1.3'
     sources:
       - type: file
         path: requirements-flatpak.txt
+      - type: file
+        path: linux-rt-upscaler-wrapper.sh
 
   - name: lvnm
     buildsystem: simple

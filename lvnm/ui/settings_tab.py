@@ -11,6 +11,7 @@ from ui.savedata_management_dialog import SavedataManagementDialog
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
+from execution_manager import ExecutionManager
 import config
 import logging
 from settings_manager import SettingsManager
@@ -96,12 +97,16 @@ class SettingsTab(QWidget):
         self.upscaler_checkbox.setChecked(self.user_settings.get(config.USER_CONF_RT_UPSCALER_ENABLED, False))
         self.upscaler_params = QLineEdit(self.user_settings.get(config.USER_CONF_RT_UPSCALER_PARAMS, ""))
         self.upscaler_params.setPlaceholderText(self.tr("Parameters (e.g., --profile 1080p --crop-top 19)"))
+        self.upscaler_gui_btn = QPushButton(self.tr("Open GUI"))
+        self.upscaler_gui_btn.setToolTip(self.tr("Open the linux-rt-upscaler configuration interface"))
         if not config.RT_UPSCALING_INSTALLED:
             self.upscaler_checkbox.setDisabled(True)
             self.upscaler_checkbox.setCheckable(False)
             self.upscaler_params.setDisabled(True)
+            self.upscaler_gui_btn.setDisabled(True)
         upscaler_layout.addWidget(self.upscaler_checkbox)
         upscaler_layout.addWidget(self.upscaler_params)
+        upscaler_layout.addWidget(self.upscaler_gui_btn)
         settings_layout.addRow(QLabel(self.tr("linux-rt-upscaler:")), upscaler_layout)
         
         # Global Env Variables
@@ -773,6 +778,7 @@ class SettingsTab(QWidget):
         self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
         self.upscaler_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_RT_UPSCALER_ENABLED, bool(s)))
         self.upscaler_params.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_RT_UPSCALER_PARAMS, t))
+        self.upscaler_gui_btn.clicked.connect(self._open_upscaler_gui)
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
         self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
         self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
@@ -800,6 +806,15 @@ class SettingsTab(QWidget):
         gp_manager = GameProcessManager.get_instance()
         gp_manager.game_started.connect(lambda: self._set_folders_enabled(False))
         gp_manager.game_stopped.connect(lambda: self._check_should_re_enable_folders())
+
+    def _open_upscaler_gui(self):
+        """Open the bundled or system linux-rt-upscaler GUI."""
+        try:
+            ExecutionManager.run(["upscale-gui"], SystemUtils.get_clean_env(), wait=False, detached=True)
+        except OSError as error:
+            logger.error("Failed to open linux-rt-upscaler GUI: %s", error)
+            QMessageBox.warning(self, self.tr("Unable to Open GUI"),
+                self.tr("linux-rt-upscaler GUI could not be started:\n{}").format(error))
 
     def _connect_folder_signal(self, key, edit_widget, btn_widget):
         """Helper to bind signals without loop closure issues."""
