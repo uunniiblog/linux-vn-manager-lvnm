@@ -691,15 +691,19 @@ class SystemUtils:
     def get_launch_command(game_name: str, for_steam: bool = False):
         """
         Determines the correct executable path and arguments depending on 
-        whether the app is running as an AppImage, a PyInstaller binary, or from source.
+        whether the app is running as an AppImage, binary, flatpak, or from source.
         """
         appimage_path = os.environ.get("APPIMAGE")
         flatpak_id = os.environ.get("FLATPAK_ID")
         
         if flatpak_id:
             logger.debug("get_launch_command - Running as a Flatpak")
-            exe_cmd = f"flatpak run {flatpak_id}"
-            args = f'-r "{game_name}"'
+            if for_steam:
+                exe_cmd = "flatpak"
+                args = f'run {flatpak_id} -r "{game_name}"'
+            else:
+                exe_cmd = f"flatpak run {flatpak_id}"
+                args = f'-r "{game_name}"'
         elif appimage_path:
             logger.debug("get_launch_command - Running as an AppImage")
             exe_cmd = f'"{appimage_path}"'
@@ -799,4 +803,3 @@ class SystemUtils:
     def contains_japanese(text):
         # Matches Hiragana, Katakana, and CJK Kanji
         return bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', text))
-        
