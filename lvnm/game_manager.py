@@ -8,7 +8,7 @@ from prefix_manager import PrefixManager
 from runner_manager import RunnerManagerInterface
 from pathlib import Path
 from dataclasses import asdict
-from model.game_card import GameCard, GameScope
+from model.game_card import GameCard, GameScope, SavedataConfig
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class GameManager:
 
         current_card = GameCard.from_dict(original_name, raw_data[original_name])
         old_vndb = current_card.vndb
-        old_savedata_path = current_card.savedata_path
+        old_savedata = asdict(current_card.savedata)
 
         for key, value in updates.items():
             attr_key = key.replace("-", "_")
@@ -99,6 +99,12 @@ class GameManager:
             elif key == "rtUpscaler" and isinstance(value, dict):
                 for upscale_key, upscale_val in value.items():
                     setattr(current_card.rtUpscaler, upscale_key, upscale_val)
+            elif key == "savedata" and isinstance(value, dict):
+                current_card.savedata = SavedataConfig.from_dict(value)
+                current_card.savedata_path = current_card.savedata.primary_path()
+            elif key == "savedata_path" and "savedata" not in updates:
+                current_card.savedata_path = str(value)
+                current_card.savedata = SavedataConfig.from_dict(None, current_card.savedata_path)
             elif hasattr(current_card, attr_key):
                 setattr(current_card, attr_key, value)
         
@@ -108,7 +114,7 @@ class GameManager:
             del raw_data[original_name]
 
         # Reset GDrive sync manifest if savedata changed
-        if current_card.savedata_path != old_savedata_path:
+        if asdict(current_card.savedata) != old_savedata:
             from savedata_manager import SavedataManager
             SavedataManager.reset_sync_manifest(new_name)
 
@@ -229,6 +235,7 @@ class GameManager:
         game_data["pre_launch_script_wait"] = False
         game_data["exit_script"] = ""
         game_data["savedata_path"] = ""
+        game_data["savedata"] = asdict(SavedataConfig())
         game_data["gdrive"] = False
 
         if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":

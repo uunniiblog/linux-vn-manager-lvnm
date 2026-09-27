@@ -5,14 +5,15 @@ from PySide6.QtWidgets import (
     QDialog, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QSizePolicy,
     QWidget, QLineEdit, QLabel, QFileDialog, QComboBox,
-    QMessageBox, QCheckBox, QStyle, QDialogButtonBox
+    QMessageBox, QCheckBox, QDialogButtonBox
 )
-from PySide6.QtCore import QSettings, Qt, QObject, QEvent
+from PySide6.QtCore import QSettings, Qt
 from settings_manager import SettingsManager
 from game_manager import GameManager
 from prefix_manager import PrefixManager
 from savedata_manager import SavedataManager
 from pregame_sync_pipeline import ManualSyncPipeline, SavedataSyncStep, TrackingSyncStep
+from ui.savedata_config_dialog import SavedataConfigDialog
 from ui.savedata_conflict_prompt import prompt_savedata_conflict
 
 logger = logging.getLogger(__name__)
@@ -31,8 +32,14 @@ class SavedataManagementDialog(QDialog):
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
 
         layout = QVBoxLayout(self)
-        self.info_label = QLabel(self.tr("When adding the savedata path add the furthermost path that contains the actual save files. If the savedata is inside the same prefix as the game you can also copy the save files to another prefixes."))
-        self.info_label2 = QLabel(self.tr("Enable Gdrive sync individually per game case where you need it. If changing prefix of a game or savedata folder with gdrive sync make sure first to copy the saves to the new prefix first to avoid data sync corruption."))
+        self.info_label = QLabel(self.tr(
+            "Add one or more savedata folders, with optional file exclusions, or select the individual files the game uses. "
+            "Sources inside the game's prefix can also be copied to another prefix."
+        ))
+        self.info_label2 = QLabel(self.tr(
+            "Enable Gdrive sync individually per game. Before changing a prefix or savedata source, copy the saves to the "
+            "new prefix to avoid sync conflicts."
+        ))
         self.info_label.setWordWrap(True)
         self.info_label2.setWordWrap(True)
         layout.addWidget(self.info_label)
@@ -63,6 +70,7 @@ class SavedataManagementDialog(QDialog):
             reverse=True
         )
         self.games = dict(sorted_items)
+        self._savedata_rows = {}
 
         # Table Setup
         self.table = QTableWidget(len(self.games), 4)
@@ -72,7 +80,7 @@ class SavedataManagementDialog(QDialog):
 
         self.table.setHorizontalHeaderLabels([
             self.tr("Game"),
-            self.tr("Savedata Path"),
+            self.tr("Savedata Sources"),
             self.tr("Prefix"),
             self.tr("Gdrive Sync")
         ])
@@ -94,7 +102,7 @@ class SavedataManagementDialog(QDialog):
 
             # Column 1: Savedata path (line edit + browse button)
             path_sort_item = SortableItem()
-            path_sort_item.setData(Qt.UserRole, game_data.get("savedata_path", ""))
+            path_sort_item.setData(Qt.UserRole, self._savedata_summary(game_data))
             savedata_widget = self._create_savedata_widget(row, game_data, path_sort_item)
             self.table.setCellWidget(row, 1, savedata_widget)
             self.table.setItem(row, 1, path_sort_item)
@@ -107,6 +115,14 @@ class SavedataManagementDialog(QDialog):
             self.table.setItem(row, 2, prefix_sort_item)
             prefix_widget.sort_item = prefix_sort_item
 
+            game_name = game_data.get("name", game_id)
+            self._savedata_rows[game_name] = {
+                "game_data": game_data,
+                "savedata_widget": savedata_widget,
+                "prefix_widget": prefix_widget,
+                "path_item": path_sort_item,
+            }
+
             # Column 3: Gdrive - left empty for now
             gdrive_sort_item = SortableItem()
             gdrive_sort_item.setData(Qt.UserRole, bool(game_data.get("gdrive", False)))
@@ -115,8 +131,11 @@ class SavedataManagementDialog(QDialog):
             self.table.setItem(row, 3, gdrive_sort_item)
 
             # Enable/disable the copy button as the path changes
-            savedata_widget.line_edit.textChanged.connect(lambda text, btn=prefix_widget.copy_button: btn.setEnabled(
-                    bool(text.strip()) and SavedataManager.is_savedata_inside_prefix({**game_data, "savedata_path": text.strip()})))
+            savedata_widget.line_edit.textChanged.connect(
+                lambda text, btn=prefix_widget.copy_button, gd=game_data: btn.setEnabled(
+                    bool(text.strip()) and SavedataManager.is_savedata_inside_prefix(gd)
+                )
+            )
             # savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
 
         self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
@@ -143,24 +162,20 @@ class SavedataManagementDialog(QDialog):
                 self.table.setRowHidden(row, not is_visible)
     
     def _create_savedata_widget(self, row, game_data, path_item):
-        """Creates a widget with a line edit + browse button for the savedata path."""
+        """Creates a widget with a savedata summary and configuration button."""
         widget = QWidget()
         h_layout = QHBoxLayout(widget)
         h_layout.setContentsMargins(2, 2, 2, 2)
 
-        line_edit = QLineEdit(game_data.get("savedata_path", ""))
+        line_edit = QLineEdit(self._savedata_summary(game_data))
+        line_edit.setReadOnly(True)
 
-        browse_button = QPushButton()
-        browse_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon)
-        browse_button.setIcon(browse_icon)
-        browse_button.clicked.connect(lambda: self._browse_savedata_folder(line_edit, game_data, path_item))
+        browse_button = QPushButton(self.tr("Configure..."))
+        browse_button.clicked.connect(lambda: self._configure_savedata(line_edit, game_data, path_item))
 
         auto_detect_button = QPushButton(self.tr("Auto Detect"))
         auto_detect_button.setToolTip(self.tr("Attemps to find the savedata folder automatically"))
         auto_detect_button.clicked.connect(lambda: self._auto_detect_savedata_folder(line_edit, game_data, path_item))
-
-        # Also persist manual edits
-        line_edit.editingFinished.connect(lambda: self._save_savedata_path(line_edit, game_data, path_item))
 
         h_layout.addWidget(line_edit)
         h_layout.addWidget(browse_button)
@@ -171,15 +186,47 @@ class SavedataManagementDialog(QDialog):
 
         return widget
 
-    def _save_savedata_path(self, line_edit, game_data, path_item=None):
-        """Persists the savedata path for this game via GameManager."""
-        game_name = game_data.get("name")
-        new_path = line_edit.text()
-        game_data["savedata_path"] = new_path
-        GameManager.update_game(game_name, {"savedata_path": new_path})
+    def _savedata_summary(self, game_data):
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        if savedata_config.get("mode") == "files":
+            count = sum(len(group.get("files", [])) for group in savedata_config.get("file_groups", []))
+            return self.tr("{0} selected files").format(count) if count else ""
+        folders = savedata_config.get("folders", [])
+        excluded = sum(len(folder.get("excluded", [])) for folder in folders)
+        if not folders:
+            return ""
+        if len(folders) == 1 and excluded == 0:
+            return folders[0].get("path", "")
+        return self.tr("{0} folders ({1} excluded)").format(len(folders), excluded)
 
+    def _refresh_savedata_row(self, game_name):
+        row_data = self._savedata_rows.get(game_name)
+        updated_card = GameManager.get_game(game_name)
+        if row_data is None or updated_card is None:
+            return
+
+        game_data = row_data["game_data"]
+        game_data.clear()
+        game_data.update(updated_card.to_dict())
+        summary = self._savedata_summary(game_data)
+        row_data["savedata_widget"].line_edit.setText(summary)
+        row_data["path_item"].setData(Qt.UserRole, summary)
+        row_data["prefix_widget"].copy_button.setEnabled(SavedataManager.is_savedata_inside_prefix(game_data))
+
+    def _configure_savedata(self, line_edit, game_data, path_item=None):
+        dialog = SavedataConfigDialog(game_data, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        savedata_config = dialog.result_config()
+        game_name = game_data.get("name")
+        game_data["savedata"] = savedata_config
+        sources = SavedataManager._active_sources(savedata_config)
+        game_data["savedata_path"] = SavedataManager._source_root(sources[0], savedata_config.get("mode")) if sources else ""
+        GameManager.update_game(game_name, {"savedata": savedata_config})
+        summary = self._savedata_summary(game_data)
+        line_edit.setText(summary)
         if path_item:
-            path_item.setData(Qt.UserRole, new_path)
+            path_item.setData(Qt.UserRole, summary)
 
     def _create_prefix_widget(self, row, game_data):
         """Creates a widget with the current prefix label + a 'Copy to...' button."""
@@ -192,7 +239,6 @@ class SavedataManagementDialog(QDialog):
 
         copy_button = QPushButton(self.tr("Copy to..."))
         copy_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-        copy_button.setEnabled(bool(game_data.get("savedata_path", "")))
         is_inside = SavedataManager.is_savedata_inside_prefix(game_data)
         copy_button.setEnabled(is_inside)
         copy_button.clicked.connect(lambda: self._open_copy_to_prefix_dialog(game_data))
@@ -204,26 +250,6 @@ class SavedataManagementDialog(QDialog):
         widget.copy_button = copy_button
 
         return widget
-
-    def _browse_savedata_folder(self, line_edit, game_data, path_item=None):
-        dialog = QFileDialog(self)
-        dialog.setWindowTitle(self.tr("Select Savedata Folder"))
-        dialog.setFileMode(QFileDialog.FileMode.Directory)
-        dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
-
-        savedata_path = game_data.get("savedata_path", "")
-        game_folder = game_data.get("path", "")
-        if savedata_path:
-            dialog.setDirectory(savedata_path)
-        elif game_folder:
-            dialog.setDirectory(game_folder)
-        
-        if dialog.exec():
-            selected_files = dialog.selectedFiles()
-            if selected_files:
-                folder = selected_files[0]
-                line_edit.setText(folder)
-                self._save_savedata_path(line_edit, game_data, path_item)
 
     def _open_copy_to_prefix_dialog(self, game_data):
         """Opens a small dialog to pick a prefix and copy the savedata into it."""
@@ -292,8 +318,19 @@ class SavedataManagementDialog(QDialog):
         """Tries to auto-detect the savedata folder; fills the field on success, warns otherwise."""
         detected_path = SavedataManager.auto_detect_savedata_folder(game_data)
         if detected_path:
-            line_edit.setText(detected_path)
-            self._save_savedata_path(line_edit, game_data, path_item)
+            savedata_config = {
+                "version": 1,
+                "mode": "folders",
+                "folders": [{"path": detected_path, "excluded": [], "source_id": "primary"}],
+                "file_groups": [],
+            }
+            game_data["savedata"] = savedata_config
+            game_data["savedata_path"] = detected_path
+            GameManager.update_game(game_data.get("name"), {"savedata": savedata_config})
+            summary = self._savedata_summary(game_data)
+            line_edit.setText(summary)
+            if path_item:
+                path_item.setData(Qt.UserRole, summary)
         else:
             QMessageBox.warning(
                 self,
@@ -353,11 +390,17 @@ class SavedataManagementDialog(QDialog):
             steps.append(TrackingSyncStep(game_data['path'], self.tr("Syncing time tracking data...")))
             
             self._pending_pipeline = ManualSyncPipeline(self, steps)
-            self._pending_pipeline.finished.connect(lambda proceed: setattr(self, '_pending_pipeline', None))
+            self._pending_pipeline.finished.connect(
+                lambda proceed, name=game_data['name']: self._on_sync_finished(name)
+            )
             self._pending_pipeline.start()
         except Exception as e:
             logging.error(f"Gdrive sync failed for '{game_data.get('name', '')}': {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Gdrive Sync Failed"), str(e))
+
+    def _on_sync_finished(self, game_name):
+        self._pending_pipeline = None
+        self._refresh_savedata_row(game_name)
 
     def resizeEvent(self, event):
         """Called automatically when the dialog is resized."""

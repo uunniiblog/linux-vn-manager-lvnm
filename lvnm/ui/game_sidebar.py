@@ -14,7 +14,7 @@ from ui.prefix_tab import PrefixTab
 from ui.timetracker_dialog import TimetrackerDialog
 from game_manager import GameManager
 from prefix_manager import PrefixManager
-from model.game_card import GameCard, GameScope
+from model.game_card import GameCard, GameScope, SavedataConfig
 from system_utils import SystemUtils
 from vndb_manager import VndbManager, VndbWorker
 from settings_manager import SettingsManager
@@ -24,6 +24,7 @@ from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
+from ui.savedata_config_dialog import SavedataConfigDialog
 from timetracker.log_manager import LogManager
 from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, TrackingSyncStep
 from ui.savedata_conflict_prompt import prompt_savedata_conflict
@@ -199,11 +200,12 @@ class GameSidebar(QFrame):
 
         # Save data folder (Only if enabled in settings)
         self.edit_savedata = QLineEdit()
+        self.edit_savedata.setReadOnly(True)
         self.btn_savedata = QPushButton()
         self.btn_savedata.setIcon(browse_icon)
         self.btn_savedata.setFixedSize(43, 32)
         self.btn_savedata.clicked.connect(self.browse_savedata)
-        self.edit_savedata.setPlaceholderText("~/.local/share/lvnm/prefixes/protonge1034/drive_c/users/user/AppData/Roaming/Frontwing/GINKA/")
+        self.edit_savedata.setPlaceholderText(self.tr("No savedata sources configured"))
         self.btn_open_svdata = QPushButton()
         self.btn_open_svdata.setIcon(add_icon)
         self.btn_open_svdata.setFixedSize(43, 32)
@@ -336,7 +338,8 @@ class GameSidebar(QFrame):
             if game_to_update:
                 self.current_game.last_played = game_to_update.last_played
                 self.current_game.savedata_path = game_to_update.savedata_path
-                self.edit_savedata.setText(game_to_update.savedata_path)
+                self.current_game.savedata = game_to_update.savedata
+                self.edit_savedata.setText(self._savedata_summary(game_to_update.to_dict()))
 
                 if self.current_game.gdrive:
                     self.show_sync_message(self.tr("Gdrive Syncing..."), "#ffc107", timeout_ms=0)
@@ -433,7 +436,7 @@ class GameSidebar(QFrame):
         self.edit_name.setText(card.name)
         self.edit_path.setText(card.path)
         self.edit_vndb.setText(card.vndb)
-        self.edit_savedata.setText(card.savedata_path)
+        self.edit_savedata.setText(self._savedata_summary(card.to_dict()))
         self.gdrive_sync_checkbox.setChecked(bool(getattr(card, "gdrive", False)))
         self.update_savedata_visibility()
 
@@ -712,23 +715,29 @@ class GameSidebar(QFrame):
                 self.edit_path.setText(selected_files[0])
 
     def browse_savedata(self):
-        """File system browser"""
-        dialog = QFileDialog(self)
-        current_path = self.edit_path.text()
-        savedata_path = self.edit_savedata.text()
-        if savedata_path:
-            dialog.setDirectory(savedata_path.strip())
-        elif current_path:
-            dialog.setDirectory(current_path.strip())
-        
-        # TODO: doesn't seem to be a way to show files but only choose directories
-        dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setViewMode(QFileDialog.Detail)
+        """Opens the shared savedata source editor."""
+        if not self.current_game:
+            return
+        game_data = self.current_game.to_dict()
+        game_data["path"] = self.edit_path.text()
+        dialog = SavedataConfigDialog(game_data, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        savedata_config = dialog.result_config()
+        self.current_game.savedata = SavedataConfig.from_dict(savedata_config)
+        self.current_game.savedata_path = self.current_game.savedata.primary_path()
+        self.edit_savedata.setText(self._savedata_summary(self.current_game.to_dict()))
+        if GameManager.get_game(self.current_game.name):
+            GameManager.update_game(self.current_game.name, {"savedata": savedata_config})
 
-        folder = dialog.getExistingDirectory(self, self.tr("Select Savedata Folder"), "")
-
-        if folder:
-            self.edit_savedata.setText(folder)
+    def _savedata_summary(self, game_data):
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        if savedata_config.get("mode") == "files":
+            count = sum(len(group.get("files", [])) for group in savedata_config.get("file_groups", []))
+            return self.tr("{0} selected files").format(count) if count else ""
+        folders = savedata_config.get("folders", [])
+        excluded = sum(len(folder.get("excluded", [])) for folder in folders)
+        return self.tr("{0} folders ({1} excluded)").format(len(folders), excluded) if folders else ""
 
     def save_data(self):
         """
@@ -747,7 +756,6 @@ class GameSidebar(QFrame):
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text()
-        self.current_game.savedata_path = self.edit_savedata.text()
         self.current_game.gdrive = self.gdrive_sync_checkbox.isChecked()
 
         if not self.current_game.name:
@@ -840,9 +848,9 @@ class GameSidebar(QFrame):
                     self.tr(
                         "This game's savedata lives inside its prefix, and Gdrive sync is enabled.\n\n"
                         "Your existing saves won't be deleted. But the game will create fresh saves at the new prefix location.\n\n"
-                        "If you want to bring them along use use 'Copy to...' in Manage Savedata before changing the prefix, "
-                        "and update the Savedata Path afterward to keep GDrive sync working.\n\n"
-                        "Alternatively: Remove the savedata path field from the game to automatically fill it from the actual Gdrive sync info into the new prefix."
+                        "If you want to bring them along, use 'Copy to...' in Manage Savedata before changing the prefix, "
+                        "and update the savedata sources to keep GDrive sync working.\n\n"
+                        "Alternatively, remove the savedata sources so the next GDrive sync can restore their locations for the new prefix."
                     )
                 )
         
@@ -957,7 +965,8 @@ class GameSidebar(QFrame):
         updated_card = GameManager.get_game(self.current_game.name)
         if updated_card:
             self.current_game.savedata_path = updated_card.savedata_path
-            self.edit_savedata.setText(updated_card.savedata_path)
+            self.current_game.savedata = updated_card.savedata
+            self.edit_savedata.setText(self._savedata_summary(updated_card.to_dict()))
             self.gdrive_sync_checkbox.setChecked(updated_card.gdrive)
             self.update_savedata_visibility()
             

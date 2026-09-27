@@ -33,6 +33,7 @@ class SavedataManager(QObject):
     DELETION_SAFETY_THRESHOLD = 0.7
     # # Uploaded alongside savedata files with savedata path info
     SYNC_LOCATION_METADATA_FILENAME = ".lvnm_savedata_location.json"
+    SECONDARY_SOURCE_FOLDER = ".lvnm_sources"
     LOCATION_REFERENCE_METADATA_KEY = "__location_references__"
     CONFLICT_PREFER_LOCAL = "prefer_local"
     CONFLICT_PREFER_REMOTE = "prefer_remote"
@@ -52,6 +53,121 @@ class SavedataManager(QObject):
         self._gdrive_sync_workers = {}
         self.user_settings = SettingsManager()
         self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
+
+    @staticmethod
+    def get_savedata_config(game_data: dict) -> dict:
+        config_data = game_data.get("savedata")
+        if isinstance(config_data, dict):
+            mode = config_data.get("mode", "folders")
+            return {
+                "version": 1,
+                "mode": mode if mode in {"folders", "files"} else "folders",
+                "folders": list(config_data.get("folders", [])),
+                "file_groups": list(config_data.get("file_groups", [])),
+            }
+
+        legacy_path = game_data.get("savedata_path", "")
+        return {
+            "version": 1,
+            "mode": "folders",
+            "folders": [{"path": legacy_path, "excluded": [], "source_id": "primary"}] if legacy_path else [],
+            "file_groups": [],
+        }
+
+    @staticmethod
+    def _active_sources(savedata_config: dict) -> list[dict]:
+        key = "file_groups" if savedata_config.get("mode") == "files" else "folders"
+        return savedata_config.get(key, [])
+
+    @staticmethod
+    def has_savedata(game_data: dict) -> bool:
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        mode = savedata_config.get("mode")
+        return any(SavedataManager._source_root(source, mode) for source in SavedataManager._active_sources(savedata_config))
+
+    @staticmethod
+    def _source_root(source: dict, mode: str) -> str:
+        return str(source.get("root" if mode == "files" else "path", ""))
+
+    @staticmethod
+    def _source_cloud_prefix(source: dict) -> str:
+        source_id = str(source.get("source_id", "primary"))
+        if not source_id or not all(character.isalnum() or character in "_-" for character in source_id):
+            raise ValueError(f"Invalid savedata source ID: {source_id}")
+        return "" if source_id == "primary" else f"{SavedataManager.SECONDARY_SOURCE_FOLDER}/{source_id}"
+
+    @staticmethod
+    def _safe_relative_path(value: str) -> Path:
+        rel_path = Path(value)
+        if not value or rel_path.is_absolute() or ".." in rel_path.parts:
+            raise ValueError(f"Invalid savedata relative path: {value}")
+        return rel_path
+
+    @staticmethod
+    def _cloud_path(source: dict, rel_path: str) -> str:
+        prefix = SavedataManager._source_cloud_prefix(source)
+        return f"{prefix}/{rel_path}" if prefix else rel_path
+
+    @staticmethod
+    def _source_relative_cloud_path(source: dict, cloud_path: str) -> str | None:
+        prefix = SavedataManager._source_cloud_prefix(source)
+        if not prefix:
+            if cloud_path.startswith(f"{SavedataManager.SECONDARY_SOURCE_FOLDER}/"):
+                return None
+            return cloud_path
+        prefix_with_separator = f"{prefix}/"
+        return cloud_path[len(prefix_with_separator):] if cloud_path.startswith(prefix_with_separator) else None
+
+    @staticmethod
+    def _is_managed_relative_path(source: dict, mode: str, rel_path: str) -> bool:
+        if mode == "files":
+            return rel_path in {Path(path).as_posix() for path in source.get("files", [])}
+        return rel_path not in {Path(path).as_posix() for path in source.get("excluded", [])}
+
+    @staticmethod
+    def _local_target_for_cloud_path(savedata_config: dict, cloud_path: str) -> Path | None:
+        mode = savedata_config.get("mode", "folders")
+        for source in SavedataManager._active_sources(savedata_config):
+            rel_path = SavedataManager._source_relative_cloud_path(source, cloud_path)
+            if rel_path is None or not SavedataManager._is_managed_relative_path(source, mode, rel_path):
+                continue
+            root_value = SavedataManager._source_root(source, mode)
+            if not root_value:
+                continue
+            root = Path(root_value)
+            return root / SavedataManager._safe_relative_path(rel_path)
+        return None
+
+    @staticmethod
+    def collect_managed_files(savedata_config: dict) -> dict[str, Path]:
+        mode = savedata_config.get("mode", "folders")
+        managed_files = {}
+        source_ids = [str(source.get("source_id", "primary")) for source in SavedataManager._active_sources(savedata_config)]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("Savedata source IDs must be unique.")
+        for source in SavedataManager._active_sources(savedata_config):
+            root_value = SavedataManager._source_root(source, mode)
+            if not root_value:
+                continue
+            root = Path(root_value)
+            if mode == "files":
+                candidates = [SavedataManager._safe_relative_path(path) for path in source.get("files", [])]
+            else:
+                candidates = [path.relative_to(root) for path in root.rglob("*") if path.is_file()] if root.is_dir() else []
+
+            for relative in candidates:
+                rel_path = relative.as_posix()
+                if not SavedataManager._is_managed_relative_path(source, mode, rel_path):
+                    continue
+                local_path = root / relative
+                try:
+                    local_path.resolve().relative_to(root.resolve())
+                except ValueError:
+                    logger.warning(f"Skipping savedata file outside its configured root: {local_path}")
+                    continue
+                if local_path.is_file():
+                    managed_files[SavedataManager._cloud_path(source, rel_path)] = local_path
+        return managed_files
 
     def start_gdrive_sync(self, name: str, game_data: dict, conflict_resolution: str = "defer"):
         """Runs the Gdrive sync in a background thread so it doesn't block the UI."""
@@ -81,25 +197,19 @@ class SavedataManager(QObject):
     @staticmethod
     def copy_savedata_to_prefix(game_data: dict, prefix_name: str, overwrite: bool = False):
         """
-        Copies a game's savedata folder into the equivalent location inside
-        the target prefix, preserving the folder structure relative to the
-        original prefix root.
+        Copies all managed savedata sources into their equivalent locations
+        inside the target prefix.
 
         Only works for savedata that lives inside the game's current prefix
         Raises an exception if the savedata path is not actually inside the original prefix.
         """
         game_name = game_data.get("name", "")
-        savedata_path = game_data.get("savedata_path", "")
         original_prefix_name = game_data.get("prefix", "")
 
-        if not savedata_path:
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        if not SavedataManager.has_savedata(game_data):
             logging.error(f"No savedata path set for '{game_name}'. Cannot copy.")
             raise ValueError(f"No savedata path set for '{game_name}'.")
-
-        src = Path(savedata_path)
-        if not src.exists():
-            logging.error(f"Savedata path does not exist: {src}")
-            raise FileNotFoundError(f"Savedata path does not exist: {src}")
 
         # Resolve the ORIGINAL prefix (the one the savedata currently lives in)
         original_prefix_info = PrefixManager.get_prefix_info(original_prefix_name)
@@ -122,40 +232,36 @@ class SavedataManager(QObject):
             logging.error(f"Target prefix path does not exist: {target_prefix_path}")
             raise FileNotFoundError(f"Target prefix path does not exist: {target_prefix_path}")
 
-        # Ensure the savedata path is actually inside the original prefix,
-        resolved_src = Path(os.path.abspath(src))
+        copy_plan = []
+        mode = savedata_config.get("mode", "folders")
+        managed_files = SavedataManager.collect_managed_files(savedata_config)
+        for source in SavedataManager._active_sources(savedata_config):
+            root_value = SavedataManager._source_root(source, mode)
+            if not root_value:
+                continue
+            source_root = Path(os.path.abspath(root_value))
+            if not source_root.exists():
+                raise FileNotFoundError(f"Savedata path does not exist: {source_root}")
+            try:
+                root_relative = source_root.relative_to(original_prefix_path)
+            except ValueError:
+                raise ValueError(f"Savedata path is not inside the original prefix: {source_root}")
+            destination_root = target_prefix_path / SavedataManager._remap_user_segment(root_relative, target_prefix_path)
+            prefix = SavedataManager._source_cloud_prefix(source)
+            for cloud_path, local_path in managed_files.items():
+                relative = SavedataManager._source_relative_cloud_path(source, cloud_path)
+                if relative is not None and (prefix or not cloud_path.startswith(f"{SavedataManager.SECONDARY_SOURCE_FOLDER}/")):
+                    copy_plan.append((local_path, destination_root / relative))
+
+        if not overwrite and any(destination.exists() for _, destination in copy_plan):
+            raise FileExistsError(f"Savedata for '{game_name}' already exists in prefix '{prefix_name}'.")
+
         try:
-            rel_path = resolved_src.relative_to(original_prefix_path)
-            logger.debug(f"rel_path {rel_path}")
-        except ValueError:
-            logging.error(
-                f"Savedata path '{resolved_src}' is not inside the original prefix "
-                f"'{original_prefix_path}'. Cannot copy."
-            )
-            raise ValueError(f"Savedata path is not inside the original prefix: {original_prefix_name}")
+            for source, destination in copy_plan:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
 
-        # Remap the username segment steamuser <-> real Linux user
-        rel_path = SavedataManager._remap_user_segment(rel_path, target_prefix_path)
-        logger.debug(f"remapped rel_path: {rel_path}")
-        
-        dest = target_prefix_path / rel_path
-
-        # Check whether the target already has savedata for this game
-        if dest.exists() and not overwrite:
-            logging.warning(f"Savedata already exists at destination: {dest}")
-            raise FileExistsError(
-                f"Savedata for '{game_name}' already exists in prefix '{prefix_name}'."
-            )
-
-        # Create target dest and copy files
-        try:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if src.is_dir():
-                shutil.copytree(src, dest, dirs_exist_ok=True)
-            else:
-                shutil.copy2(src, dest)
-
-            logging.info(f"Copied savedata for '{game_name}' to prefix '{prefix_name}' ({dest})")
+            logging.info(f"Copied savedata for '{game_name}' to prefix '{prefix_name}'")
             return True
         except Exception as e:
             logging.error(f"Failed to copy savedata for '{game_name}' to '{prefix_name}': {e}")
@@ -298,6 +404,7 @@ class SavedataManager(QObject):
         if detected_path:
             logger.info(f"Auto-detected savedata folder for '{name}': {detected_path}")
             game_card.savedata_path = detected_path
+            game_card.savedata = game_card.savedata.from_dict(None, detected_path)
             return True
 
         logger.warning(f"Could not auto-detect savedata folder for '{name}'.")
@@ -305,40 +412,37 @@ class SavedataManager(QObject):
 
     @staticmethod
     def is_savedata_inside_prefix(game_data: dict) -> bool:
-        """Checks whether the game's savedata_path currently lives inside its own prefix folder."""
-        savedata_path = game_data.get("savedata_path", "")
+        """Checks whether every configured savedata source lives inside the game's prefix."""
         prefix_name = game_data.get("prefix", "")
-        if not savedata_path or not prefix_name:
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        sources = SavedataManager._active_sources(savedata_config)
+        if not sources or not prefix_name:
             return False
         prefix_info = PrefixManager.get_prefix_info(prefix_name)
         if not prefix_info:
             return False
         prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
-        resolved_src = Path(os.path.abspath(savedata_path))
-        try:
-            resolved_src.relative_to(prefix_path)
-            return True
-        except ValueError:
-            return False
+        mode = savedata_config.get("mode", "folders")
+        for source in sources:
+            root = SavedataManager._source_root(source, mode)
+            if not root:
+                return False
+            try:
+                Path(os.path.abspath(root)).relative_to(prefix_path)
+            except ValueError:
+                return False
+        return True
 
     @staticmethod
-    def _compute_portable_location_reference(game_data: dict) -> dict | None:
-        """
-        Describes this device's savedata_path in a form meaningful on ANY device
-        running the same game, not this device's absolute path. Returns:
-        Savedata inside prefix: {"kind": "prefix", "rel_path": ...} 
-        Next to game's exe: {"kind": "install", "rel_path": ...}
-        None
-        """
-        savedata_path = game_data.get("savedata_path", "")
-        if not savedata_path:
-            return None
-        src = Path(os.path.abspath(savedata_path))
-
-        if SavedataManager.is_savedata_inside_prefix(game_data):
-            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+    def _compute_portable_path_reference(game_data: dict, path: str) -> dict | None:
+        src = Path(os.path.abspath(path))
+        prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+        if prefix_info:
             prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
-            return {"kind": "prefix", "rel_path": src.relative_to(prefix_path).as_posix()}
+            try:
+                return {"kind": "prefix", "rel_path": src.relative_to(prefix_path).as_posix()}
+            except ValueError:
+                pass
 
         game_path = game_data.get("path", "")
         if game_path:
@@ -346,14 +450,36 @@ class SavedataManager(QObject):
             try:
                 return {"kind": "install", "rel_path": src.relative_to(install_dir).as_posix()}
             except ValueError:
-                # TODO: savedata_path isn't under the install dir either
-                logger.warn("_compute_portable_location_reference: Savedata path is not in prefix or game's folder")
-                pass  
-
+                pass
         return None
 
     @staticmethod
-    def _resolve_portable_location(game_data: dict, reference: dict) -> Path | None:
+    def _compute_portable_location_reference(game_data: dict) -> dict | None:
+        """
+        Describes all savedata sources relative to the prefix or install folder
+        so another device can reconstruct the same selection.
+        """
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        mode = savedata_config.get("mode", "folders")
+        portable_sources = []
+        for source in SavedataManager._active_sources(savedata_config):
+            root = SavedataManager._source_root(source, mode)
+            if not root:
+                continue
+            location = SavedataManager._compute_portable_path_reference(game_data, root)
+            if location is None:
+                logger.warning(f"Savedata source is not in the prefix or game folder: {root}")
+                return None
+            portable_source = {"source_id": source.get("source_id", "primary"), "location": location}
+            if mode == "files":
+                portable_source["files"] = list(source.get("files", []))
+            else:
+                portable_source["excluded"] = list(source.get("excluded", []))
+            portable_sources.append(portable_source)
+        return {"version": 2, "mode": mode, "sources": portable_sources} if portable_sources else None
+
+    @staticmethod
+    def _resolve_portable_path(game_data: dict, reference: dict) -> Path | None:
         """
         Resolves game's savedata path in local prefix from _compute_portable_location_reference
         """
@@ -361,6 +487,7 @@ class SavedataManager(QObject):
         rel_path = reference.get("rel_path")
         if not kind or not rel_path:
             return None
+        relative = SavedataManager._safe_relative_path(str(rel_path))
 
         if kind == "prefix":
             prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
@@ -369,16 +496,50 @@ class SavedataManager(QObject):
                 raise ValueError("_resolve_portable_location: no prefix set for game")
 
             prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
-            remapped = SavedataManager._remap_user_segment(Path(rel_path), prefix_path)
+            remapped = SavedataManager._remap_user_segment(relative, prefix_path)
             return prefix_path / remapped
 
         if kind == "install":
             game_path = game_data.get("path", "")
             if not game_path:
                 return None
-            return Path(os.path.abspath(game_path)).parent / rel_path
+            return Path(os.path.abspath(game_path)).parent / relative
 
         return None
+
+    @staticmethod
+    def _resolve_portable_location(game_data: dict, reference: dict) -> dict | None:
+        # Version 1 metadata represented a single directory directly.
+        if "version" not in reference:
+            path = SavedataManager._resolve_portable_path(game_data, reference)
+            if path is None:
+                return None
+            return {
+                "version": 1,
+                "mode": "folders",
+                "folders": [{"path": str(path), "excluded": [], "source_id": "primary"}],
+                "file_groups": [],
+            }
+
+        mode = reference.get("mode", "folders")
+        resolved = {"version": 1, "mode": mode, "folders": [], "file_groups": []}
+        for source in reference.get("sources", []):
+            root = SavedataManager._resolve_portable_path(game_data, source.get("location", {}))
+            if root is None:
+                return None
+            if mode == "files":
+                resolved["file_groups"].append({
+                    "root": str(root),
+                    "files": list(source.get("files", [])),
+                    "source_id": source.get("source_id", "primary"),
+                })
+            else:
+                resolved["folders"].append({
+                    "path": str(root),
+                    "excluded": list(source.get("excluded", [])),
+                    "source_id": source.get("source_id", "primary"),
+                })
+        return resolved
 
     @staticmethod
     def _upload_location_reference(folder_id: str, existing_location_meta: dict | None, game_data: dict):
@@ -411,15 +572,13 @@ class SavedataManager(QObject):
             logger.warning(f"Could not upload savedata location hint for '{game_data.get('name', '')}': {e}")
 
     @staticmethod
-    def get_savedata_path_from_gdrive(game_data: dict) -> str | None:
+    def get_savedata_config_from_gdrive(game_data: dict) -> dict | None:
         """
-        For a game with NO savedata_path set yet: checks whether Drive already
-        has savedata for it from another device, and if so, predicts where it
-        should live on this device.
-        Returns the predicted absolute path as a string.
+        Restores the savedata source configuration from Drive when the game has
+        no local configuration yet.
         """
         game_name = game_data.get("name", "")
-        if game_data.get("savedata_path", ""):
+        if SavedataManager.has_savedata(game_data):
             return None
 
         root_folder_id = GdriveManager.get_root_folder_id()
@@ -445,19 +604,28 @@ class SavedataManager(QObject):
             logger.warning(f"get_savedata_path_from_gdrive: Could not read savedata savedata location hint for '{game_name}': {e}")
             return None
 
-        predicted_path = SavedataManager._resolve_portable_location(game_data, reference)
-        if predicted_path is None:
-            logger.warning("get_savedata_path_from_gdrive: predicted_path not found")
+        predicted_config = SavedataManager._resolve_portable_location(game_data, reference)
+        if predicted_config is None:
+            logger.warning("get_savedata_config_from_gdrive: savedata configuration could not be resolved")
             return None
 
-        logger.info(f"Predicted savedata location for '{game_name}' from cloud hint: {predicted_path}")
-        return str(predicted_path)
+        logger.info(f"Resolved savedata configuration for '{game_name}' from cloud hint")
+        return predicted_config
+
+    @staticmethod
+    def get_savedata_path_from_gdrive(game_data: dict) -> str | None:
+        """Compatibility wrapper returning the first restored source root."""
+        savedata_config = SavedataManager.get_savedata_config_from_gdrive(game_data)
+        if savedata_config is None:
+            return None
+        sources = SavedataManager._active_sources(savedata_config)
+        return SavedataManager._source_root(sources[0], savedata_config.get("mode")) if sources else None
 
     @staticmethod
     def sync_savedata_to_gdrive(game_data: dict, max_workers: int = 10, conflict_resolution: str = "defer") -> dict:
         """
-        Bidirectionally syncs a game's savedata folder with Drive, preserving
-        subfolder structure and propagating deletions:
+        Bidirectionally syncs a game's managed savedata files with Drive,
+        preserving source namespaces and propagating deletions:
         - Present on both sides: newer mtime wins.
         - Present on only one side: if it was in the last-synced manifest,
         it was deleted on the other side -> delete it here too.
@@ -467,44 +635,45 @@ class SavedataManager(QObject):
         - If first sync and newer mtime than what already exists in gdrive ask/defer files.
         Returns {"uploaded": [...], "downloaded": [...], "deleted_local": [...],
                 "deleted_remote": [...], "skipped": [...], "deferred_conflicts": [...],
-                get_savedata_path_from_gdrive: bool}
+                "restored_savedata_config": dict | None}
         """
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
         if not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
             return False
 
         game_name = game_data.get("name", "")
-        savedata_path = game_data.get("savedata_path", "")
-        savedata_path_was_already_set = bool(savedata_path)
+        savedata_config = SavedataManager.get_savedata_config(game_data)
+        savedata_was_already_set = SavedataManager.has_savedata(game_data)
+        predicted_config = None
 
         if not game_data.get("gdrive", False):
             raise ValueError(f"Gdrive sync is not enabled for '{game_name}'.")
 
-        if not savedata_path:
-            predicted_path = SavedataManager.get_savedata_path_from_gdrive(game_data)
-            if predicted_path is None:
+        if not savedata_was_already_set:
+            predicted_config = SavedataManager.get_savedata_config_from_gdrive(game_data)
+            if predicted_config is None:
                 raise ValueError(f"No savedata path set for '{game_name}'.")
 
-            logger.info(f"savedata path for '{game_name}' from cloud hint: {predicted_path}")
-            savedata_path = predicted_path
-            game_data["savedata_path"] = predicted_path
-            GameManager.update_game(game_name, {"savedata_path": predicted_path})
-            # savedata_path will be refreshed on game close in the UI
+            savedata_config = predicted_config
+            game_data["savedata"] = predicted_config
+            sources = SavedataManager._active_sources(predicted_config)
+            primary_path = SavedataManager._source_root(sources[0], predicted_config.get("mode")) if sources else ""
+            game_data["savedata_path"] = primary_path
+            GameManager.update_game(game_name, {"savedata": predicted_config})
 
-        src = Path(savedata_path)
-        if savedata_path_was_already_set:
-            # Savedata path explicitly set doesn't exist
-            if not src.exists():
+        mode = savedata_config.get("mode", "folders")
+        for source in SavedataManager._active_sources(savedata_config):
+            root_value = SavedataManager._source_root(source, mode)
+            if not root_value:
+                continue
+            root = Path(root_value)
+            if savedata_was_already_set and not root.exists():
                 raise FileNotFoundError(
-                    f"Configured savedata path for '{game_name}' does not exist: {src}. "
+                    f"Configured savedata path for '{game_name}' does not exist: {root}. "
                     f"If the game was moved, update the savedata path in settings before syncing."
                 )
-        else:
-            # Predicted savedata folder when not set
-            try:
-                src.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                raise FileNotFoundError(f"Could not create savedata path: {src} ({e})")
+            if not savedata_was_already_set:
+                root.mkdir(parents=True, exist_ok=True)
 
         root_folder_id = GdriveManager.get_root_folder_id()
         folder_id = GdriveManager.find_folder(game_name, parent_id=root_folder_id)
@@ -521,9 +690,14 @@ class SavedataManager(QObject):
         # Exclude the reserved filename from regular sync
         existing_location_meta = remote_files.pop(SavedataManager.SYNC_LOCATION_METADATA_FILENAME, None)
 
-        local_files_by_rel = {
-            f.relative_to(src).as_posix(): f
-            for f in src.rglob("*") if f.is_file()
+        local_files_by_rel = SavedataManager.collect_managed_files(savedata_config)
+        remote_files = {
+            rel_path: metadata for rel_path, metadata in remote_files.items()
+            if SavedataManager._local_target_for_cloud_path(savedata_config, rel_path) is not None
+        }
+        manifest = {
+            rel_path: mtime for rel_path, mtime in manifest.items()
+            if SavedataManager._local_target_for_cloud_path(savedata_config, rel_path) is not None
         }
 
         all_rel_paths = set(local_files_by_rel.keys()) | set(remote_files.keys()) | set(manifest.keys())
@@ -581,7 +755,8 @@ class SavedataManager(QObject):
                     delete_remote_plan.append(remote_meta["id"])
                 else:
                     remote_mtime = datetime.fromisoformat(remote_meta["modifiedTime"]).timestamp()
-                    download_plan.append((remote_meta["id"], src / rel_path, remote_mtime, rel_path))
+                    local_target = SavedataManager._local_target_for_cloud_path(savedata_config, rel_path)
+                    download_plan.append((remote_meta["id"], local_target, remote_mtime, rel_path))
                 continue
 
         # Safeguard in case of mass wipe
@@ -620,7 +795,7 @@ class SavedataManager(QObject):
         for local_file in delete_local_plan:
             try:
                 local_file.unlink()
-                deleted_local.append(local_file.relative_to(src).as_posix())
+                deleted_local.append(next((rel for rel, path in local_files_by_rel.items() if path == local_file), str(local_file)))
             except Exception as e:
                 logger.warning(f"Failed to delete local file '{local_file}': {e}")
 
@@ -629,13 +804,11 @@ class SavedataManager(QObject):
 
         # Rebuild manifest
         new_manifest = {}
-        for f in src.rglob("*"):
-            if f.is_file():
-                rel = f.relative_to(src).as_posix()
-                if rel in deferred_rel_paths:
-                    # Deferred conflicts are left out so they keep showing up as ambiguous until resolved
-                    continue
-                new_manifest[rel] = f.stat().st_mtime
+        for rel, local_file in SavedataManager.collect_managed_files(savedata_config).items():
+            if rel in deferred_rel_paths:
+                # Deferred conflicts are left out so they keep showing up as ambiguous until resolved
+                continue
+            new_manifest[rel] = local_file.stat().st_mtime
         SavedataManager._save_sync_manifest(game_name, new_manifest)
         SavedataManager._upload_location_reference(folder_id, existing_location_meta, game_data)
 
@@ -643,13 +816,14 @@ class SavedataManager(QObject):
             f"Gdrive sync for '{game_name}': {len(uploaded)} uploaded, {len(downloaded)} downloaded, "
             f"{len(deleted_local)} deleted locally, {len(deleted_remote)} deleted remotely, "
             f"{len(skipped)} unchanged, {len(deferred_conflicts)} deffered. "
-            f"get_savedata_path_from_gdrive: {predicted_path if not savedata_path_was_already_set else None}"
+            f"restored_savedata_config: {predicted_config is not None}"
         )
         return {
             "uploaded": uploaded, "downloaded": downloaded,
             "deleted_local": deleted_local, "deleted_remote": deleted_remote,
             "skipped": skipped, "deferred_conflicts": deferred_conflicts,
-            "get_savedata_path_from_gdrive": predicted_path if not savedata_path_was_already_set else None,
+            "restored_savedata_config": predicted_config,
+            "get_savedata_path_from_gdrive": game_data.get("savedata_path") if predicted_config is not None else None,
         }
 
     @staticmethod
@@ -714,16 +888,21 @@ class SavedataManager(QObject):
     @staticmethod
     def reset_sync_manifest(game_name: str):
         """
-        Clears the sync manifest for a game. Called whenever savedata_path changes
-        so the next sync treats the new location as a fresh environment to avoid file deletion
+        Clears the sync manifest for a game whenever its savedata configuration
+        changes so the next sync cannot infer deletions from the old selection.
         """
         all_metadata = SavedataManager._load_gsync_metadata()
+        changed = False
         if game_name in all_metadata:
             all_metadata.pop(game_name)
-            refs = all_metadata.get(SavedataManager.LOCATION_REFERENCE_METADATA_KEY, {})
+            changed = True
+        refs = all_metadata.get(SavedataManager.LOCATION_REFERENCE_METADATA_KEY, {})
+        if game_name in refs:
             refs.pop(game_name, None)
+            changed = True
+        if changed:
             SavedataManager._save_gsync_metadata(all_metadata)
-            logger.info(f"Reset Gdrive sync manifest for '{game_name}' (savedata path changed).")
+            logger.info(f"Reset Gdrive sync manifest for '{game_name}' (savedata configuration changed).")
 
 class GdriveSyncWorker(QThread):
     """

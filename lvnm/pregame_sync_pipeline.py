@@ -23,7 +23,7 @@ class SyncStep(Protocol):
 
 
 class SavedataSyncStep:
-    """Syncs a game's savedata folder with Google Drive before launch."""
+    """Syncs a game's configured savedata sources with Google Drive before launch."""
 
     def __init__(self, name: str, game_data: dict, label: str, conflict_prompt=None):
         self.name = name
