@@ -7,19 +7,31 @@ import time
 import config
 import logging
 from pathlib import Path
+from system_utils import SystemUtils as MainSystemUtils
 
 logger = logging.getLogger(__name__)
 
 class SystemUtils:
     _afk_process = None
+    _runtime_type = MainSystemUtils.get_runtime_type()
 
     @staticmethod
     def is_wine_or_proton(pid):
         try:
-            exe_path = os.readlink(f"/proc/{pid}/exe")
+            if SystemUtils._runtime_type == "flatpak":
+                result = subprocess.run(
+                    ["flatpak-spawn", "--host", "readlink", "-f", f"/proc/{pid}/exe"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                exe_path = result.stdout.strip()
+            else:
+                exe_path = os.readlink(f"/proc/{pid}/exe")
+
+            logger.debug(exe_path)
             exe_name = os.path.basename(exe_path).lower()
-            if "wine" in exe_name:
-                return True
+            return "wine" in exe_name
         except Exception as e:
             logger.error(f"[ERROR] is_wine_or_proton failed: {e}")
             return False
