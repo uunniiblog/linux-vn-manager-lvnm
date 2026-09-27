@@ -37,8 +37,8 @@ Download the .flatpak from: https://github.com/uunniiblog/linux-vn-manager-lvnm/
 
 Install with `flatpak install --user LVNM-x86_64.flatpak`
 
-It bundles umu, winetricks, gamescope, GStreamer libraries and linux-rt-upscaler so all external tools the launcher uses are usable.
-Recommended for read only systems.
+It bundles umu, winetricks, GStreamer libraries and linux-rt-upscaler so all external tools the launcher uses are usable.
+Recommended for read only systems like Steam Deck. If you want gamescope at desktop level you will need to install gamescope flatpak `flatpak install --user flathub org.freedesktop.Platform.VulkanLayer.gamescope`
 
 It uses the shared location: `~/.local/share/lvnm`.
 
