@@ -6,10 +6,9 @@ from PySide6.QtWidgets import (
     QGridLayout, QMessageBox, QStyle, QSizePolicy,
     QToolButton, QProgressBar, QDialog, QApplication
 )
-import threading
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.savedata_management_dialog import SavedataManagementDialog
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
 import config
@@ -23,14 +22,34 @@ from gdrive_manager import GdriveManager, GdriveDeviceFlowWorker
 
 logger = logging.getLogger(__name__)
 
+
+class SystemInfoWorker(QThread):
+    results_ready = Signal(dict, dict)
+
+    def run(self):
+        try:
+            system_info = SystemUtils.get_system_info()
+            software_info = SystemUtils.get_software_support()
+            self.results_ready.emit(system_info, software_info)
+        except Exception:
+            logger.exception("Failed to load Settings system information")
+            self.results_ready.emit({}, {})
+
+
+class UpdateCheckWorker(QThread):
+    results_ready = Signal(str, str)
+
+    def run(self):
+        tag, url = SystemUtils.get_latest_release_info()
+        if tag and url:
+            self.results_ready.emit(tag, url)
+
+
 class SettingsTab(QWidget):
     CONFIG_FILE = config.USER_SETTINGS
 
-    update_available_signal = Signal(str, str)
-
     def __init__(self, theme_manager):
         super().__init__()
-        self.update_available_signal.connect(self._on_update_found)
 
         self.theme_manager = theme_manager
         self.user_settings = SettingsManager()
@@ -62,6 +81,7 @@ class SettingsTab(QWidget):
         outer_layout.addWidget(scroll)
 
         self._connect_signals()
+        self._start_background_checks()
 
     # ==========================================
     # Interface methods
@@ -708,15 +728,9 @@ class SettingsTab(QWidget):
         sysinfo_group = QGroupBox(self.tr("System Info"))
         sysinfo_layout = QFormLayout(sysinfo_group)
         sysinfo_layout.setLabelAlignment(Qt.AlignLeft)
-        
-        sys_data = SystemUtils.get_system_info()
-        software = SystemUtils.get_software_support()
+
         runtime = SystemUtils.get_runtime_type()
-        version_label = sys_data.get('app_version')
-        gamescope_ver = software.get('gamescope_version')
-        upscale_ver = software.get('upscale_version')
-        umu_ver = software.get('umu_run_version')
-        winetricks_ver = software.get('winetricks_version')
+        version_label = config.VERSION
 
         if runtime == "appimage":
             version_label += "  📦 AppImage"
@@ -725,20 +739,27 @@ class SettingsTab(QWidget):
         else:
             version_label += "  (native)"
 
-        sysinfo_layout.addRow(QLabel(self.tr("LVNM Version:")), QLabel(version_label))
-        sysinfo_layout.addRow(QLabel(self.tr("OS:")), QLabel(sys_data.get('os')))
-        sysinfo_layout.addRow(QLabel(self.tr("Kernel:")), QLabel(sys_data.get('kernel')))
-        sysinfo_layout.addRow(QLabel(self.tr("Desktop:")), QLabel(f"{sys_data.get('desktop_environment')} - {sys_data.get('session_type')}"))
-        sysinfo_layout.addRow(QLabel(self.tr("CPU:")), QLabel(sys_data.get('cpu')))
-        sysinfo_layout.addRow(QLabel(self.tr("GPU:")), QLabel(sys_data.get('gpu')))
-        sysinfo_layout.addRow(QLabel(self.tr("Vulkan Support:")), QLabel(self.check(software.get('vulkan_support'))))
-        sysinfo_layout.addRow(QLabel(self.tr("Gamescope:")), QLabel(self.check_with_version(software.get('gamescope'), gamescope_ver)))
-        sysinfo_layout.addRow(QLabel(self.tr("linux-rt-upscaler:")), QLabel(self.check_with_version(software.get('upscale'), upscale_ver)))
-        sysinfo_layout.addRow(QLabel(self.tr("Umu-run:")), QLabel(self.check_with_version(software.get('umu_run'), umu_ver)))
-        sysinfo_layout.addRow(QLabel(self.tr("Winetricks:")), QLabel(self.check_with_version(software.get('winetricks'), winetricks_ver)))
+        self._sysinfo_values = {}
 
-        for pkg, installed in software.get('gstreamer_packages', {}).items():
-            sysinfo_layout.addRow(QLabel(f"{pkg}:"), QLabel(self.check(installed)))
+        def add_value(label, key, value="…"):
+            value_label = QLabel(value)
+            self._sysinfo_values[key] = value_label
+            sysinfo_layout.addRow(QLabel(label), value_label)
+
+        add_value(self.tr("LVNM Version:"), "app_version", version_label)
+        add_value(self.tr("OS:"), "os")
+        add_value(self.tr("Kernel:"), "kernel")
+        add_value(self.tr("Desktop:"), "desktop")
+        add_value(self.tr("CPU:"), "cpu")
+        add_value(self.tr("GPU:"), "gpu")
+        add_value(self.tr("Vulkan Support:"), "vulkan_support")
+        add_value(self.tr("Gamescope:"), "gamescope")
+        add_value(self.tr("linux-rt-upscaler:"), "upscale")
+        add_value(self.tr("Umu-run:"), "umu_run")
+        add_value(self.tr("Winetricks:"), "winetricks")
+
+        for pkg in SystemUtils.GSTREAMER_PACKAGES:
+            add_value(f"{pkg}:", f"gstreamer:{pkg}")
         
         return sysinfo_group
 
@@ -758,8 +779,6 @@ class SettingsTab(QWidget):
         wineprefixes_label.linkActivated.connect(SystemUtils.open_url)
 
         about_layout.addRow(QLabel(self.tr("Wineprefixes guide:")), wineprefixes_label)
-
-        threading.Thread(target=self._check_for_updates, daemon=True).start()
 
         return about_group
 
@@ -971,14 +990,63 @@ class SettingsTab(QWidget):
         if file_path:
             target_edit.setText(file_path)
 
-    def _check_for_updates(self):
-        """Background thread search update"""
-        tag, url = SystemUtils.get_latest_release_info()
+    def _start_background_checks(self):
+        self._system_info_worker = SystemInfoWorker()
+        self._system_info_worker.results_ready.connect(self._on_system_info_ready)
+        self._system_info_worker.start()
+
+        self._update_check_worker = UpdateCheckWorker()
+        self._update_check_worker.results_ready.connect(self._on_update_check_ready)
+        self._update_check_worker.start()
+
+    def _on_update_check_ready(self, tag, url):
         if tag and url:
             current = config.VERSION.lstrip('v')
             latest = tag.lstrip('v')
             if latest != current:
-                self.update_available_signal.emit(tag, url)
+                self._on_update_found(tag, url)
+
+    def _on_system_info_ready(self, system_info, software_info):
+        if not system_info and not software_info:
+            for key, label in self._sysinfo_values.items():
+                if key != "app_version":
+                    label.setText("?")
+            return
+
+        system_values = {
+            "os": system_info.get("os", "?"),
+            "kernel": system_info.get("kernel", "?"),
+            "desktop": (
+                f'{system_info.get("desktop_environment", "?")} - '
+                f'{system_info.get("session_type", "?")}'
+            ),
+            "cpu": system_info.get("cpu", "?"),
+            "gpu": system_info.get("gpu", "?"),
+        }
+        for key, value in system_values.items():
+            self._sysinfo_values[key].setText(str(value))
+
+        software_values = {
+            "vulkan_support": self.check(software_info.get("vulkan_support")),
+            "gamescope": self.check_with_version(
+                software_info.get("gamescope"), software_info.get("gamescope_version")
+            ),
+            "upscale": self.check_with_version(
+                software_info.get("upscale"), software_info.get("upscale_version")
+            ),
+            "umu_run": self.check_with_version(
+                software_info.get("umu_run"), software_info.get("umu_run_version")
+            ),
+            "winetricks": self.check_with_version(
+                software_info.get("winetricks"), software_info.get("winetricks_version")
+            ),
+        }
+        for key, value in software_values.items():
+            self._sysinfo_values[key].setText(value)
+
+        gstreamer = software_info.get("gstreamer_packages", {})
+        for pkg in SystemUtils.GSTREAMER_PACKAGES:
+            self._sysinfo_values[f"gstreamer:{pkg}"].setText(self.check(gstreamer.get(pkg)))
 
     def _sign_in_gdrive(self):
         """Starts the Google Drive device-flow sign-in using the configured client id/secret."""
