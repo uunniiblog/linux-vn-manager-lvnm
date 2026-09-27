@@ -94,8 +94,12 @@ class SystemUtils:
         }
 
         # Get OS Name
+        os_release_path = Path("/etc/os-release")
+        host_os_release = Path("/run/host/etc/os-release")
+        if SystemUtils.get_runtime_type() == "flatpak" and host_os_release.exists():
+            os_release_path = host_os_release
         try:
-            with open("/etc/os-release") as f:
+            with os_release_path.open() as f:
                 for line in f:
                     if line.startswith("PRETTY_NAME="):
                         info["os"] = line.split("=")[1].strip().strip('"')
@@ -238,6 +242,33 @@ class SystemUtils:
         if env is None:
             env = SystemUtils.get_clean_env()
         try:
+            # Flatpak runtimes do not expose their packages through the host's
+            # dpkg/rpm/pacman database.  Probe representative GStreamer
+            # plugins instead.  The KDE runtime supplies base/good/bad and the
+            # optional codecs-extra extension supplies the restricted codecs.
+            if SystemUtils.get_runtime_type() == "flatpak":
+                plugin_for_package = {
+                    "gstreamer": "coreelements",
+                    "gst-plugins-base": "playback",
+                    "gst-plugins-base-libs": "audioconvert",
+                    "gst-plugins-good": "autodetect",
+                    "gst-plugins-bad": "videoparsersbad",
+                    "gst-plugins-bad-libs": "mpegtsdemux",
+                    "gst-plugins-ugly": "x264",
+                    "gst-plugin-pipewire": "pipewire",
+                    "gst-libav": "libav",
+                }
+                plugin = plugin_for_package.get(pkg_name)
+                if plugin and shutil.which("gst-inspect-1.0"):
+                    result = subprocess.run(
+                        ["gst-inspect-1.0", plugin],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        env=env,
+                    )
+                    return result.returncode == 0
+                return False
+
             if shutil.which("pacman"):
                 result = subprocess.run(["pacman", "-Qq", pkg_name], capture_output=True, env=env)
                 return result.returncode == 0
@@ -363,6 +394,8 @@ class SystemUtils:
     @staticmethod
     def get_runtime_type() -> str:
         """Returns the runtime environment type."""
+        if os.environ.get("FLATPAK_ID") or Path("/.flatpak-info").exists():
+            return "flatpak"
         if os.environ.get("APPDIR"):
             return "appimage"
         return "dev"
@@ -661,8 +694,13 @@ class SystemUtils:
         whether the app is running as an AppImage, a PyInstaller binary, or from source.
         """
         appimage_path = os.environ.get("APPIMAGE")
+        flatpak_id = os.environ.get("FLATPAK_ID")
         
-        if appimage_path:
+        if flatpak_id:
+            logger.debug("get_launch_command - Running as a Flatpak")
+            exe_cmd = f"flatpak run {flatpak_id}"
+            args = f'-r "{game_name}"'
+        elif appimage_path:
             logger.debug("get_launch_command - Running as an AppImage")
             exe_cmd = f'"{appimage_path}"'
             args = f'-r "{game_name}"'

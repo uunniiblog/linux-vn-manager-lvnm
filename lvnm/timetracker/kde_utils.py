@@ -7,6 +7,7 @@ import atexit
 import signal
 import threading
 import logging
+import config
 from PySide6.QtDBus import QDBusInterface, QDBusConnection
 from PySide6.QtCore import QObject, Slot, QCoreApplication
 from timetracker.system_utils import SystemUtils as TimeTrackUtils
@@ -212,7 +213,7 @@ class KdeUtils(DesktopUtilsInterface):
             logger.error("Could not connect to KWin DBus interface")
 
         unique_suffix = f"{os.getpid()}_{uuid.uuid4().hex[:8]}"
-        self._service_name = f"org.timetracker.Notifier{unique_suffix}"
+        self._service_name = f"io.github.uunniiblog.lvnm.Notifier{unique_suffix}"
         self._object_path = f"/Notifier{unique_suffix}"
         self.notifier = KwinNotifier()
         self._script_name = self.SCRIPT_NAME
@@ -258,8 +259,13 @@ class KdeUtils(DesktopUtilsInterface):
         temp_path = None
 
         try:
-            # Write script string to temporary file so KWin DBus loadScript interface can read it.
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as tf:
+            with tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix='.js',
+                prefix='.kwin-tracker-',
+                dir=config.DATA_DIR,
+                delete=False,
+            ) as tf:
                 tf.write(js_code)
                 temp_path = tf.name
 

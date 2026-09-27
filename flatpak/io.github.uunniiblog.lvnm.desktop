@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=LVNM
+Comment=Manage and launch visual novels on Linux
+Exec=lvnm
+Icon=io.github.uunniiblog.lvnm
+Terminal=false
+Type=Application
+Categories=Game;
+Keywords=visual novel;wine;proton;game;

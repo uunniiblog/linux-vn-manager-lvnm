@@ -1,0 +1,139 @@
+id: io.github.uunniiblog.lvnm
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: lvnm
+
+add-extensions:
+  org.freedesktop.Platform.Compat.i386:
+    directory: lib/i386-linux-gnu
+    version: '25.08'
+    autodelete: false
+    autodownload: true
+  org.freedesktop.Platform.GL32:
+    directory: lib/i386-linux-gnu/GL
+    version: '1.4'
+    versions: 25.08;25.08-extra;1.4
+    subdirectories: true
+    no-autodownload: true
+    autodelete: false
+    add-ld-path: lib
+    merge-dirs: vulkan/icd.d;glvnd/egl_vendor.d;egl/egl_external_platform.d;OpenCL/vendors;lib/dri;lib/d3d;lib/gbm;vulkan/explicit_layer.d;vulkan/implicit_layer.d;vdpau
+    download-if: active-gl-driver
+    enable-if: active-gl-driver
+    autoprune-unless: active-gl-driver
+  org.freedesktop.Platform.codecs_extra.i386:
+    directory: lib/i386-linux-gnu/codecs-extra
+    version: 25.08-extra
+    autodelete: false
+    autodownload: true
+    add-ld-path: lib
+  org.freedesktop.Platform.VulkanLayer.gamescope:
+    directory: lib/extensions/vulkan/gamescope
+    version: '25.08'
+    autodelete: false
+    autodownload: true
+
+build-options:
+  env:
+    BASEAPP_REMOVE_WEBENGINE: '1'
+    BASEAPP_DISABLE_NUMPY: '1'
+
+# LVNM is a game/runner manager rather than a document editor. It needs to see
+# configured games, runners and prefixes, and Wine needs graphics, audio and
+# network access. `home` intentionally preserves ~/.local/share/lvnm and the
+# Steam compatibilitytools.d path used by the native/AppImage builds.
+finish-args:
+  - --share=ipc
+  - --share=network
+  # Wine commonly uses Xwayland even when LVNM's Qt UI uses Wayland.
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=all
+  - --allow=devel
+  - --allow=multiarch
+  - --allow=per-app-dev-shm
+  - --filesystem=home
+  - --filesystem=/media
+  - --filesystem=/mnt
+  - --filesystem=/run/media
+  - --talk-name=org.kde.KWin
+  - --env=LD_LIBRARY_PATH=/app/lib/i386-linux-gnu/codecs-extra/lib:/app/lib:/app/lib/i386-linux-gnu:/usr/lib/x86_64-linux-gnu/codecs-extra/lib:/usr/lib/i386-linux-gnu/codecs-extra/lib
+  - --env=PATH=/app/bin:/usr/bin:/app/lib/extensions/vulkan/gamescope/bin:/usr/lib/extensions/vulkan/gamescope/bin
+  - --env=GST_PLUGIN_SYSTEM_PATH=/app/lib/gstreamer-1.0:/app/lib32/gstreamer-1.0:/app/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/app/lib/i386-linux-gnu/gstreamer-1.0:/usr/lib/extensions/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/gstreamer-1.0:/usr/lib/i386-linux-gnu/gstreamer-1.0
+
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+  - mkdir -p /app/lib/i386-linux-gnu
+  - mkdir -p /app/lib/i386-linux-gnu/GL
+  - mkdir -p /app/lib/i386-linux-gnu/codecs-extra
+  - mkdir -p /app/lib/extensions/vulkan/gamescope
+
+modules:
+  - name: cabextract
+    buildsystem: autotools
+    cleanup:
+      - /share/man
+    sources:
+      - type: archive
+        url: https://deb.debian.org/debian/pool/main/c/cabextract/cabextract_1.11.orig.tar.gz
+        sha256: b5546db1155e4c718ff3d4b278573604f30dd64c3c5bfd4657cd089b823a3ac6
+
+  - name: winetricks
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 src/winetricks /app/bin/winetricks
+    sources:
+      - type: archive
+        url: https://github.com/Winetricks/winetricks/archive/20260125/winetricks-20260125.tar.gz
+        sha256: 2890bd9fbbade4638e58b4999a237273192df03b58516ae7b8771e09c22d2f56
+
+  - name: umu-launcher
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 umu-run /app/bin/umu-run
+      - install -Dm644 LICENSE /app/share/licenses/umu-launcher/LICENSE
+    sources:
+      - type: archive
+        url: https://github.com/Open-Wine-Components/umu-launcher/releases/download/1.4.4/umu-launcher-1.4.4-zipapp.tar
+        sha256: eb590691841f7fad3fc3ad8fd5db4ccb87849fe7948e62b28ece7a4ee48cc851
+        strip-components: 1
+      - type: file
+        url: https://raw.githubusercontent.com/Open-Wine-Components/umu-launcher/cf3d1b107147480c447ffbfb3f789dc74335074c/LICENSE
+        sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+
+  - name: python-dependencies
+    buildsystem: simple
+    build-options:
+      # The local/CI build helper resolves only the explicitly listed Python
+      # dependencies. A future Flathub submission should replace this with a
+      # checked-in flatpak-pip-generator source list for offline builds.
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --no-cache-dir --prefix=/app -r requirements-flatpak.txt
+    sources:
+      - type: file
+        path: requirements-flatpak.txt
+
+  - name: lvnm
+    buildsystem: simple
+    build-commands:
+      - install -d /app/bin /app/share/lvnm /app/share/applications /app/share/metainfo /app/share/icons/hicolor/256x256/apps
+      - cp -a lvnm/. /app/share/lvnm/
+      - install -Dm755 flatpak/lvnm-wrapper.sh /app/bin/lvnm
+      - install -Dm644 flatpak/io.github.uunniiblog.lvnm.desktop /app/share/applications/io.github.uunniiblog.lvnm.desktop
+      - install -Dm644 flatpak/io.github.uunniiblog.lvnm.metainfo.xml /app/share/metainfo/io.github.uunniiblog.lvnm.metainfo.xml
+      - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/io.github.uunniiblog.lvnm.png
+    sources:
+      - type: dir
+        path: ../lvnm
+        dest: lvnm
+      - type: dir
+        path: .
+        dest: flatpak
+      - type: file
+        path: ../icon.png

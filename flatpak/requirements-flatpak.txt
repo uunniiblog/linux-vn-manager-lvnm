@@ -1,0 +1,7 @@
+# PySide6 is supplied by io.qt.PySide.BaseApp. PyInstaller is build-only for
+# the AppImage and does not belong in the Flatpak.
+setproctitle==1.3.7
+requests==2.34.2
+python-xlib==0.33
+google-api-python-client==2.198.0
+google-auth==2.55.1

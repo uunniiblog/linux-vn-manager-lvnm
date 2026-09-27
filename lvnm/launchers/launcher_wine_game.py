@@ -477,12 +477,22 @@ class LauncherWineGame(LauncherBaseGame):
             self.env.pop(var, None)
         
         if "LD_LIBRARY_PATH" in self.env:
-            logger.debug(f"Removing LD_LIBRARY_PATH: {self.env.get('LD_LIBRARY_PATH')}")
-            self.env.pop("LD_LIBRARY_PATH")
-        return var
+            if SystemUtils.get_runtime_type() == "flatpak":
+                logger.debug("Preserving Flatpak LD_LIBRARY_PATH for runtime and graphics extensions: %s",self.env["LD_LIBRARY_PATH"],)
+            else:
+                logger.debug(f"Removing LD_LIBRARY_PATH: {self.env.get('LD_LIBRARY_PATH')}")
+                self.env.pop("LD_LIBRARY_PATH")
 
     def _log_run_command(self, runner_path: Path):
         """Logs the final configuration right before execution."""
+        if SystemUtils.get_runtime_type() == "flatpak":
+            gl32_root = Path("/app/lib/i386-linux-gnu/GL")
+            gl32_files = list(gl32_root.glob("*/lib/dri/*_dri.so"))
+            if gl32_files:
+                logger.debug("Flatpak GL32 driver files detected: %s", ", ".join(str(path) for path in gl32_files),)
+            else:
+                logger.warning("No Flatpak GL32 DRI driver is mounted under %s; ""32-bit OpenGL and DXVK games may fail to launch.", gl32_root,)
+
         if self.settings.get(config.USER_CONF_LOG_LEVEL, "info").lower() == "debug":
             logging.debug("" + "="*60)
             logging.debug(f"LAUNCHING: {self.name}")

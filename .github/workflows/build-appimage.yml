@@ -1,4 +1,4 @@
-name: Build lvnm AppImage
+name: Build LVNM Releases
 
 on:
   push:
@@ -6,11 +6,12 @@ on:
     tags: [ "v*" ] 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  build-appimage:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write # Required to create releases
 
     steps:
       - name: Checkout Code
@@ -131,8 +132,73 @@ jobs:
       - name: Upload Artifact (Always)
         uses: actions/upload-artifact@v4
         with:
-          name: LVNM-x86_64.AppImage
+          name: appimage
           path: LVNM-x86_64.AppImage
+
+  build-flatpak:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install SDK, PySide base, graphics and codecs
+        run: |
+          flatpak install --user --noninteractive -y flathub \
+            org.kde.Platform//6.11 \
+            org.kde.Sdk//6.11 \
+            io.qt.PySide.BaseApp//6.11 \
+            org.freedesktop.Platform.codecs-extra//25.08-extra \
+            org.freedesktop.Platform.Compat.i386//25.08 \
+            org.freedesktop.Platform.GL32.default//25.08 \
+            org.freedesktop.Platform.GL32.default//25.08-extra \
+            org.freedesktop.Platform.codecs_extra.i386//25.08-extra \
+            org.freedesktop.Platform.VulkanLayer.gamescope//25.08
+
+      - name: Build Flatpak repository
+        run: |
+          flatpak-builder --user --force-clean --repo=flatpak-repo \
+            --install-deps-from=flathub flatpak-build \
+            flatpak/io.github.uunniiblog.lvnm.yml
+
+      - name: Create Flatpak bundle
+        run: |
+          flatpak build-bundle flatpak-repo LVNM-x86_64.flatpak \
+            io.github.uunniiblog.lvnm \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: LVNM-x86_64.flatpak
+          if-no-files-found: error
+
+  publish-release:
+    needs: [build-appimage, build-flatpak]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum LVNM-x86_64.AppImage LVNM-x86_64.flatpak > SHA256SUMS
 
       - name: Set Release Variables
         id: vars
@@ -165,10 +231,11 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           body: |
             Automated build for commit: ${{ github.sha }}
-            Download the latest AppImage below.
+            Download the AppImage or Flatpak bundle below.
           files: |
             LVNM-x86_64.AppImage
-            LVNM-x86_64.AppImage.sha256
+            LVNM-x86_64.flatpak
+            SHA256SUMS
           draft: false
           prerelease: ${{ env.IS_PRERELEASE == 'true' }}
         env:

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.uunniiblog.lvnm</id>
+  <name>LVNM</name>
+  <summary>Manage and launch visual novels on Linux</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- The upstream repository does not currently publish a license. -->
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>LVNM manages visual novels, Wine and Proton runners, prefixes, cover art, play time and save data.</p>
+  </description>
+  <launchable type="desktop-id">io.github.uunniiblog.lvnm.desktop</launchable>
+  <url type="homepage">https://github.com/uunniiblog/linux-vn-manager-lvnm</url>
+  <developer id="io.github.uunniiblog">
+    <name>uunniiblog</name>
+  </developer>
+  <provides>
+    <binary>lvnm</binary>
+  </provides>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.5.4" date="2026-09-27" />
+  </releases>
+</component>

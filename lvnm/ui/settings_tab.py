@@ -720,6 +720,8 @@ class SettingsTab(QWidget):
 
         if runtime == "appimage":
             version_label += "  📦 AppImage"
+        elif runtime == "flatpak":
+            version_label += "  📦 Flatpak"
         else:
             version_label += "  (native)"
 
