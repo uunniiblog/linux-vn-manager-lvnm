@@ -700,7 +700,8 @@ class SystemUtils:
             logger.debug("get_launch_command - Running as a Flatpak")
             if for_steam:
                 exe_cmd = "flatpak"
-                args = f'run {flatpak_id} -r "{game_name}"'
+                # Apply a UTF-8 locale before Steam expands the executable.
+                args = f'LC_ALL=C.UTF-8 %command% run {flatpak_id} -r "{game_name}"'
             else:
                 exe_cmd = f"flatpak run {flatpak_id}"
                 args = f'-r "{game_name}"'
