@@ -24,8 +24,9 @@ class SgdbAutocompleteLineEdit(QLineEdit):
     # Emits status messages for the UI
     status_changed = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, fetch_assets_on_select=True):
         super().__init__(parent)
+        self.fetch_assets_on_select = fetch_assets_on_select
         
         # State
         self.sgdb_cached_search_term = ""
@@ -169,8 +170,9 @@ class SgdbAutocompleteLineEdit(QLineEdit):
         
         self.game_selected.emit(game_data)
 
-        # start fetching grids/heroes
-        self.fetch_game_assets(game_data['id'], game_data['name'])
+        # The advanced images dialog needs the assets. name only fields do not.
+        if self.fetch_assets_on_select:
+            self.fetch_game_assets(game_data['id'], game_data['name'])
 
     def fetch_game_assets(self, game_id, game_name: str = ""):
         self.status_changed.emit(self.tr("Fetching images..."))

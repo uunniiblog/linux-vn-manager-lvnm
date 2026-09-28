@@ -59,6 +59,43 @@ class SteamGridDbManager:
         )
 
     @staticmethod
+    def fetch_and_store_primary_cover(game_id: int, api_key: str = "") -> tuple[str, str]:
+        """Download the first portrait grid for a game and return (path, source_url)."""
+        url = f"{SteamGridDbManager.SGDB_API_URL}/grids/game/{game_id}"
+        try:
+            response = requests.get(
+                url,
+                headers=SteamGridDbManager._headers(api_key),
+                timeout=5,
+            )
+            response.raise_for_status()
+            data = response.json()
+            grids = data.get("data", []) if data.get("success") else []
+            if not grids:
+                logger.info("[SGDB] No covers found for game ID %s", game_id)
+                return "", ""
+
+            # Prefer a portrait grid
+            selected = next(
+                (
+                    grid for grid in grids
+                    if grid.get("height", 0) > grid.get("width", 0)
+                ),
+                grids[0],
+            )
+            source_url = selected.get("url", "")
+            if not source_url:
+                return "", ""
+
+            cover_path = SteamGridDbManager.download_full_image(
+                source_url, f"sgdb{game_id}", "vertical"
+            )
+            return cover_path, source_url if cover_path else ""
+        except Exception as e:
+            logger.error("[SGDB] Failed to fetch cover for game ID %s: %s", game_id, e)
+            return "", ""
+
+    @staticmethod
     def fetch_heroes_temp(game_id: int, api_key: str = "", is_cancelled: callable = None) -> list:
         """
         Fetches horizontal hero/banner images (1920x620) for a SteamGridDB game ID.
@@ -206,6 +243,7 @@ class SteamGridDbManager:
             suffix = "_p" if role == "vertical" else "_h"
 
             covers_dir = Path(SettingsManager().get(config.USER_CONF_COVERS_PATH, config.COVERS_DIR))
+            covers_dir.mkdir(parents=True, exist_ok=True)
             dest = covers_dir / f"{game_id_str}{suffix}{ext}"
 
             response = requests.get(full_url, timeout=10)
@@ -302,3 +340,20 @@ class SteamGridDbImagesWorker(QThread):
         )
         if not self._cancelled:
             self.images_ready.emit(grids, heroes + steam)
+
+
+class SteamGridDbCoverWorker(QThread):
+    """Fetches and stores one automatic vertical cover for a saved game."""
+    cover_ready = Signal(str, str, str)
+
+    def __init__(self, game_name: str, game_id: int, api_key: str = ""):
+        super().__init__()
+        self.game_name = game_name
+        self.game_id = game_id
+        self.api_key = api_key
+
+    def run(self):
+        cover_path, source_url = SteamGridDbManager.fetch_and_store_primary_cover(
+            self.game_id, self.api_key
+        )
+        self.cover_ready.emit(self.game_name, cover_path, source_url)

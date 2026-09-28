@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
     QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
-    QMessageBox, QDialog, QProgressDialog, QStyle
+    QMessageBox, QDialog, QProgressDialog, QStyle, QStackedWidget
 )
 from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent
@@ -17,12 +17,14 @@ from prefix_manager import PrefixManager
 from model.game_card import GameCard, GameScope, SavedataConfig
 from system_utils import SystemUtils
 from vndb_manager import VndbManager, VndbWorker
+from steamgrid_manager import SteamGridDbManager, SteamGridDbCoverWorker
 from settings_manager import SettingsManager
 from savedata_manager import SavedataManager
 from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
+from ui.sgdb_autocomplete import SgdbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
 from ui.savedata_config_dialog import SavedataConfigDialog
 from timetracker.log_manager import LogManager
@@ -33,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 class GameSidebar(QFrame):
     VNDB_SITE_URL = config.VNDB_SITE_URL
+    SGDB_SITE_URL = config.SGDB_SITE_URL
     EGS_SITE_URL = config.EGS_SITE_URL
 
     def __init__(self, parent=None):
@@ -156,8 +159,19 @@ class GameSidebar(QFrame):
         gen_group = QGroupBox(self.tr("Edit Game"))
         self.gen_form = QFormLayout(gen_group)
         self.gen_form.setLabelAlignment(Qt.AlignLeft)
-        self.edit_name = VndbAutocompleteLineEdit()
-        self.edit_name.vn_selected.connect(self.on_vndb_item_selected)
+        self.name_edit_stack = QStackedWidget()
+        self.name_edits = {
+            "vndb": VndbAutocompleteLineEdit(),
+            "sgdb": SgdbAutocompleteLineEdit(fetch_assets_on_select=False),
+            "none": QLineEdit(),
+        }
+        self.name_edits["vndb"].vn_selected.connect(self.on_vndb_item_selected)
+        self.name_edits["sgdb"].game_selected.connect(self.on_sgdb_item_selected)
+        for name_edit in self.name_edits.values():
+            self.name_edit_stack.addWidget(name_edit)
+        self._name_autocomplete_source = None
+        self.edit_name = self.name_edits["vndb"]
+        self.refresh_name_autocomplete()
         self.edit_path = QLineEdit()
         self.btn_path = QPushButton()
         browse_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon)
@@ -196,7 +210,7 @@ class GameSidebar(QFrame):
         self.prefix_warning.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.edit_vndb = QLineEdit()
-        self.edit_vndb.setPlaceholderText("v11")
+        self.edit_vndb.setPlaceholderText("v11 or sgdb12345")
 
         # Save data folder (Only if enabled in settings)
         self.edit_savedata = QLineEdit()
@@ -218,7 +232,7 @@ class GameSidebar(QFrame):
         # Gdrive sync checkbox
         self.gdrive_sync_checkbox = QCheckBox(self.tr("Sync this game's savedata to Google Drive"))
 
-        self.gen_form.addRow(self.tr("Name:"), self.edit_name)
+        self.gen_form.addRow(self.tr("Name:"), self.name_edit_stack)
         self.gen_form.addRow(self.tr("Path:"), path_row)
         self.gen_form.addRow(self.tr("Prefix:"), prefix_row)
         self.gen_form.addRow("", self.prefix_warning)
@@ -408,10 +422,39 @@ class GameSidebar(QFrame):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
         self.edit_vndb.setText(vn_data.get('id', ''))
 
+    def on_sgdb_item_selected(self, game_data):
+        """Store SGDB IDs in the existing VNDB field with an explicit prefix."""
+        game_id = game_data.get("id")
+        if game_id is not None:
+            self.edit_vndb.setText(f"sgdb{game_id}")
+
+    @staticmethod
+    def _get_sgdb_id(metadata_id):
+        value = (metadata_id or "").strip().lower()
+        if not value.startswith("sgdb"):
+            return None
+        numeric_id = value[4:].lstrip(":")
+        return int(numeric_id) if numeric_id.isdigit() else None
+
+    def refresh_name_autocomplete(self):
+        """Apply the configured autocomplete provider while preserving entered text."""
+        source = self.user_settings.get(config.USER_CONF_NAME_AUTOCOMPLETE, "vndb")
+        if source not in self.name_edits:
+            source = "vndb"
+        if source == self._name_autocomplete_source:
+            return
+
+        current_text = self.edit_name.text() if self._name_autocomplete_source else ""
+        self.edit_name = self.name_edits[source]
+        self.edit_name.setText(current_text)
+        self.name_edit_stack.setCurrentWidget(self.edit_name)
+        self._name_autocomplete_source = source
+
     def load_game(self, card: GameCard):
         """
         Loaded from GameTab with the data of the game selected
         """
+        self.refresh_name_autocomplete()
         self.current_game = card
 
         # Don't preload from global settings in existing game load
@@ -561,6 +604,7 @@ class GameSidebar(QFrame):
 
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
+        self.refresh_name_autocomplete()
         self.current_game = card
         self.set_ui_start_state()
 
@@ -749,13 +793,13 @@ class GameSidebar(QFrame):
         # Record if this is a new game before we overwrite the original name
         is_new_game = not self.current_game.name 
         original_name = self.current_game.name
-        old_vndb = self.current_game.vndb
+        old_vndb = (self.current_game.vndb or "").strip()
 
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
         self.current_game.prefix = self.combo_prefix.currentText()
-        self.current_game.vndb = self.edit_vndb.text()
+        self.current_game.vndb = self.edit_vndb.text().strip()
         self.current_game.gdrive = self.gdrive_sync_checkbox.isChecked()
 
         if not self.current_game.name:
@@ -780,9 +824,10 @@ class GameSidebar(QFrame):
             if reply == QMessageBox.No:
                 return
 
-        if old_vndb and not self.current_game.vndb:
-            logger.info(f"VNDB ID removed for {self.current_game.name}. Clearing cover path.")
+        if old_vndb != self.current_game.vndb:
+            logger.info(f"Metadata ID changed for {self.current_game.name}. Clearing the old cover path.")
             self.current_game.cover_path = ""
+            self.current_game.cover_source_url = ""
         
         # Env Vars
         env_vars_definitions = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
@@ -826,9 +871,16 @@ class GameSidebar(QFrame):
 
             GameManager.update_game(original_name, self.current_game.to_dict())
 
-        # Check if we need to fetch VNDB metadata
-        new_vndb = self.edit_vndb.text()
-        if new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle):
+        # Fetch metadata/cover from the provider encoded in the existing field.
+        new_vndb = self.current_game.vndb
+        sgdb_id = self._get_sgdb_id(new_vndb)
+        if sgdb_id is not None:
+            current_cover = SystemUtils.get_cover_path(self.current_game.cover_path, self.current_game.vndb)
+            if new_vndb != old_vndb or not current_cover:
+                self.fetch_sgdb_cover_async(self.current_game.name, sgdb_id)
+        elif new_vndb.lower().startswith("sgdb"):
+            logger.warning(f"Invalid SteamGridDB ID: {new_vndb}")
+        elif new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle):
             logger.debug("Fetching VNDB data")
             self.fetch_vndb_async(self.current_game.name, new_vndb)
 
@@ -1001,6 +1053,39 @@ class GameSidebar(QFrame):
         self.vndb_thread.finished.connect(self.on_vndb_finished)
         self.vndb_thread.start()
 
+    def fetch_sgdb_cover_async(self, game_name, sgdb_id):
+        api_key = SteamGridDbManager._get_api_key()
+        if not api_key:
+            QMessageBox.warning(
+                self,
+                self.tr("No API Key"),
+                self.tr("No SteamGridDB API key is set.\n\nPlease add your key in Settings."),
+            )
+            return
+
+        self.sgdb_cover_thread = SteamGridDbCoverWorker(game_name, sgdb_id, api_key)
+        self.sgdb_cover_thread.cover_ready.connect(self.on_sgdb_cover_finished)
+        self.sgdb_cover_thread.start()
+
+    def on_sgdb_cover_finished(self, game_name, cover_path, source_url):
+        if not cover_path:
+            logger.warning(f"No SteamGridDB cover was downloaded for {game_name}.")
+            return
+
+        game_card = GameManager.get_game(game_name)
+        if not game_card:
+            return
+
+        game_card.cover_path = cover_path
+        game_card.cover_source_url = source_url
+        GameManager.update_game(game_name, game_card.to_dict())
+        self.on_metadata_updated(game_name)
+
+        if self.current_game and self.current_game.name == game_name:
+            self.current_game.cover_path = cover_path
+            self.current_game.cover_source_url = source_url
+            self.update_game_cover()
+
     def on_vndb_finished(self, game_name, results):
         logger.debug(f"[on_vndb_finished] fired for '{game_name}', current_game='{self.current_game.name if self.current_game else None}'")
         if results:
@@ -1040,11 +1125,17 @@ class GameSidebar(QFrame):
             self.lbl_cover.set_pixmap_from_path(display_path)
 
             if has_vndb:
-                vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
-                self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
-                jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
-                egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
-                self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+                sgdb_id = self._get_sgdb_id(card.vndb)
+                if sgdb_id is not None:
+                    sgdb_url = self.SGDB_SITE_URL.format(sgdbid=sgdb_id)
+                    self.lbl_vndb_link.setText(f'<a href="{sgdb_url}" style="color: #66b2ff;">SteamGridDB</a>')
+                    self.lbl_egs_link.clear()
+                else:
+                    vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
+                    self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
+                    jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
+                    egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
+                    self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
             else:
                 self.lbl_vndb_link.clear()
                 self.lbl_egs_link.clear()

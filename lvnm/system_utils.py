@@ -491,6 +491,9 @@ class SystemUtils:
         # Search for any file extension matching the VNDB ID
         matches = list(covers_dir.glob(f"{vndb_id}-*_p.*"))
         if not matches:
+            # SteamGridDB automatic and advanced covers use sgdb<ID>_p.<ext>.
+            matches = list(covers_dir.glob(f"{vndb_id}_p.*"))
+        if not matches:
             # fallback check for original naming without _p to not break current covers
             matches = list(covers_dir.glob(f"{vndb_id}.*"))
         

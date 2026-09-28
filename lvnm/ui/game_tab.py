@@ -138,6 +138,7 @@ class GameTab(QWidget):
 
     def refresh_active_tab(self):
         """Forces the currently visible sub-tab to reload its data"""
+        self.sidebar.refresh_name_autocomplete()
         if self.card is not None:
             if not self.card.name:
                 # New game sidebar

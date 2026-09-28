@@ -4,7 +4,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLineEdit, QPushButton,
     QCheckBox, QFileDialog, QScrollArea, QFrame,
     QGridLayout, QMessageBox, QStyle, QSizePolicy,
-    QToolButton, QProgressBar, QDialog, QApplication
+    QToolButton, QProgressBar, QDialog, QApplication,
+    QRadioButton, QButtonGroup
 )
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.savedata_management_dialog import SavedataManagementDialog
@@ -134,6 +135,28 @@ class SettingsTab(QWidget):
         sgdb_container.addWidget(sgdb_link)
         
         settings_layout.addRow(self.tr("SteamGridDB API Key:"), sgdb_container)
+
+        # Game sidebar name autocomplete
+        autocomplete_layout = QHBoxLayout()
+        self.name_autocomplete_group = QButtonGroup(self)
+        self.name_autocomplete_buttons = {}
+        current_autocomplete = self.user_settings.get(config.USER_CONF_NAME_AUTOCOMPLETE, "vndb")
+        if current_autocomplete not in ("vndb", "sgdb", "none"):
+            current_autocomplete = "vndb"
+
+        for label, source in (
+            ("VNDB", "vndb"),
+            ("SteamGridDB", "sgdb"),
+            (self.tr("None"), "none"),
+        ):
+            button = QRadioButton(label)
+            button.setChecked(source == current_autocomplete)
+            self.name_autocomplete_group.addButton(button)
+            self.name_autocomplete_buttons[source] = button
+            autocomplete_layout.addWidget(button)
+
+        autocomplete_layout.addStretch()
+        settings_layout.addRow(self.tr("Name autocomplete:"), autocomplete_layout)
 
         # Log Level + File Logging
         self.log_level_combo = QComboBox()
@@ -771,6 +794,11 @@ class SettingsTab(QWidget):
         self.font_btn.clicked.connect(self.browse_font_folder)
         self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
         self.sgdb_key_edit.textChanged.connect(lambda text: self.save_setting(config.USER_CONF_SGDB_API_KEY, text))
+        for source, button in self.name_autocomplete_buttons.items():
+            button.toggled.connect(
+                lambda checked, value=source: checked
+                and self.save_setting(config.USER_CONF_NAME_AUTOCOMPLETE, value)
+            )
         self.log_level_combo.currentIndexChanged.connect(self.change_log_level)
         self.log_to_file_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOG_TO_FILE, bool(s)))
         self.log_wine_traces.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOGS_WINE, bool(s)))
