@@ -590,7 +590,12 @@ class GameSidebar(QFrame):
     def _open_advanced_settings(self):
         if not self.current_game:
             return
-            
+
+        # Give current values even if not saved
+        self.current_game.name = self.edit_name.text()
+        self.current_game.path = self.edit_path.text()
+        self.current_game.prefix = self.combo_prefix.currentText()
+
         # Figure out the current prefix type to pass to the dialog
         prefix_name = self.combo_prefix.currentText()
         prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")

@@ -1,14 +1,17 @@
 import threading
+import shlex
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
 from PySide6.QtCore import QProcess, QProcessEnvironment, Signal, Slot
 from PySide6.QtGui import QTextCursor
 import logging
+from execution_manager import ExecutionManager
 
 logger = logging.getLogger(__name__)
 
 class ConsoleDialog(QDialog):
     finished_all = Signal() # Signal emitted when the queue is empty
-    task_finished = Signal()
+    failed = Signal(str)
+    task_finished = Signal(bool, str)
     append_text_signal = Signal(str)
 
     def __init__(self, parent=None):
@@ -31,13 +34,14 @@ class ConsoleDialog(QDialog):
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
         self.process.readyReadStandardError.connect(self.handle_stderr)
         self.process.finished.connect(self._on_process_finished)
-        self.task_finished.connect(self._on_process_finished)
+        self.task_finished.connect(self._on_callable_finished)
         self.append_text_signal.connect(self.console.append)
         self._had_error = False
         self.process.errorOccurred.connect(self._on_process_error)
 
         self.task_queue = []
         self.current_callback = None
+        self.completed_successfully = False
 
     def add_task(self, cmd, env, description, on_finished_callback=None):
         """Adds a command to the queue."""
@@ -50,16 +54,17 @@ class ConsoleDialog(QDialog):
 
     def start_queue(self):
         """Starts executing the first task in the queue."""
+        self.completed_successfully = False
         if not self.task_queue:
             self.console.append(self.tr("\n[Done] No tasks to execute."))
             self.close_btn.setEnabled(True)
+            self.completed_successfully = True
             return
         self._run_next()
 
     def _run_next(self):
         if self.task_queue:
             task = self.task_queue.pop(0)
-            logger.debug(f"[debug] Starting task {task["desc"]}")
             self.current_callback = task["callback"]
             
             self.console.append(self.tr("\n>>> {}...").format(task['desc']))
@@ -68,8 +73,10 @@ class ConsoleDialog(QDialog):
 
             try:
                 if isinstance(cmd, list):
+                    self.console.append(f"$ {shlex.join(str(part) for part in cmd)}")
                     qenv = QProcessEnvironment()
-                    for k, v in task["env"].items():
+                    final_env = ExecutionManager._get_verbosity_env(task["env"])
+                    for k, v in final_env.items():
                         qenv.insert(k, str(v))
                     self.process.setProcessEnvironment(qenv)
                     self.process.start(cmd[0], cmd[1:])
@@ -77,33 +84,64 @@ class ConsoleDialog(QDialog):
                     def wrapper():
                         try:
                             # Pass the logger to methods queued up so it shows up in the dialog
-                           cmd(logger=self.append_text_signal.emit)
+                            cmd(logger=self.append_text_signal.emit)
                         except Exception as e:
-                            self.append_text_signal.emit(f"[Thread Error] {e}")
-                        
+                            self.task_finished.emit(False, str(e))
+                            return
+
                         # Tell the main thread this task is done so it can run the next one
-                        self.task_finished.emit()
+                        self.task_finished.emit(True, "")
 
                     threading.Thread(target=wrapper, daemon=True).start()
             except Exception as e:
-                logger.error(f"[Error] Task failed: {e}")
+                self._abort_queue(str(e))
 
         else:
             self.console.append(self.tr("\n--- All tasks completed successfully ---"))
             self.close_btn.setEnabled(True)
+            self.completed_successfully = True
             self.finished_all.emit()
 
-    def _on_process_finished(self):
+    def _on_process_finished(self, exit_code=0, exit_status=QProcess.NormalExit):
+        # Drain any final output emitted immediately before process exit.
+        self.handle_stdout()
+        self.handle_stderr()
+
         # Check error
         if self._had_error:
             self._had_error = False
             return
 
+        if exit_status != QProcess.NormalExit or exit_code != 0:
+            self._abort_queue(self.tr("Process exited with code {}.").format(exit_code))
+            return
+
         # Run callback then move to next task
-        logger.debug(f"Task finished")
         if self.current_callback:
-            self.current_callback()
+            try:
+                self.current_callback()
+            except Exception as e:
+                self._abort_queue(str(e))
+                return
         self._run_next()
+
+    @Slot(bool, str)
+    def _on_callable_finished(self, success, error_message):
+        if not success:
+            self._abort_queue(error_message)
+            return
+        self._on_process_finished()
+
+    def _abort_queue(self, error_message):
+        self.task_queue.clear()
+        self.current_callback = None
+        self.completed_successfully = False
+        message = self.tr("\n[ERROR] {}").format(error_message)
+        self.console.append(message)
+        self.console.append(self.tr("\nTask queue aborted due to error."))
+        self.close_btn.setEnabled(True)
+        self.failed.emit(error_message)
+        logger.error("Console task queue aborted: %s", error_message)
 
     def _on_process_error(self, error):
         """Captures errors when the process fails to start or crashes."""
@@ -113,9 +151,7 @@ class ConsoleDialog(QDialog):
         exit_status = self.process.exitStatus()
         self.append_text_signal.emit(self.tr("\n[FATAL ERROR] Could not start process: {}").format(error_msg))
         logger.error(f"console tasks ERROR: {error_msg} | exitCode={exit_code} | exitStatus={exit_status} | errorCode={error}")
-        self.console.append(self.tr("\n Task queue aborted due to error"))
-        
-        self.close_btn.setEnabled(True)
+        self._abort_queue(error_msg)
 
     def handle_stdout(self):
         data = self.process.readAllStandardOutput().data().decode(errors='replace').strip()

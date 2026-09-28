@@ -95,6 +95,7 @@ class GameCard:
     pre_launch_script: str = ""
     pre_launch_script_wait: bool = False
     exit_script: str = ""
+    registry_path: str = ""
     arguments: str = ""
     savedata_path: str = ""
     savedata: SavedataConfig = field(default_factory=SavedataConfig)

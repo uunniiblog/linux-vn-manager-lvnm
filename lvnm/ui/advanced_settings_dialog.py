@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QLabel, QPushButton, QFileDialog,
     QCheckBox, QGroupBox, QScrollArea, QWidget,
     QGridLayout, QComboBox, QStackedWidget,
-    QFrame, QSplitter, QStyle, QSizePolicy
+    QFrame, QSplitter, QStyle, QSizePolicy, QMessageBox
 )
 from PySide6.QtCore import Qt, QSettings, QTimer, QSize
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QPalette
@@ -15,6 +15,9 @@ from vndb_manager import VndbReleaseImagesWorker
 from system_utils import SystemUtils
 from steamgrid_manager import SteamGridDbSearchWorker, SteamGridDbImagesWorker, SteamGridDbManager
 from settings_manager import SettingsManager
+from prefix_manager import PrefixManager
+from regedit_management import RegeditManager
+from ui.console_dialog import ConsoleDialog
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +116,20 @@ class AdvancedSettingsDialog(QDialog):
         exit_script_layout.addWidget(self.edit_exit_script)
         exit_script_layout.addWidget(self.btn_exit_script)
         form.addRow(self.tr("Exit Script:"), exit_script_layout)
+
+        # Registry Keys
+        self.edit_registry_path = QLineEdit(getattr(self.current_game, "registry_path", ""))
+        self.edit_registry_path.setPlaceholderText(r"HKLM\Software\Key\Rewrite_PLUS")
+        self.btn_detect_registry = QPushButton(self.tr("Auto-detect"))
+        self.btn_detect_registry.clicked.connect(self._auto_detect_registry_path)
+        self.btn_copy_registry = QPushButton(self.tr("Copy to..."))
+        self.btn_copy_registry.clicked.connect(self._open_copy_registry_dialog)
+
+        registry_layout = QHBoxLayout()
+        registry_layout.addWidget(self.edit_registry_path)
+        registry_layout.addWidget(self.btn_detect_registry)
+        registry_layout.addWidget(self.btn_copy_registry)
+        form.addRow(self.tr("Registry Path:"), registry_layout)
 
         self.scroll_layout.addLayout(form)
 
@@ -367,7 +384,100 @@ class AdvancedSettingsDialog(QDialog):
         self.current_game.pre_launch_script = self.edit_pre_script.text()
         self.current_game.pre_launch_script_wait = self.chk_pre_script_wait.isChecked()
         self.current_game.exit_script = self.edit_exit_script.text()
+        self.current_game.registry_path = self.edit_registry_path.text().strip()
         super().accept()
+
+    def _auto_detect_registry_path(self):
+        try:
+            candidates = RegeditManager.find_registry_keys(self.current_game)
+        except Exception as exc:
+            logger.exception("Registry auto-detection failed")
+            QMessageBox.critical(self, self.tr("Registry Detection Failed"), str(exc))
+            return
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                self.tr("Registry Key Not Found"),
+                self.tr("No likely registry key was found. You can enter one manually."),
+            )
+            return
+
+        self.edit_registry_path.setText(candidates[0])
+        if len(candidates) > 1:
+            self.edit_registry_path.setToolTip(
+                self.tr("Other possible keys:\n{0}").format(
+                    "\n".join(candidates[1:6])
+                )
+            )
+
+    def _open_copy_registry_dialog(self):
+        registry_path = self.edit_registry_path.text().strip()
+        if not registry_path:
+            QMessageBox.warning(
+                self,
+                self.tr("Registry Path Required"),
+                self.tr("Enter or auto-detect a registry path first."),
+            )
+            return
+
+        prefixes = {
+            name: data
+            for name, data in PrefixManager.get_prefix_json().items()
+            if name != self.current_game.prefix and data.get("type") in ("wine", "proton")
+        }
+        if not prefixes:
+            QMessageBox.information(
+                self,
+                self.tr("No Target Prefix"),
+                self.tr("There are no other Wine or Proton prefixes available."),
+            )
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Copy Registry Data to Prefix"))
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(self.tr("Target prefix:")))
+        combo = QComboBox()
+        combo.addItems(sorted(prefixes))
+        layout.addWidget(combo)
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        cancel_button = QPushButton(self.tr("Cancel"))
+        ok_button = QPushButton(self.tr("OK"))
+        cancel_button.clicked.connect(dialog.reject)
+        ok_button.clicked.connect(dialog.accept)
+        button_row.addWidget(cancel_button)
+        button_row.addWidget(ok_button)
+        layout.addLayout(button_row)
+
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        console = ConsoleDialog(self)
+        console.setWindowTitle(self.tr("Copying Registry Data"))
+
+        cleanup = None
+        try:
+            cleanup = RegeditManager.queue_registry_copy(
+                registry_path,
+                self.current_game.prefix,
+                combo.currentText(),
+                console,
+                game=self.current_game,
+            )
+        except Exception as exc:
+            logger.exception("Registry copy failed")
+            QMessageBox.critical(self, self.tr("Registry Copy Failed"), str(exc))
+            return
+
+        console.start_queue()
+        console.exec()
+        if cleanup:
+            cleanup()
+
+        if not console.completed_successfully:
+            return
 
     def on_vn_selected(self, vn_data):
         """Fetches release images for a selected VNDB entry."""
