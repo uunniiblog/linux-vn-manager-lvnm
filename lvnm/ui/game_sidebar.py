@@ -812,6 +812,9 @@ class GameSidebar(QFrame):
             )
             # After adding, we need to save the extra fields (envvars, etc)
             GameManager.update_game(self.current_game.name, self.current_game.to_dict())
+
+            # Disable creation mode to avoid weird editing bugs.
+            self._create_mode_defaults = None
             self.launch_btn.setVisible(True)
         else:
             logger.debug(f"Updating game: {original_name}")
