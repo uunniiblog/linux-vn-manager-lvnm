@@ -74,6 +74,21 @@ cleanup-commands:
   - mkdir -p /app/lib/extensions/vulkan/gamescope
 
 modules:
+  - name: swayidle
+    buildsystem: meson
+    config-opts:
+      # LVNM only needs the compositor idle timeout/resume observer.
+      - -Dman-pages=disabled
+      - -Dzsh-completions=false
+      - -Dbash-completions=false
+      - -Dfish-completions=false
+    cleanup:
+      - /share
+    sources:
+      - type: archive
+        url: https://github.com/swaywm/swayidle/archive/refs/tags/v1.9.0.tar.gz
+        sha256: 161f5827b8c79bc486a472d27690e98d75da6615bb2dee9f24393cbbb13af656
+
   - name: cabextract
     buildsystem: autotools
     cleanup:
