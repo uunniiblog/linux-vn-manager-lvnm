@@ -25,7 +25,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 libxcb1 libxcb-icccm4 libxcb-keysyms1 libxcb-util1 libxcb-cursor0 libxcb-image0 libxkbcommon-x11-0 libxcb-xkb1
+          sudo apt-get install -y libfuse2 libsdl2-2.0-0 libxcb1 libxcb-icccm4 libxcb-keysyms1 libxcb-util1 libxcb-cursor0 libxcb-image0 libxkbcommon-x11-0 libxcb-xkb1
           # pip install PySide6 setproctitle requests pyinstaller
           # Add any other requirements from your requirements.txt if needed
           pip install -r requirements.txt
@@ -49,6 +49,7 @@ jobs:
             --add-data "lvnm/vn_winestuff:vn_winestuff" \
             --add-data "lvnm/assets:assets" \
             --add-data "lvnm/locale:locale" \
+            --add-binary "/usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb.so.1:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-icccm.so.4:." \
             --add-binary "/usr/lib/x86_64-linux-gnu/libxcb-keysyms.so.1:." \

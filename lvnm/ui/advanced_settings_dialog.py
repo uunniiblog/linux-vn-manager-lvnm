@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QComboBox, QStackedWidget,
     QFrame, QSplitter, QStyle, QSizePolicy, QMessageBox
 )
-from PySide6.QtCore import Qt, QSettings, QTimer, QSize
+from PySide6.QtCore import Qt, QSettings, QTimer, QSize, Signal
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QPalette
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.sgdb_autocomplete import SgdbAutocompleteLineEdit
@@ -22,6 +22,7 @@ from ui.console_dialog import ConsoleDialog
 logger = logging.getLogger(__name__)
 
 class AdvancedSettingsDialog(QDialog):
+    content_changed = Signal()
     SETTINGS_FILE = config.UI_SETTINGS
 
     def __init__(self, prefix_type, current_game, parent=None):
@@ -630,6 +631,7 @@ class AdvancedSettingsDialog(QDialog):
         selected at any time in the entire dialog.
         """
         self._user_modified_combos.add(id(changed_combo))
+        self.content_changed.emit()
 
         if index == 0:
             return
@@ -791,6 +793,7 @@ class AdvancedSettingsDialog(QDialog):
         self.current_game.cover_source_url = ""
         self.current_game.layout_source_url = ""
         self._update_current_asset_thumbnails()
+        self.content_changed.emit()
 
     def _update_current_asset_thumbnails(self):
         """Refreshes the thumbnail previews of saved assets."""
