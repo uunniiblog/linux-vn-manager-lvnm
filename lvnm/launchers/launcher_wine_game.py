@@ -21,6 +21,7 @@ class LauncherWineGame(LauncherBaseGame):
         self.is_steam = is_steam
         self.umu_path = None
         self.is_proton = False
+        self.network_isolation_fds = ()
 
     def prepare_environment(self):
         """Builds the environment and the final command list."""
@@ -74,6 +75,37 @@ class LauncherWineGame(LauncherBaseGame):
         self.cmd = self.apply_pre_launch_args(self.cmd)
         # Apply Gamescope Wrapper
         self.cmd = self.apply_gamescope(self.cmd)
+        # Disable network access option
+        self.cmd = self.apply_network_isolation(self.cmd)
+
+    def apply_network_isolation(self, cmd: list) -> list:
+        """Run the final game command without network access when supported."""
+        for descriptor in getattr(self, "network_isolation_fds", ()):
+            os.close(descriptor)
+        self.network_isolation_fds = ()
+        
+        if not getattr(self.game, "disable_network", False):
+            return cmd
+
+        if SystemUtils.get_runtime_type() == "flatpak":
+            spawn_env = ExecutionManager._get_verbosity_env(self.env)
+            environment = b"\0".join(os.fsencode(f"{key}={value}") for key, value in spawn_env.items()) + b"\0"
+            environment_fd = os.memfd_create("lvnm-flatpak-environment", flags=0)
+            with os.fdopen(environment_fd, "wb", closefd=False) as environment_file:
+                environment_file.write(environment)
+            os.lseek(environment_fd, 0, os.SEEK_SET)
+            os.set_inheritable(environment_fd, True)
+            self.network_isolation_fds = (environment_fd,)
+            logger.info(f"Network access disabled for game '{self.game.name}' using Flatpak.")
+            return ["flatpak-spawn", "--no-network", "--watch-bus", f"--env-fd={environment_fd}", *cmd]
+
+        firejail = SystemUtils.get_firejail_path()
+        if firejail is None:
+            logger.warning(f"Network isolation was requested for '{self.game.name}', but Firejail is not installed. Launching without network isolation.")
+            return cmd
+
+        logger.info(f"Network access disabled for game '{self.game.name}' using Firejail.")
+        return [firejail, "--noprofile", "--net=none", *cmd]
 
     def run_in_prefix(self, exe_path: str, prefix_name: str):
         """
@@ -244,7 +276,7 @@ class LauncherWineGame(LauncherBaseGame):
             self.run_external_script(self.game.pre_launch_script.strip())
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless)
+        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless, pass_fds=self.network_isolation_fds)
         logger.debug(f"Launched PID {self.process.pid} for game {self.game.path}")
 
         # Apply linux-rt-upscaler

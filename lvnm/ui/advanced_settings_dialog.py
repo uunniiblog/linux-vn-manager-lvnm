@@ -131,6 +131,33 @@ class AdvancedSettingsDialog(QDialog):
         registry_layout.addWidget(self.btn_copy_registry)
         form.addRow(self.tr("Registry Path:"), registry_layout)
 
+        # Per-game network isolation
+        network_isolation_available = (
+            SystemUtils.get_runtime_type() == "flatpak"
+            or SystemUtils.get_firejail_path() is not None
+        )
+        network_help_text = self.tr(
+            "Prevents this game from accessing the network. Requires the Flatpak "
+            "build of LVNM or Firejail installed on the system."
+        )
+        self.label_disable_network = QLabel(self.tr("Disable Network:"))
+        self.chk_disable_network = QCheckBox()
+        self.chk_disable_network.setEnabled(network_isolation_available)
+        self.chk_disable_network.setChecked(
+            network_isolation_available
+            and getattr(self.current_game, "disable_network", False)
+        )
+        self.lbl_disable_network_help = QLabel(network_help_text)
+        self.lbl_disable_network_help.setWordWrap(True)
+        network_option_layout = QHBoxLayout()
+        network_option_layout.addWidget(self.chk_disable_network)
+        network_option_layout.addWidget(self.lbl_disable_network_help, 1)
+        network_option_visible = prefix_type in ("wine", "proton")
+        self.label_disable_network.setVisible(network_option_visible)
+        self.chk_disable_network.setVisible(network_option_visible)
+        self.lbl_disable_network_help.setVisible(network_option_visible)
+        form.addRow(self.label_disable_network, network_option_layout)
+
         self.scroll_layout.addLayout(form)
 
         # Space form from image section
@@ -380,6 +407,7 @@ class AdvancedSettingsDialog(QDialog):
         self.current_game.umu_store = self.edit_umu_store.text()
         self.current_game.umu_gameid = self.edit_umu_id.text()
         self.current_game.pre_launch_args = self.edit_pre_args.text()
+        self.current_game.disable_network = self.chk_disable_network.isChecked()
         self.current_game.arguments = self.edit_arguments.text()
         self.current_game.pre_launch_script = self.edit_pre_script.text()
         self.current_game.pre_launch_script_wait = self.chk_pre_script_wait.isChecked()

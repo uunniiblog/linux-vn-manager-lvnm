@@ -401,6 +401,11 @@ class SystemUtils:
         return "dev"
 
     @staticmethod
+    def get_firejail_path() -> str | None:
+        """Returns the Firejail executable path when it is installed."""
+        return shutil.which("firejail")
+
+    @staticmethod
     def apply_ui_zoom(zoom_factor: float):
         """
         Applies a global font-based zoom to the entire application.

@@ -92,6 +92,7 @@ class GameCard:
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     label: str = ""
     pre_launch_args: str = ""
+    disable_network: bool = False
     pre_launch_script: str = ""
     pre_launch_script_wait: bool = False
     exit_script: str = ""

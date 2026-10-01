@@ -46,7 +46,7 @@ class ExecutionManager:
         return env
 
     @staticmethod
-    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None, detached=True):
+    def run(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None, detached=True, pass_fds=()):
         """
         Executes a command with automatic verbosity management.
         
@@ -59,6 +59,7 @@ class ExecutionManager:
             cwd: Sets the current directory before the child is executed (useful for some VNs)
             log_callback: Callback to store the log in gamerunner.
             detached: hopefully this helps
+            pass_fds: File descriptors that must remain open in the child process.
         """
         if suppress_codes is None:
             suppress_codes = []
@@ -80,7 +81,8 @@ class ExecutionManager:
             universal_newlines=False,
             bufsize=0,
             cwd=cwd,
-            start_new_session=detached
+            start_new_session=detached,
+            pass_fds=pass_fds,
         )
 
         # Handle Logging (Threaded to prevent pipe clogs)
