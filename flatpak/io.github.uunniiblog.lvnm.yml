@@ -65,6 +65,7 @@ finish-args:
   - --filesystem=/media
   - --filesystem=/mnt
   - --filesystem=/run/media
+  - --filesystem=xdg-run/hypr
   - --talk-name=org.kde.KWin
   - --talk-name=io.github.uunniiblog.lvnm.GnomeWindowTracker
   - --talk-name=org.freedesktop.Flatpak
