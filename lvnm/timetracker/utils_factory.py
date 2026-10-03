@@ -2,6 +2,7 @@ import logging
 from system_utils import SystemUtils
 from timetracker.kde_utils import KdeUtils
 from timetracker.gnome_utils import GnomeUtils
+from timetracker.hyprland_utils import HyprlandUtils
 from timetracker.x11_utils import X11Utils
 from timetracker.gamescope_utils import GamescopeUtils
 
@@ -25,6 +26,9 @@ def get_desktop_utils():
             logger.warning(f"GNOME native window tracking is unavailable: {error}")
             logger.info("Falling back to X11Utils for XWayland windows")
             return X11Utils()
+    elif SystemUtils.is_desktop_environment("HYPRLAND"):
+        logger.info("Using HyprlandUtils")
+        return HyprlandUtils()
     elif SystemUtils.is_desktop_environment("GAMESCOPE"):
         logger.info("Using GamescopeUtils")
         return GamescopeUtils()

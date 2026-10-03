@@ -334,7 +334,7 @@ class SettingsTab(QWidget):
         tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
 
         # Warning Message
-        self.tt_warning_label = QLabel(self.tr("Native Wayland tracking is supported on KDE and on GNOME with the LVNM Shell extension. Other desktops use XWayland."))
+        self.tt_warning_label = QLabel(self.tr("Native Wayland tracking is supported on KDE, Hyprland, and GNOME with the LVNM Shell extension. Other desktops use XWayland."))
         self.tt_warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
         self.tt_warning_label.setWordWrap(True)
         timetracker_layout.addRow(self.tt_warning_label)
