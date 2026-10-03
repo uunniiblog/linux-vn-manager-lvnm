@@ -16,6 +16,7 @@ from settings_manager import SettingsManager
 from timetracker.system_utils import SystemUtils as TimeTrackUtils
 from timetracker.utils_factory import get_desktop_utils
 from timetracker.x11_utils import X11Utils
+from taskbar_audio_entry import TaskbarAudioEntry
 
 logger = logging.getLogger(__name__)
 
@@ -177,3 +178,15 @@ class LauncherBaseGame(ABC):
     def get_full_log(self):
         """Returns the entire buffer as a single string for a UI text box"""
         return "\n".join(self.logs)
+
+    def _run_game_process(self, cmd, env, **kwargs):
+        """Launch the main game process with optional desktop integration."""
+        taskbar_audio = TaskbarAudioEntry(self)
+        taskbar_audio.prepare()
+        try:
+            self.process = ExecutionManager.run(cmd, env, **kwargs)
+        except Exception:
+            taskbar_audio.launch_failed()
+            raise
+        taskbar_audio.started()
+        return self.process

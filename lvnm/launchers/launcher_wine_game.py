@@ -276,7 +276,8 @@ class LauncherWineGame(LauncherBaseGame):
             self.run_external_script(self.game.pre_launch_script.strip())
 
         self._log_run_command(Path(self.prefix_info["runner"]))
-        self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless, pass_fds=self.network_isolation_fds)
+        self.process = self._run_game_process(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless, pass_fds=self.network_isolation_fds)
+        # self.process = ExecutionManager.run(self.cmd, self.env, wait=False, cwd=self.game_dir, log_callback=self._add_log_line, detached=not is_headless, pass_fds=self.network_isolation_fds)
         logger.debug(f"Launched PID {self.process.pid} for game {self.game.path}")
 
         # Apply linux-rt-upscaler
