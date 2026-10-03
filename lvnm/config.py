@@ -27,6 +27,10 @@ AFK_FILE = Path(tempfile.gettempdir()) / "lvnm" / "lvnm_afk_detection_file"
 TEMP_COVERS = Path(tempfile.gettempdir()) / "lvnm" / "search"
 GSYNC_METADATA = DATA_DIR / ".gsync_metadata.json"
 
+# Desktop scripts
+GNOME_EXTENSION_UUID = "lvnm-window-tracker@linux-vn-manager-lvnm"
+KWIN_SCRIPT_NAME = "timetracker-live-notifier"
+
 # URLS
 LVNM_API_URL = "https://api.github.com/repos/uunniiblog/linux-vn-manager-lvnm/releases"
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"

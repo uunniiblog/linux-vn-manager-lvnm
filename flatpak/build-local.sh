@@ -37,6 +37,7 @@ ensure_ref org.freedesktop.Platform.GL32.default//25.08
 ensure_ref org.freedesktop.Platform.GL32.default//25.08-extra
 ensure_ref org.freedesktop.Platform.codecs_extra.i386//25.08-extra
 ensure_ref org.freedesktop.Platform.VulkanLayer.gamescope//25.08
+ensure_ref org.freedesktop.Platform.VulkanLayer.MangoHud//25.08
 
 # Mesa GL32 is installed explicitly because a locally installed application and
 # its runtime extensions come from different origins. Flatpak selects another

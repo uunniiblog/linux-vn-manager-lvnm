@@ -62,6 +62,11 @@ jobs:
           # Move it immediately to avoid collision
           cp -r dist/LVNM/* LVNM.AppDir/usr/bin/
 
+          # Fail the build if the GNOME Shell extension was not bundled.
+          test -f LVNM.AppDir/usr/bin/_internal/assets/gnome_extension/install.sh
+          test -f LVNM.AppDir/usr/bin/_internal/assets/gnome_extension/lvnm-window-tracker@linux-vn-manager-lvnm/metadata.json
+          test -f LVNM.AppDir/usr/bin/_internal/assets/gnome_extension/lvnm-window-tracker@linux-vn-manager-lvnm/extension.js
+
           # Remove entirely of google api discovery to save file size
           rm -rf LVNM.AppDir/usr/bin/_internal/googleapiclient/discovery_cache/documents
 

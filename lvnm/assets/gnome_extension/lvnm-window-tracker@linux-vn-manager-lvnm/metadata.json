@@ -1,0 +1,8 @@
+{
+  "uuid": "lvnm-window-tracker@linux-vn-manager-lvnm",
+  "name": "LVNM Window Tracker",
+  "description": "Exposes GNOME Shell window metadata to Linux Visual Novel Manager for native Wayland time tracking.",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/uunniiblog/linux-vn-manager-lvnm",
+  "version": 1
+}

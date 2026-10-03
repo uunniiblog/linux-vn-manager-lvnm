@@ -53,8 +53,8 @@ class SystemUtils:
                     
                     #logger.debug(f"get_window_list title {title}")
                     if only_show_wine:
-                        pid_str = utils.get_window_pid(wid)
-                        if pid_str and pid_str.isdigit() and SystemUtils.is_wine_or_proton(int(pid_str)):
+                        pid_str = str(utils.get_window_pid(wid) or "")
+                        if pid_str.isdigit() and SystemUtils.is_wine_or_proton(int(pid_str)):
                             window_list.append((title, wid))
                     else:
                         window_list.append((title, wid))
@@ -123,11 +123,17 @@ class SystemUtils:
     def get_full_cmdline(pid):
         """Gets the full command line for a PID. Reads as bytes to handle non-UTF-8 Wine cmdlines."""
         try:
-            with open(f"/proc/{pid}/cmdline", "rb") as f:
-                raw = f.read()
+            if SystemUtils._runtime_type == "flatpak":
+                result = subprocess.run(["flatpak-spawn", "--host", "cat", f"/proc/{pid}/cmdline"], capture_output=True, timeout=2,)
+                if result.returncode != 0:
+                    return ""
+                raw = result.stdout
+            else:
+                with open(f"/proc/{pid}/cmdline", "rb") as f:
+                    raw = f.read()
             # cmdline args are null-separated; decode with surrogateescape so no crash on bad bytes
             return raw.replace(b'\x00', b' ').decode('utf-8', errors='surrogateescape')
-        except:
+        except Exception:
             return ""
 
     @staticmethod
@@ -267,3 +273,36 @@ class SystemUtils:
             return True, int(time.time() - start_time)
         except:
             return False, 0
+
+    @staticmethod
+    def get_gnome_extension_installer_path() -> Path:
+        """Return the bundled GNOME Shell extension installer path."""
+        return config.BASE_DIR / "assets" / "gnome_extension" / "install.sh"
+
+    @staticmethod
+    def install_gnome_shell_extension() -> str:
+        """Install or update LVNM's per-user GNOME Shell extension."""
+        if not MainSystemUtils.is_gnome_desktop():
+            raise RuntimeError("The GNOME Shell extension can only be installed from a GNOME session.")
+
+        installer = SystemUtils.get_gnome_extension_installer_path()
+        if not installer.is_file():
+            raise RuntimeError(f"GNOME Shell extension installer was not found: {installer}")
+
+        try:
+            result = subprocess.run(
+                ["sh", str(installer)],
+                capture_output=True,
+                text=True,
+                env=MainSystemUtils.get_clean_env(),
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError(f"Could not run the GNOME Shell extension installer: {error}") from error
+
+        if result.returncode != 0:
+            details = (result.stderr or result.stdout).strip()
+            raise RuntimeError(details or "The GNOME Shell extension installer failed.")
+
+        logger.info(f"Installed GNOME Shell extension {config.GNOME_EXTENSION_UUID}")
+        return result.stdout.strip()

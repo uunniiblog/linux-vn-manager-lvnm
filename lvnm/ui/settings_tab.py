@@ -12,6 +12,7 @@ from ui.savedata_management_dialog import SavedataManagementDialog
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QIntValidator
 from system_utils import SystemUtils
+from timetracker.system_utils import SystemUtils as TimeTrackerSystemUtils
 from execution_manager import ExecutionManager
 import config
 import logging
@@ -333,10 +334,25 @@ class SettingsTab(QWidget):
         tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
 
         # Warning Message
-        self.tt_warning_label = QLabel(self.tr("In Desktops other than KDE it only works through XWayland. Check github for details."))
+        self.tt_warning_label = QLabel(self.tr("Native Wayland tracking is supported on KDE and on GNOME with the LVNM Shell extension. Other desktops use XWayland."))
         self.tt_warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
         self.tt_warning_label.setWordWrap(True)
         timetracker_layout.addRow(self.tt_warning_label)
+
+        if SystemUtils.is_gnome_desktop():
+            self.gnome_extension_message = QLabel(self.tr(
+                "GNOME native Wayland tracking requires the LVNM Shell extension. "
+                "After installing or updating it, log out and log back in to restart the session."
+            ))
+            self.gnome_extension_message.setWordWrap(True)
+            self.gnome_extension_install_btn = QPushButton(self.tr("Install / Update GNOME Extension"))
+            self.gnome_extension_install_btn.setCursor(Qt.PointingHandCursor)
+            self.gnome_extension_install_btn.clicked.connect(self._install_gnome_extension)
+
+            gnome_extension_layout = QVBoxLayout()
+            gnome_extension_layout.addWidget(self.gnome_extension_message)
+            gnome_extension_layout.addWidget(self.gnome_extension_install_btn, 0, Qt.AlignLeft)
+            timetracker_layout.addRow(QLabel(self.tr("GNOME integration:")), gnome_extension_layout)
 
         # Enable Checkbox
         self.timetracking_enable = QCheckBox(self.tr("Enable"))
@@ -843,6 +859,30 @@ class SettingsTab(QWidget):
             logger.error("Failed to open linux-rt-upscaler GUI: %s", error)
             QMessageBox.warning(self, self.tr("Unable to Open GUI"),
                 self.tr("linux-rt-upscaler GUI could not be started:\n{}").format(error))
+
+    def _install_gnome_extension(self):
+        """Install or update the bundled GNOME Shell extension."""
+        self.gnome_extension_install_btn.setEnabled(False)
+        try:
+            TimeTrackerSystemUtils.install_gnome_shell_extension()
+        except RuntimeError as error:
+            logger.error("Failed to install GNOME Shell extension: %s", error)
+            QMessageBox.critical(
+                self,
+                self.tr("GNOME Extension Installation Failed"),
+                self.tr("The GNOME Shell extension could not be installed:\n{}").format(error),
+            )
+        else:
+            QMessageBox.information(
+                self,
+                self.tr("GNOME Extension Installed"),
+                self.tr(
+                    "The LVNM GNOME Shell extension was installed successfully. "
+                    "Log out and log back in to restart your GNOME session before using native Wayland tracking."
+                ),
+            )
+        finally:
+            self.gnome_extension_install_btn.setEnabled(True)
 
     def _connect_folder_signal(self, key, edit_widget, btn_widget):
         """Helper to bind signals without loop closure issues."""

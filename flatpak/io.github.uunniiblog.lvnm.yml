@@ -34,7 +34,12 @@ add-extensions:
     directory: lib/extensions/vulkan/gamescope
     version: '25.08'
     autodelete: false
-    autodownload: true
+    autodownload: false
+  org.freedesktop.Platform.VulkanLayer.MangoHud:
+    directory: lib/extensions/vulkan/MangoHud
+    version: '25.08'
+    autodelete: false
+    autodownload: false
 
 build-options:
   env:
@@ -61,9 +66,12 @@ finish-args:
   - --filesystem=/mnt
   - --filesystem=/run/media
   - --talk-name=org.kde.KWin
+  - --talk-name=io.github.uunniiblog.lvnm.GnomeWindowTracker
   - --talk-name=org.freedesktop.Flatpak
   - --env=LD_LIBRARY_PATH=/app/lib/i386-linux-gnu/codecs-extra/lib:/app/lib:/app/lib/i386-linux-gnu:/usr/lib/x86_64-linux-gnu/codecs-extra/lib:/usr/lib/i386-linux-gnu/codecs-extra/lib
-  - --env=PATH=/app/bin:/usr/bin:/app/lib/extensions/vulkan/gamescope/bin:/usr/lib/extensions/vulkan/gamescope/bin
+  # Wine games can request Japanese even when Flatpak did not install the Japanese subset of org.kde.Platform.Locale. Keep a small, app-bundled locale first and fall back to the runtime for every other locale.
+  - --env=LOCPATH=/app/share/lvnm/glibc-locales:/usr/lib/locale
+  - --env=PATH=/app/bin:/usr/bin:/app/lib/extensions/vulkan/gamescope/bin:/usr/lib/extensions/vulkan/gamescope/bin:/app/lib/extensions/vulkan/MangoHud/bin:/usr/lib/extensions/vulkan/MangoHud/bin
   - --env=GST_PLUGIN_SYSTEM_PATH=/app/lib/gstreamer-1.0:/app/lib32/gstreamer-1.0:/app/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/app/lib/i386-linux-gnu/gstreamer-1.0:/usr/lib/extensions/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/i386-linux-gnu/codecs-extra/lib/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/gstreamer-1.0:/usr/lib/i386-linux-gnu/gstreamer-1.0
 
 cleanup-commands:
@@ -72,6 +80,7 @@ cleanup-commands:
   - mkdir -p /app/lib/i386-linux-gnu/GL
   - mkdir -p /app/lib/i386-linux-gnu/codecs-extra
   - mkdir -p /app/lib/extensions/vulkan/gamescope
+  - mkdir -p /app/lib/extensions/vulkan/MangoHud
 
 modules:
   - name: swayidle
@@ -148,6 +157,13 @@ modules:
     build-commands:
       - install -d /app/bin /app/share/lvnm /app/share/applications /app/share/metainfo /app/share/icons/hicolor/256x256/apps
       - cp -a lvnm/. /app/share/lvnm/
+      - test -f /app/share/lvnm/assets/gnome_extension/install.sh
+      - test -f /app/share/lvnm/assets/gnome_extension/lvnm-window-tracker@linux-vn-manager-lvnm/metadata.json
+      - test -f /app/share/lvnm/assets/gnome_extension/lvnm-window-tracker@linux-vn-manager-lvnm/extension.js
+      # Bundle the Japanese locale so wine works even when Flatpak has not installed it.
+      - install -d /app/share/lvnm/glibc-locales
+      - localedef --no-archive -i ja_JP -f UTF-8 /app/share/lvnm/glibc-locales/ja_JP.UTF-8
+      - test "$(LOCPATH=/app/share/lvnm/glibc-locales LANG=ja_JP.UTF-8 locale charmap)" = UTF-8
       - install -Dm755 flatpak/lvnm-wrapper.sh /app/bin/lvnm
       - install -Dm644 flatpak/io.github.uunniiblog.lvnm.desktop /app/share/applications/io.github.uunniiblog.lvnm.desktop
       - install -Dm644 flatpak/io.github.uunniiblog.lvnm.metainfo.xml /app/share/metainfo/io.github.uunniiblog.lvnm.metainfo.xml

@@ -181,9 +181,7 @@ try {
 class KdeUtils(DesktopUtilsInterface):
     _instance = None
     _instance_lock = threading.Lock()
-
-    # Fixed script identifier
-    SCRIPT_NAME = "timetracker-live-notifier"
+    SCRIPT_NAME = config.KWIN_SCRIPT_NAME
 
     def __new__(cls, *args, **kwargs):
         """Enforces thread-safe Singleton instantiation pattern."""

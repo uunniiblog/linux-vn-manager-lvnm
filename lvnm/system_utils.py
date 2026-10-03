@@ -401,6 +401,21 @@ class SystemUtils:
         return "dev"
 
     @staticmethod
+    def is_desktop_environment(name: str) -> bool:
+        """Match a desktop session name such as GNOME, KDE or Gamescope."""
+        desktop = (
+            os.environ.get("XDG_CURRENT_DESKTOP")
+            or os.environ.get("XDG_SESSION_DESKTOP")
+            or os.environ.get("DESKTOP_SESSION")
+            or ""
+        )
+        return name.upper() in desktop.upper()
+
+    @staticmethod
+    def is_gnome_desktop() -> bool:
+        return SystemUtils.is_desktop_environment("GNOME")
+
+    @staticmethod
     def get_firejail_path() -> str | None:
         """Returns the Firejail executable path when it is installed."""
         return shutil.which("firejail")
