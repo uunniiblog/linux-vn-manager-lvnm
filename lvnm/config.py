@@ -49,6 +49,7 @@ GDRIVE_DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
 GDRIVE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GDRIVE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file"
+GDRIVE_SETUP_GUIDE = "https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki/Google-Drive-Cloud-Project-Setup"
 
 # Codec List
 CODEC_LIST = [

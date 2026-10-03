@@ -467,6 +467,14 @@ class SettingsTab(QWidget):
         header_layout.addWidget(trailing_line)
         savedata_layout.addRow(header_widget)
 
+        # Guide link
+        gdrive_guide_label = QLabel(f'<a href="{config.GDRIVE_SETUP_GUIDE}" style="color: #3498db; text-decoration: none;">Google cloud setup guide:</a>')
+        gdrive_guide_label = QLabel(f'Google cloud setup guide: <a href="{config.GDRIVE_SETUP_GUIDE}"> {config.GDRIVE_SETUP_GUIDE} </a>')
+        gdrive_guide_label.linkActivated.connect(SystemUtils.open_url)
+        gdrive_guide_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
+        gdrive_guide_label.setWordWrap(True)
+        savedata_layout.addRow(gdrive_guide_label)
+
         # Auto enable Gsync games checkbox
         all_gdrive_label = QLabel(self.tr("Automatically enable:"))
         all_gdrive_label.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
