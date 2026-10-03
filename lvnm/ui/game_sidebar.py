@@ -37,6 +37,7 @@ class GameSidebar(QFrame):
     VNDB_SITE_URL = config.VNDB_SITE_URL
     SGDB_SITE_URL = config.SGDB_SITE_URL
     EGS_SITE_URL = config.EGS_SITE_URL
+    EGS_V2_SITE_URL = config.EGS_V2_SITE_URL
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -102,9 +103,14 @@ class GameSidebar(QFrame):
         self.lbl_egs_link = QLabel()
         self.lbl_egs_link.linkActivated.connect(SystemUtils.open_url)
         self.lbl_egs_link.setStyleSheet("font-size: 14px;")
+
+        self.lbl_egs2_link = QLabel()
+        self.lbl_egs2_link.linkActivated.connect(SystemUtils.open_url)
+        self.lbl_egs2_link.setStyleSheet("font-size: 14px;")
         
         links_col.addWidget(self.lbl_vndb_link)
         links_col.addWidget(self.lbl_egs_link)
+        links_col.addWidget(self.lbl_egs2_link)
         media_layout.addLayout(links_col)
         media_layout.addStretch() 
         
@@ -1135,15 +1141,19 @@ class GameSidebar(QFrame):
                     sgdb_url = self.SGDB_SITE_URL.format(sgdbid=sgdb_id)
                     self.lbl_vndb_link.setText(f'<a href="{sgdb_url}" style="color: #66b2ff;">SteamGridDB</a>')
                     self.lbl_egs_link.clear()
+                    self.lbl_egs2_link.clear()
                 else:
                     vndb_url = self.VNDB_SITE_URL.format(vndbid=card.vndb)
                     self.lbl_vndb_link.setText(f'<a href="{vndb_url}" style="color: #66b2ff;">VNDB</a>')
                     jp_encoded_name = urllib.parse.quote(card.ogtitle or card.name)
                     egs_url = self.EGS_SITE_URL.format(jpname=jp_encoded_name)
                     self.lbl_egs_link.setText(f'<a href="{egs_url}" style="color: #66b2ff;">ErogameScape</a>')
+                    egs_v2_url = self.EGS_V2_SITE_URL.format(jpname=jp_encoded_name)
+                    self.lbl_egs2_link.setText(f'<a href="{egs_v2_url}" style="color: #66b2ff;">EGS_V2</a>')
             else:
                 self.lbl_vndb_link.clear()
                 self.lbl_egs_link.clear()
+                self.lbl_egs2_link.clear()
         else:
             self.media_container.hide()
             self.lbl_cover.set_pixmap_from_path(None)
