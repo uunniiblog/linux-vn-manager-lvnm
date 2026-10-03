@@ -27,27 +27,24 @@ Attempt at making a visual novel manager for linux. It doesn't really do anythin
 </table>
 </div>
 
- ##  AppImage
+##  Download
 Releases over here: https://github.com/uunniiblog/linux-vn-manager-lvnm/releases
 
-It bundles umu and winetricks so it runs smoothly in the Steam Deck.
+Flatpak build mainly recommended for read only systems like Steam Deck. For general desktop using the AppImage will use all native dependencies with slightly better performance and less installation space taken.
 
-## Flatpak prototype
+Both releases use the same user saved settings, games, prefixes, etc stored by default at:  `~/.local/share/lvnm`.
+
+### AppImage 
+It only bundles umu and winetricks internally. Everything else is from native system installed libraries.
+
+### Flatpak prototype
 Download the .flatpak from: https://github.com/uunniiblog/linux-vn-manager-lvnm/releases
 
 Install with `flatpak install --user LVNM-x86_64.flatpak`
 
-It bundles umu, winetricks, GStreamer libraries and linux-rt-upscaler so all external tools the launcher uses are usable.
-Recommended for read only systems like Steam Deck. If you want gamescope at desktop level you will need to install gamescope flatpak `flatpak install --user flathub org.freedesktop.Platform.VulkanLayer.gamescope`
+It bundles umu, winetricks, GStreamer libraries and linux-rt-upscaler and Japanese Locale so every dependency the launcher needs is integrated.
 
-It uses the shared location: `~/.local/share/lvnm`.
-
-Flatpak build local testing:
-
-```bash
-./flatpak/build-local.sh
-flatpak run io.github.uunniiblog.lvnm
-```
+If you want gamescope at desktop level you will need to install gamescope flatpak `flatpak install --user flathub org.freedesktop.Platform.VulkanLayer.gamescope`
 
 ## How to use
 1. Runner tab -> Download wine and proton runners.
@@ -141,7 +138,7 @@ Timetracking will only track "real" playing time, it will only count the time wh
 
 Current working desktops:
 - KDE 6: Fully working for both X11 and Wayland through KWIN queries.
-- GNOME 45-51: Fully working for both X11 and Wayland through the LVNM Window Tracker GNOME Shell extension. Can be installed from settings tab. Otherwise fallbacks to x11/xwayland only.
+- GNOME 45+: Fully working for both X11 and Wayland through the LVNM Window Tracker GNOME Shell extension. Can be installed from settings tab. Otherwise fallbacks to x11/xwayland only.
 - Gamescope session: In this case it will just count the time the game is open. If you minimize the game to go config controllers or other sections of Steam while game is running it will keep counting.
 - Xwayland: As a fallback it uses x11_utils (python-xlib) which should work in any x11 desktop or in wayland running games through xwayland. That means any game not purposefully running through the wayland driver should still work. If you run the game with gamescope you will need to use **--backend sdl** and **SDL_VIDEODRIVER=x11** environment variable for gamescope to run as x11 to be able to timetrack it.
 
@@ -223,12 +220,19 @@ Tools used and inspiration:
 - Gdrive sync: https://github.com/googleapis/google-api-python-client
 - python-xlib: Timetracking for Xwayland/X11: https://github.com/python-xlib/python-xlib
 
-## Run from source directly
+## Run locally
 ```bash
 - python -m venv venv
 - source venv/bin/activate
 - pip install -r requirements.txt
 - python lvnm/launcher.py
+```
+
+Flatpak build local testing:
+
+```bash
+./flatpak/build-local.sh
+flatpak run io.github.uunniiblog.lvnm
 ```
 
 ## Translation
