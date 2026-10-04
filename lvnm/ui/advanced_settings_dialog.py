@@ -117,7 +117,8 @@ class AdvancedSettingsDialog(QDialog):
         exit_script_layout.addWidget(self.btn_exit_script)
         form.addRow(self.tr("Exit Script:"), exit_script_layout)
 
-        # Registry Keys
+        # Registry Keys (Wine/Proton only)
+        self.label_registry_path = QLabel(self.tr("Registry Path:"))
         self.edit_registry_path = QLineEdit(getattr(self.current_game, "registry_path", ""))
         self.edit_registry_path.setPlaceholderText(r"HKLM\Software\Key\Rewrite_PLUS")
         self.btn_detect_registry = QPushButton(self.tr("Auto-detect"))
@@ -129,7 +130,10 @@ class AdvancedSettingsDialog(QDialog):
         registry_layout.addWidget(self.edit_registry_path)
         registry_layout.addWidget(self.btn_detect_registry)
         registry_layout.addWidget(self.btn_copy_registry)
-        form.addRow(self.tr("Registry Path:"), registry_layout)
+        form.addRow(self.label_registry_path, registry_layout)
+
+        registry_visible = prefix_type in ("wine", "proton")
+        form.setRowVisible(self.label_registry_path, registry_visible)
 
         # Per-game network isolation
         network_isolation_available = (

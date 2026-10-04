@@ -231,7 +231,7 @@ class PrefixTab(QWidget):
             threetwop = data.get("32bit", False)
             
             # Check if it already exists in JSON
-            if PrefixManager.get_prefix_info(name):
+            if PrefixManager.get_prefix_info(name) or PrefixManager.is_virtual_prefix_name(name):
                 QMessageBox.warning(self, self.tr("Error"), self.tr("Prefix '{}' already exists.").format(name))
                 return None
                 

@@ -92,6 +92,9 @@ class PrefixManager:
 
     def create_prefix(self, runner_path: str, codecs: str = "", winetricks: str = "", dpi: bool = False, wayland: bool = False, threetwop: bool = False, executor=None):
         """Physical creation and initialization of the prefix."""
+        if self.is_virtual_prefix_name(self.name):
+            raise RuntimeError(f"Prefix name '{self.name}' is reserved for a virtual prefix.")
+
         logger.info(f"--- Creating Prefix: {self.name} ---")
         self.runner_path = Path(runner_path)
         self.type = "proton" if (self.runner_path / "proton").exists() else "wine"
@@ -301,6 +304,10 @@ class PrefixManager:
 
     def rename_prefix(self, new_name: str):
         """Renames the prefix folder and updates the json entry."""
+        if self.is_virtual_prefix_name(new_name):
+            logger.error(f"Prefix name '{new_name}' is reserved for a virtual prefix.")
+            return False
+
         if self.get_prefix_info(new_name):
             logger.error(f"A prefix named '{new_name}' already exists in the json_file.")
             return False
@@ -604,9 +611,30 @@ class PrefixManager:
 
     @staticmethod
     def get_all_prefixes() -> dict:
-        """Real wine/proton prefixes plus virtual emulator prefixes merged."""
+        """All selectable prefixes, emulation and native at bottom."""
         reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))
-        return {**reversed_prefixes, **EmulationManager.get_virtual_prefixes()}
+        reversed_prefixes.pop(config.NATIVE_PREFIX_NAME, None)
+        native_prefix = {
+            config.NATIVE_PREFIX_NAME: {
+                "type": config.NATIVE,
+                "virtual": True,
+            }
+        }
+        return {
+            **reversed_prefixes,
+            **EmulationManager.get_virtual_prefixes(),
+            **native_prefix,
+        }
+
+    @staticmethod
+    def resolve_prefix_info(prefix_name: str) -> dict | None:
+        """Resolve either a physical Wine prefix or a selectable virtual prefix."""
+        return PrefixManager.get_all_prefixes().get(prefix_name)
+
+    @staticmethod
+    def is_virtual_prefix_name(prefix_name: str) -> bool:
+        """Whether a name is reserved for a built-in virtual prefix."""
+        return prefix_name == config.NATIVE_PREFIX_NAME or prefix_name in EmulationManager.get_emulator_prefixes()
 
     @staticmethod
     def get_prefix_type(prefix_name: str) -> str | None:

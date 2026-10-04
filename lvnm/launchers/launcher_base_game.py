@@ -11,7 +11,7 @@ from datetime import datetime
 from collections import deque
 from model.game_card import GameCard
 from execution_manager import ExecutionManager
-from emulation_manager import EmulationManager
+from prefix_manager import PrefixManager
 from settings_manager import SettingsManager
 from timetracker.system_utils import SystemUtils as TimeTrackUtils
 from timetracker.utils_factory import get_desktop_utils
@@ -68,11 +68,7 @@ class LauncherBaseGame(ABC):
         return None
 
     def _get_prefix_info(self, prefix_name: str):
-        real = {}
-        if self.PREFIXES_DATA.exists():
-            with open(self.PREFIXES_DATA, "r", encoding="utf-8") as f:
-                real = json.load(f)
-        return {**real, **EmulationManager.get_virtual_prefixes()}.get(prefix_name)
+        return PrefixManager.resolve_prefix_info(prefix_name)
 
     def apply_gamescope(self, cmd: list) -> list:
         """Wraps a command with gamescope if enabled"""
@@ -88,10 +84,10 @@ class LauncherBaseGame(ABC):
             return pre_args + cmd
         return cmd
 
-    def apply_game_arguments(self, cmd: list) -> list:
+    def apply_game_arguments(self, cmd: list, posix: bool = False) -> list:
         """Appends per-game arguments"""
         if self.game.arguments.strip():
-            extra_args = shlex.split(self.game.arguments.strip(), posix=False)
+            extra_args = shlex.split(self.game.arguments.strip(), posix=posix)
             return cmd + extra_args
         return cmd
 

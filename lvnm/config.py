@@ -233,6 +233,10 @@ EMULATION_PS3 = "emulation-ps3"
 EMULATION_PSP = "emulation-psp"
 EMULATION_SWITCH = "emulation-switch"
 
+# Native games
+NATIVE_PREFIX_NAME = "Native"
+NATIVE = "native"
+
 # Available UI languages ("" = follow system locale)
 LANGUAGES = [
     {"code": "", "name": "System"},
