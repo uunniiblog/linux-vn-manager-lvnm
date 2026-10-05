@@ -3,13 +3,6 @@ name: Build LVNM Windows
 on:
   workflow_call:
   workflow_dispatch:
-  # workflow_dispatch is only exposed after this file exists on the default
-  # branch. This narrow trigger allows the initial Windows branch to build
-  # before the workflow is merged. The build only uploads an Actions artifact.
-  push:
-    branches:
-      - windows
-      - "windows/**"
 
 permissions:
   contents: read
