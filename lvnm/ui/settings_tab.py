@@ -338,6 +338,7 @@ class SettingsTab(QWidget):
         timetracker_layout.setLabelAlignment(Qt.AlignLeft)
 
         tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+        self.tt_dependent_widgets = []
 
         # Warning Message
         if self.platform.name != "windows":
@@ -349,6 +350,7 @@ class SettingsTab(QWidget):
             self.tt_warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
             self.tt_warning_label.setWordWrap(True)
             timetracker_layout.addRow(self.tt_warning_label)
+            self.tt_dependent_widgets.append(self.tt_warning_label)
 
         if SystemUtils.is_gnome_desktop():
             self.gnome_extension_message = QLabel(self.tr(
@@ -414,8 +416,7 @@ class SettingsTab(QWidget):
         self.tt_sync_label = QLabel(self.tr("Gdrive sync"))
         timetracker_layout.addRow(self.tt_sync_label, self.timetracking_sync)
 
-        self.tt_dependent_widgets = [
-            self.tt_warning_label,
+        self.tt_dependent_widgets.extend([
             self.afk_timer_edit,
             self.afk_label_prefix,
             self.afk_label_suffix,
@@ -423,8 +424,8 @@ class SettingsTab(QWidget):
             self.save_label_prefix,
             self.save_label_suffix,
             self.timetracking_autostart,
-            self.autostart_label
-        ]
+            self.autostart_label,
+        ])
 
         # Connect the checkbox signal
         self.timetracking_enable.toggled.connect(self._on_timetracking_toggled)
