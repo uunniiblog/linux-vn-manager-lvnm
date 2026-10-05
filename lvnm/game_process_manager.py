@@ -69,7 +69,10 @@ class GameProcessManager(QObject):
 
                 # Initialize Time tracking if enabled
                 if timetracker_settings.get("timetracking", False) and timetracker_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False):
-                    self.start_timetracker(name, game_card, timetracker_settings)
+                    try:
+                        self.start_timetracker(name, game_card, timetracker_settings)
+                    except Exception as e:
+                        logger.error(f"Could not start time tracking for {name}: {e}")
 
                 # Notify the UI
                 self.game_started.emit(name)

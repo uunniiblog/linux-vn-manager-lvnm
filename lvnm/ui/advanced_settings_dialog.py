@@ -18,14 +18,19 @@ from settings_manager import SettingsManager
 from prefix_manager import PrefixManager
 from regedit_management import RegeditManager
 from ui.console_dialog import ConsoleDialog
+from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
+from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
 
 class AdvancedSettingsDialog(QDialog):
     SETTINGS_FILE = config.UI_SETTINGS
 
-    def __init__(self, prefix_type, current_game, parent=None):
+    def __init__(self, prefix_type, current_game, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__(parent)
+        self.platform = platform
+        self.platform_ui = PlatformUi(platform)
+        self.prefix_type = prefix_type
         self.setWindowTitle(self.tr("Advanced Settings {}").format(current_game.name))
         self.setMinimumWidth(450)
         self.resize(550, 600)
@@ -130,10 +135,8 @@ class AdvancedSettingsDialog(QDialog):
         registry_layout.addWidget(self.edit_registry_path)
         registry_layout.addWidget(self.btn_detect_registry)
         registry_layout.addWidget(self.btn_copy_registry)
-        form.addRow(self.label_registry_path, registry_layout)
-
-        registry_visible = prefix_type in ("wine", "proton")
-        form.setRowVisible(self.label_registry_path, registry_visible)
+        if prefix_type in ("wine", "proton"):
+            self.platform_ui.add_row(form, self.label_registry_path, registry_layout, requires=Feature.REGISTRY_MANAGEMENT)
 
         # Per-game network isolation
         network_isolation_available = (
@@ -156,11 +159,8 @@ class AdvancedSettingsDialog(QDialog):
         network_option_layout = QHBoxLayout()
         network_option_layout.addWidget(self.chk_disable_network)
         network_option_layout.addWidget(self.lbl_disable_network_help, 1)
-        network_option_visible = prefix_type in ("wine", "proton")
-        self.label_disable_network.setVisible(network_option_visible)
-        self.chk_disable_network.setVisible(network_option_visible)
-        self.lbl_disable_network_help.setVisible(network_option_visible)
-        form.addRow(self.label_disable_network, network_option_layout)
+        if prefix_type in ("wine", "proton"):
+            self.platform_ui.add_row(form, self.label_disable_network, network_option_layout, requires=Feature.NETWORK_ISOLATION)
 
         self.scroll_layout.addLayout(form)
 
@@ -329,11 +329,15 @@ class AdvancedSettingsDialog(QDialog):
 
     def browse_file(self, target_line_edit):
         """Opens file system to select a script."""
+        if self.platform.name == "windows":
+            file_filter = self.tr("Windows Scripts (*.cmd *.bat *.ps1 *.exe);;All Files (*)")
+        else:
+            file_filter = self.tr("All Files (*);;Shell Scripts (*.sh)")
         path, _ = QFileDialog.getOpenFileName(
             self, 
             self.tr("Select Script File"),
             "",
-            self.tr("All Files (*);;Shell Scripts (*.sh)")
+            file_filter,
         )
         if path:
             target_line_edit.setText(path)
@@ -411,12 +415,14 @@ class AdvancedSettingsDialog(QDialog):
         self.current_game.umu_store = self.edit_umu_store.text()
         self.current_game.umu_gameid = self.edit_umu_id.text()
         self.current_game.pre_launch_args = self.edit_pre_args.text()
-        self.current_game.disable_network = self.chk_disable_network.isChecked()
+        if self.platform.supports(Feature.NETWORK_ISOLATION):
+            self.current_game.disable_network = self.chk_disable_network.isChecked()
         self.current_game.arguments = self.edit_arguments.text()
         self.current_game.pre_launch_script = self.edit_pre_script.text()
         self.current_game.pre_launch_script_wait = self.chk_pre_script_wait.isChecked()
         self.current_game.exit_script = self.edit_exit_script.text()
-        self.current_game.registry_path = self.edit_registry_path.text().strip()
+        if self.platform.supports(Feature.REGISTRY_MANAGEMENT):
+            self.current_game.registry_path = self.edit_registry_path.text().strip()
         super().accept()
 
     def _auto_detect_registry_path(self):

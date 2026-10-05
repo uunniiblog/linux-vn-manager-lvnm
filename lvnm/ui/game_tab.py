@@ -16,7 +16,8 @@ from ui.import_game_dialog import ImportGameDialog
 from model.game_card import GameCard
 from settings_manager import SettingsManager
 from timetracker.log_manager import LogManager
-from launchers.launcher_wine_game import LauncherWineGame
+from platform_profile import CURRENT_PLATFORM, Feature, IS_WINDOWS, PlatformProfile
+from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,10 @@ class GameTab(QWidget):
     SETTINGS_FILE = config.UI_SETTINGS
     LABEL_ORDER_SETTINGS_KEY = "GameTab/LabelOrder"
 
-    def __init__(self):
+    def __init__(self, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__()
+        self.platform = platform
+        self.platform_ui = PlatformUi(platform)
         self.card = None
         self.user_settings = SettingsManager()
         self.zoom = self.user_settings.get(config.USER_CONF_UI_ZOOM, 1.0)
@@ -88,7 +91,7 @@ class GameTab(QWidget):
         self.sort_action_group.triggered.connect(self.on_sort_changed)
 
         # Add to layout
-        top_controls_layout.addWidget(self.btn_run_in_prefix)
+        self.platform_ui.add_widget(top_controls_layout, self.btn_run_in_prefix, requires=Feature.PREFIXES)
         top_controls_layout.addWidget(self.search_bar, stretch=1)
         top_controls_layout.addWidget(self.btn_sort)
         list_layout.addLayout(top_controls_layout)
@@ -114,7 +117,7 @@ class GameTab(QWidget):
         list_layout.addLayout(bottom_btn_layout)
         
         # Right Side: Sidebar
-        self.sidebar = GameSidebar(self)
+        self.sidebar = GameSidebar(self, platform=self.platform)
         self.sidebar.setVisible(False)
         self.sidebar.on_close = self.close_sidebar
         self.sidebar.on_saved = self.refresh_list
@@ -267,7 +270,7 @@ class GameTab(QWidget):
             # Add the Game Items
             for card in group_cards:
                 item = QListWidgetItem(self.game_list)
-                widget = GameListItem(card, zoom_factor=self.zoom)
+                widget = GameListItem(card, zoom_factor=self.zoom, platform=self.platform)
                 item.setSizeHint(widget.sizeHint())
                 item.setData(Qt.UserRole, card)
                 
@@ -384,7 +387,8 @@ class GameTab(QWidget):
         self.game_list.clearSelection()
         
         # Create a blank game card to populate the sidebar text fields
-        empty_card = GameCard(name="", path="", prefix="", vndb="")
+        default_prefix = config.WINDOWS_PREFIX_NAME if IS_WINDOWS else ""
+        empty_card = GameCard(name="", path="", prefix=default_prefix, vndb="")
         self.card = empty_card
         self.sidebar.load_create_game(empty_card)
         
@@ -526,6 +530,7 @@ class RunInPrefixDialog(QDialog):
 
         try:
             # Instantiate LauncherWineGame with dummy card
+            from launchers.launcher_wine_game import LauncherWineGame
             runner = LauncherWineGame("Temp_Installer")
             runner.run_in_prefix(exe_path, prefix_name)
         except Exception as e:

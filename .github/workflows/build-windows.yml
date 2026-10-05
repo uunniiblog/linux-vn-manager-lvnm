@@ -1,0 +1,115 @@
+name: Build LVNM Windows
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  # workflow_dispatch is only exposed after this file exists on the default
+  # branch. This narrow trigger allows the initial Windows branch to build
+  # before the workflow is merged. The build only uploads an Actions artifact.
+  push:
+    branches:
+      - windows
+      - "windows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements-windows.txt
+
+      - name: Install Dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-windows.txt
+
+      - name: Compile Translations
+        shell: pwsh
+        run: |
+          pyside6-lrelease lvnm/locale/lvnm_de.ts -qm lvnm/locale/lvnm_de.qm
+          pyside6-lrelease lvnm/locale/lvnm_en.ts -qm lvnm/locale/lvnm_en.qm
+
+      - name: Build Windows Application
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed `
+            --paths . `
+            --paths lvnm `
+            --add-data "lvnm/assets;assets" `
+            --add-data "lvnm/locale;locale" `
+            --hidden-import launchers.launcher_windows `
+            --hidden-import timetracker.windows_system_utils `
+            --hidden-import timetracker.windows_utils `
+            --exclude-module Xlib `
+            --name LVNM `
+            lvnm/launcher.py
+
+          $discoveryCache = "dist/LVNM/_internal/googleapiclient/discovery_cache/documents"
+          if (Test-Path $discoveryCache) {
+            Remove-Item -Recurse -Force $discoveryCache
+          }
+
+          if (!(Test-Path "dist/LVNM/LVNM.exe")) {
+            throw "PyInstaller did not produce LVNM.exe"
+          }
+          if (!(Test-Path "dist/LVNM/_internal/assets/drive_v3.json")) {
+            throw "Google Drive schema was not bundled"
+          }
+          if (!(Test-Path "dist/LVNM/_internal/locale/lvnm_en.qm")) {
+            throw "Translations were not bundled"
+          }
+
+      - name: Smoke Test Executable
+        shell: pwsh
+        run: |
+          $process = Start-Process `
+            -FilePath "dist/LVNM/LVNM.exe" `
+            -ArgumentList "--version" `
+            -PassThru `
+            -Wait
+          if ($process.ExitCode -ne 0) {
+            throw "LVNM.exe --version exited with code $($process.ExitCode)"
+          }
+
+      - name: Create Portable Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item -Recurse dist/LVNM package/LVNM
+          Compress-Archive `
+            -Path package/LVNM `
+            -DestinationPath LVNM-Windows-x86_64.zip `
+            -CompressionLevel Optimal
+
+          $hash = (Get-FileHash LVNM-Windows-x86_64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  LVNM-Windows-x86_64.zip" | Set-Content SHA256SUMS-Windows.txt -Encoding ascii
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: |
+            LVNM-Windows-x86_64.zip
+            SHA256SUMS-Windows.txt
+          if-no-files-found: error
+          retention-days: 14

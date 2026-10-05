@@ -11,7 +11,7 @@ from pathlib import Path
 from game_manager import GameManager
 from system_utils import SystemUtils
 from game_process_manager import GameProcessManager
-from launchers.launcher_wine_game import LauncherWineGame
+from platform_profile import CURRENT_PLATFORM, Feature, IS_WINDOWS, PlatformProfile
 from prefix_manager import PrefixManager
 from timetracker.log_manager import LogManager
 from settings_manager import SettingsManager
@@ -29,8 +29,9 @@ class GameListItem(QWidget):
     requestExport = Signal(object)
     requestCloseSidebar = Signal()
 
-    def __init__(self, game_card, zoom_factor=1.0, parent=None):
+    def __init__(self, game_card, zoom_factor=1.0, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__(parent)
+        self.platform = platform
         self.user_settings = SettingsManager()
         self.process_manager = GameProcessManager.get_instance()
         self.setMouseTracking(True)
@@ -224,7 +225,9 @@ class GameListItem(QWidget):
             menu.addSeparator()
 
         act_shortcut = menu.addAction(self.tr("Desktop Shortcut"))
-        act_steam = menu.addAction(self.tr("Steam Shortcut"))
+        act_steam = None
+        if self.platform.supports(Feature.STEAM_SHORTCUTS):
+            act_steam = menu.addAction(self.tr("Steam Shortcut"))
         menu.addSeparator()
         act_export = menu.addAction(self.tr("Export"))
         act_dup = menu.addAction(self.tr("Duplicate"))
@@ -293,6 +296,7 @@ class GameListItem(QWidget):
             self.add_to_steam()
 
     def open_texthooker(self, texthooker_path):
+        from launchers.launcher_wine_game import LauncherWineGame
         runner = LauncherWineGame("texthook")
         if texthooker_path:
             try:
@@ -342,6 +346,7 @@ class GameListItem(QWidget):
             QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_in_prefix(self, command: str):
+        from launchers.launcher_wine_game import LauncherWineGame
         runner = LauncherWineGame("UtilityMode")
         try:
             runner.run_in_prefix(command, self.game_card.prefix)
@@ -349,6 +354,7 @@ class GameListItem(QWidget):
             QMessageBox.critical(self, self.tr("Error"), self.tr(str(e)))
 
     def run_bash(self):
+        from launchers.launcher_wine_game import LauncherWineGame
         runner = LauncherWineGame("UtilityMode")
         try:
             runner.open_terminal(self.game_card.prefix)
@@ -365,19 +371,21 @@ class GameListItem(QWidget):
         try:
             SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path)
         except FileNotFoundError:
-            default_name = f"lvnm-{self.game_card.name}.desktop"
+            extension = ".cmd" if IS_WINDOWS else ".desktop"
+            default_name = f"lvnm-{self.game_card.name}{extension}"
             default_path = str(Path.home() / default_name)
+            file_filter = self.tr("Windows Command Launcher (*.cmd)") if IS_WINDOWS else self.tr("Desktop Entry (*.desktop)")
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 self.tr("Save shortcut as"),
                 default_path,
-                self.tr("Desktop Entry (*.desktop)")
+                file_filter
             )
             if not file_path:
                 return
 
-            if not file_path.endswith(".desktop"):
-                file_path += ".desktop"
+            if not file_path.lower().endswith(extension):
+                file_path += extension
 
             try:
                 SystemUtils.create_desktop_shortcut(self.game_card.name, self.game_card.cover_path, target_path=file_path)

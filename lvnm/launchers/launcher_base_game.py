@@ -13,10 +13,6 @@ from model.game_card import GameCard
 from execution_manager import ExecutionManager
 from prefix_manager import PrefixManager
 from settings_manager import SettingsManager
-from timetracker.system_utils import SystemUtils as TimeTrackUtils
-from timetracker.utils_factory import get_desktop_utils
-from timetracker.x11_utils import X11Utils
-from taskbar_audio_entry import TaskbarAudioEntry
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +111,9 @@ class LauncherBaseGame(ABC):
 
     def _wait_for_process_then_run_script(self, script_path: str, target_process: str, cmdline_hint: str = None):
         """Calls _poll_for_window_and_execute to poll until the game window is opened then runs the script"""
+        from timetracker.utils_factory import get_desktop_utils
+        from timetracker.x11_utils import X11Utils
+
         is_proton_wayland = self.env.get("PROTON_ENABLE_WAYLAND") == "1"
         is_x11_utils = isinstance(get_desktop_utils(), X11Utils)
 
@@ -140,6 +139,9 @@ class LauncherBaseGame(ABC):
     def _poll_for_window_and_execute(self, target_process: str, on_found, cmdline_hint: str = None, 
             max_attempts: int = 20, poll_interval: float = 2.0, fallback_check=None, label: str = "poll"):
         """Spawns a background thread that polls  for a window owned by target_process, then calls on_found"""
+        from timetracker.system_utils import SystemUtils as TimeTrackUtils
+        from timetracker.utils_factory import get_desktop_utils
+
         utils = get_desktop_utils()
 
         def _poll():
@@ -177,6 +179,8 @@ class LauncherBaseGame(ABC):
 
     def _run_game_process(self, cmd, env, **kwargs):
         """Launch the main game process with optional desktop integration."""
+        from taskbar_audio_entry import TaskbarAudioEntry
+
         taskbar_audio = TaskbarAudioEntry(self)
         taskbar_audio.prepare()
         try:

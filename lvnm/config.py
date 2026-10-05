@@ -1,5 +1,6 @@
 from pathlib import Path
 import tempfile
+from platform_profile import IS_WINDOWS, get_data_dir
 
 VERSION = 'v0.5.4'
 GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
@@ -7,7 +8,7 @@ GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
 LOCALE_DIR = BASE_DIR / "locale"
-DATA_DIR = Path.home() / ".local" / "share" / "lvnm" 
+DATA_DIR = get_data_dir()
 WINE_RUNNERS_DIR = DATA_DIR / "runners" / "wine"
 # PROTON_RUNNERS_DIR = DATA_DIR / "runners" / "proton"
 PROTON_RUNNERS_DIR =  Path.home() / ".local" / "share" / "Steam" / "compatibilitytools.d"
@@ -236,6 +237,8 @@ EMULATION_SWITCH = "emulation-switch"
 # Native games
 NATIVE_PREFIX_NAME = "Native"
 NATIVE = "native"
+WINDOWS_PREFIX_NAME = "Windows"
+WINDOWS = "windows"
 
 # Available UI languages ("" = follow system locale)
 LANGUAGES = [
@@ -253,9 +256,10 @@ RT_UPSCALING_INSTALLED = False
 
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-WINE_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
-# PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True) # Don't create in case steam not installed
-PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
-DXVK_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+if not IS_WINDOWS:
+    WINE_RUNNERS_DIR.mkdir(parents=True, exist_ok=True)
+    # PROTON_RUNNERS_DIR.mkdir(parents=True, exist_ok=True) # Don't create in case steam not installed
+    PREFIXES_DIR.mkdir(parents=True, exist_ok=True)
+    DXVK_DIR.mkdir(parents=True, exist_ok=True)

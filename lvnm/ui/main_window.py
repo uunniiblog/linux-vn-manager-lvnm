@@ -7,12 +7,16 @@ from PySide6.QtCore import Qt, QSettings, QByteArray
 import config
 from ui.game_tab import GameTab
 from ui.theme_manager import ThemeManager
+from ui.platform_ui import PlatformUi
+from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
 
 class MainWindow(QMainWindow):
     SETTINGS_FILE = config.UI_SETTINGS
 
-    def __init__(self):
+    def __init__(self, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__()
+        self.platform = platform
+        self.platform_ui = PlatformUi(platform)
         self.setWindowTitle(f"LVNM - {config.VERSION}")
         self.resize(1200, 800)
 
@@ -36,16 +40,23 @@ class MainWindow(QMainWindow):
         self.sidebar.setMinimumWidth(120)
 
                 
-        # Sidebar items
-        self.sidebar.addItem(self.tr("Games"))
-        self.sidebar.addItem(self.tr("Prefixes"))
-        self.sidebar.addItem(self.tr("Runners"))
-        self.sidebar.addItem(self.tr("Statistics"))
-        self.sidebar.addItem(self.tr("Settings"))
+        self.tab_definitions = [
+            (self.tr("Games"), lambda: GameTab(platform=self.platform), None),
+            (self.tr("Prefixes"), self._create_prefix_tab, Feature.PREFIXES),
+            (self.tr("Runners"), self._create_runner_tab, Feature.RUNNERS),
+            (self.tr("Statistics"), self._create_stats_tab, None),
+            (self.tr("Settings"), self._create_settings_tab, None),
+        ]
+        self.tab_definitions = [
+            definition for definition in self.tab_definitions
+            if self.platform_ui.supported(definition[2])
+        ]
+        for label, _, _ in self.tab_definitions:
+            self.sidebar.addItem(label)
 
         # RIGHT CONTENT AREA
         self.content_stack = QStackedWidget()
-        for _ in range(5):
+        for _ in self.tab_definitions:
             self.content_stack.addWidget(QWidget())
         # self.content_stack.addWidget(GameTab())
         # self.content_stack.addWidget(PrefixTab())
@@ -94,20 +105,8 @@ class MainWindow(QMainWindow):
 
         if type(current_widget) is QWidget:
             new_tab = None
-            if index == 0:
-                new_tab = GameTab()
-            elif index == 1:
-                from ui.prefix_tab import PrefixTab
-                new_tab = PrefixTab()
-            elif index == 2:
-                from ui.runner_tab import RunnerTab
-                new_tab = RunnerTab()
-            elif index == 3:
-                from ui.stats_tab import StatsTab
-                new_tab = StatsTab(self.theme_manager)
-            elif index == 4:
-                from ui.settings_tab import SettingsTab
-                new_tab = SettingsTab(self.theme_manager)
+            if 0 <= index < len(self.tab_definitions):
+                new_tab = self.tab_definitions[index][1]()
 
             if new_tab:
                 # Remove the placeholder and insert the real tab
@@ -123,6 +122,24 @@ class MainWindow(QMainWindow):
         if hasattr(current_widget, 'refresh_active_tab'):
             current_widget.refresh_active_tab()
 
+    @staticmethod
+    def _create_prefix_tab():
+        from ui.prefix_tab import PrefixTab
+        return PrefixTab()
+
+    @staticmethod
+    def _create_runner_tab():
+        from ui.runner_tab import RunnerTab
+        return RunnerTab()
+
+    def _create_stats_tab(self):
+        from ui.stats_tab import StatsTab
+        return StatsTab(self.theme_manager)
+
+    def _create_settings_tab(self):
+        from ui.settings_tab import SettingsTab
+        return SettingsTab(self.theme_manager, platform=self.platform)
+
     def closeEvent(self, event):
         """
         Triggered when the user closes the window.
@@ -137,5 +154,3 @@ class MainWindow(QMainWindow):
         app_font = QApplication.instance().font()
         app_font.setPointSizeF(app_font.pointSizeF() * 1.5)
         self.sidebar.setFont(app_font)
-    
-    

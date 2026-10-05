@@ -12,9 +12,8 @@ import config
 from ui.main_window import MainWindow
 from system_utils import SystemUtils
 from cli_handler import CliHandler
-#from cli_controller import CliController
 from settings_manager import SettingsManager
-
+from platform_profile import IS_WINDOWS
 
 def install_translator(app, settings):
     language = settings.get(config.USER_CONF_LANGUAGE, "")
@@ -37,7 +36,8 @@ def main():
         os.environ['REQUESTS_CA_BUNDLE'] = cert_path
     
     # QFileDialog native system integration
-    os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
+    if not IS_WINDOWS:
+        os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
 
     # Close with ctrl c in terminal
     signal.signal(signal.SIGINT, signal.SIG_DFL)

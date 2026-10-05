@@ -20,6 +20,7 @@ from settings_manager import SettingsManager
 from model.game_card import GameCard
 from vndb_manager import VndbManager
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
+from platform_profile import IS_WINDOWS
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +237,18 @@ class ImportGameDialog(QDialog):
         self.game_data["name"] = name
         self.game_data["path"] = path
         self.game_data["vndb"] = self.edit_vndb.text().strip()
+
+        if IS_WINDOWS:
+            self.game_data["prefix"] = config.WINDOWS_PREFIX_NAME
+            card = GameCard.from_dict(name, self.game_data)
+            card.prefix = config.WINDOWS_PREFIX_NAME
+            if self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False) and self.savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False):
+                card.gdrive = True
+            GameManager.add_game(path, name, config.WINDOWS_PREFIX_NAME, card.vndb)
+            GameManager.update_game(name, card.to_dict())
+            logger.info("Imported '%s' as a native Windows game; Wine prefix data was ignored.", name)
+            self.accept()
+            return
 
         runner_type = self.prefix_data.get("type", "")
         runner_name = self.prefix_data.get("runner", "")

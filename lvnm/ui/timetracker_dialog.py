@@ -1,13 +1,15 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QLabel
 from PySide6.QtCore import Qt
 from timetracker.system_utils import SystemUtils
+from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
 import logging
 
 logger = logging.getLogger(__name__)
 
 class TimetrackerDialog(QDialog):
-    def __init__(self, tracker_service, parent=None):
+    def __init__(self, tracker_service, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__(parent)
+        self.platform = platform
         self.setWindowTitle(self.tr("Manual Tracking Selection"))
         self.setMinimumWidth(400)
         
@@ -41,6 +43,7 @@ class TimetrackerDialog(QDialog):
         self.wine_check = QCheckBox(self.tr("Only Show Wine/Proton Processes"))
         self.wine_check.setChecked(False)
         self.wine_check.stateChanged.connect(self.refresh_list)
+        self.wine_check.setVisible(self.platform.supports(Feature.WINE_CONFIGURATION))
         layout.addWidget(self.wine_check)
 
         layout.addSpacing(10) 

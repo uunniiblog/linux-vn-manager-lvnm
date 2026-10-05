@@ -112,6 +112,53 @@ class ThemeManager(QObject):
         outline: none;
     }}
 
+    /* ── Tables ────────────────────────────────────────────────── */
+    /* Do not rely on the host Qt style for these colors. Some
+       Windows and non-KDE styles otherwise render light alternate
+       rows and headers inside LVNM's dark theme. */
+    QTableView {{
+        background-color: {bg_main};
+        alternate-background-color: {bg_item_hover};
+        color: {text_main};
+        border: 1px solid {border_color};
+        gridline-color: {border_color};
+        selection-background-color: {bg_sidebar_sel};
+        selection-color: {text_highlight};
+        outline: none;
+    }}
+    QTableView::item {{
+        padding: 3px;
+        border: none;
+    }}
+    QTableView::item:hover {{
+        background-color: {bg_item_hover};
+    }}
+    QTableView::item:selected {{
+        background-color: {bg_sidebar_sel};
+        color: {text_highlight};
+    }}
+    QHeaderView {{
+        background-color: {bg_sidebar};
+        color: {text_main};
+    }}
+    QHeaderView::section {{
+        background-color: {bg_sidebar};
+        color: {text_main};
+        border: none;
+        border-right: 1px solid {border_color};
+        border-bottom: 1px solid {border_color};
+        padding: 5px 8px;
+    }}
+    QHeaderView::section:hover {{
+        background-color: {bg_button_hover};
+    }}
+    QTableCornerButton::section {{
+        background-color: {bg_sidebar};
+        border: none;
+        border-right: 1px solid {border_color};
+        border-bottom: 1px solid {border_color};
+    }}
+
     /* ── Buttons ────────────────────────────────────────────────── */
     QPushButton {{
         background-color: {bg_button};

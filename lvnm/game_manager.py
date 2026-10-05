@@ -241,7 +241,7 @@ class GameManager:
         if str(game_data["gamescope"].get("enabled", "false")).lower() != "true":
             game_data["gamescope"]["parameters"] = ""
 
-        prefix_json = PrefixManager.get_prefix_info(source_card.prefix)
+        prefix_json = PrefixManager.resolve_prefix_info(source_card.prefix)
         prefix_data = dict(prefix_json)
         prefix_data["path"] = ""
         raw_runner = prefix_data.get("runner", "")

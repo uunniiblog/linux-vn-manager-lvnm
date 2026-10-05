@@ -16,8 +16,12 @@ jobs:
   flatpak:
     uses: ./.github/workflows/build-flatpak.yml
 
+  windows:
+    uses: ./.github/workflows/build-windows.yml
+
   publish-release:
-    needs: [appimage, flatpak]
+    needs: [appimage, flatpak, windows]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -34,7 +38,7 @@ jobs:
           merge-multiple: true
 
       - name: Generate checksums
-        run: sha256sum LVNM-x86_64.AppImage LVNM-x86_64.flatpak > SHA256SUMS
+        run: sha256sum LVNM-x86_64.AppImage LVNM-x86_64.flatpak LVNM-Windows-x86_64.zip > SHA256SUMS
 
       - name: Set Release Variables
         run: |
@@ -49,7 +53,7 @@ jobs:
           fi
 
       - name: Move Continuous Tag
-        if: github.ref_type == 'branch'
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,10 +67,11 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           body: |
             Automated build for commit: ${{ github.sha }}
-            Download the AppImage or Flatpak bundle below.
+            Download the AppImage, Flatpak bundle, or portable Windows zip below.
           files: |
             LVNM-x86_64.AppImage
             LVNM-x86_64.flatpak
+            LVNM-Windows-x86_64.zip
             SHA256SUMS
           draft: false
           prerelease: ${{ env.IS_PRERELEASE == 'true' }}

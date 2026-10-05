@@ -15,14 +15,20 @@ from savedata_manager import SavedataManager
 from pregame_sync_pipeline import ManualSyncPipeline, SavedataSyncStep, TrackingSyncStep
 from ui.savedata_config_dialog import SavedataConfigDialog
 from ui.savedata_conflict_prompt import prompt_savedata_conflict
+from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
+from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
 
 class SavedataManagementDialog(QDialog):
     SETTINGS_FILE = config.UI_SETTINGS
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__(parent)
+        self.platform = platform
+        self.platform_ui = PlatformUi(platform)
+        self.has_prefix_copy = self.platform_ui.supported(Feature.PREFIXES)
+        self.gdrive_column = 3 if self.has_prefix_copy else 2
         self.setWindowTitle(self.tr("Manage Savedata files"))
         self.resize(600, 400)
 
@@ -32,14 +38,23 @@ class SavedataManagementDialog(QDialog):
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
 
         layout = QVBoxLayout(self)
-        self.info_label = QLabel(self.tr(
-            "Add one or more savedata folders, with optional file exclusions, or select the individual files the game uses. "
-            "Sources inside the game's prefix can also be copied to another prefix."
-        ))
-        self.info_label2 = QLabel(self.tr(
-            "Enable Gdrive sync individually per game. Before changing a prefix or savedata source, copy the saves to the "
-            "new prefix to avoid sync conflicts."
-        ))
+        info_text = self.tr(
+            "Add one or more savedata folders, with optional file exclusions, or select the individual files the game uses."
+        )
+        if self.has_prefix_copy:
+            info_text += " " + self.tr("Sources inside the game's prefix can also be copied to another prefix.")
+        self.info_label = QLabel(info_text)
+        self.info_label2 = QLabel(
+            self.tr(
+                "Enable Gdrive sync individually per game. Before changing a prefix or savedata source, copy the saves "
+                "to the new prefix to avoid sync conflicts."
+            )
+            if self.has_prefix_copy
+            else self.tr(
+                "Enable Gdrive sync individually per game. Cloud location information translates Windows user folders "
+                "and Wine prefix folders between operating systems."
+            )
+        )
         self.info_label.setWordWrap(True)
         self.info_label2.setWordWrap(True)
         layout.addWidget(self.info_label)
@@ -73,24 +88,18 @@ class SavedataManagementDialog(QDialog):
         self._savedata_rows = {}
 
         # Table Setup
-        self.table = QTableWidget(len(self.games), 4)
+        column_labels = [self.tr("Game"), self.tr("Savedata Sources")]
+        if self.has_prefix_copy:
+            column_labels.append(self.tr("Prefix"))
+        column_labels.append(self.tr("Gdrive Sync"))
+        self.table = QTableWidget(len(self.games), len(column_labels))
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setMouseTracking(True)
         self.table.setHorizontalHeader(HoverHeaderView(Qt.Horizontal, self.table))
 
-        self.table.setHorizontalHeaderLabels([
-            self.tr("Game"),
-            self.tr("Savedata Sources"),
-            self.tr("Prefix"),
-            self.tr("Gdrive Sync")
-        ])
+        self.table.setHorizontalHeaderLabels(column_labels)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setColumnWidth(0, 150)
-        self.table.setColumnWidth(1, 250)
-        self.table.setColumnWidth(2, 150)
 
         self.table.setSortingEnabled(False)
 
@@ -107,13 +116,15 @@ class SavedataManagementDialog(QDialog):
             self.table.setCellWidget(row, 1, savedata_widget)
             self.table.setItem(row, 1, path_sort_item)
 
-            # Column 2: Prefix (label + "Copy to..." button)
-            prefix_widget = self._create_prefix_widget(row, game_data)
-            self.table.setCellWidget(row, 2, prefix_widget)
-            prefix_sort_item = SortableItem()
-            prefix_sort_item.setData(Qt.UserRole, game_data.get("prefix", ""))
-            self.table.setItem(row, 2, prefix_sort_item)
-            prefix_widget.sort_item = prefix_sort_item
+            prefix_widget = None
+            if self.has_prefix_copy:
+                # Column 2: Prefix (label + "Copy to..." button)
+                prefix_widget = self._create_prefix_widget(row, game_data)
+                self.table.setCellWidget(row, 2, prefix_widget)
+                prefix_sort_item = SortableItem()
+                prefix_sort_item.setData(Qt.UserRole, game_data.get("prefix", ""))
+                self.table.setItem(row, 2, prefix_sort_item)
+                prefix_widget.sort_item = prefix_sort_item
 
             game_name = game_data.get("name", game_id)
             self._savedata_rows[game_name] = {
@@ -123,19 +134,20 @@ class SavedataManagementDialog(QDialog):
                 "path_item": path_sort_item,
             }
 
-            # Column 3: Gdrive - left empty for now
+            # Last column: Gdrive
             gdrive_sort_item = SortableItem()
             gdrive_sort_item.setData(Qt.UserRole, bool(game_data.get("gdrive", False)))
             gdrive_widget = self._create_gdrive_widget(row, game_data, gdrive_sort_item)
-            self.table.setCellWidget(row, 3, gdrive_widget)
-            self.table.setItem(row, 3, gdrive_sort_item)
+            self.table.setCellWidget(row, self.gdrive_column, gdrive_widget)
+            self.table.setItem(row, self.gdrive_column, gdrive_sort_item)
 
             # Enable/disable the copy button as the path changes
-            savedata_widget.line_edit.textChanged.connect(
-                lambda text, btn=prefix_widget.copy_button, gd=game_data: btn.setEnabled(
-                    bool(text.strip()) and SavedataManager.is_savedata_inside_prefix(gd)
+            if prefix_widget is not None:
+                savedata_widget.line_edit.textChanged.connect(
+                    lambda text, btn=prefix_widget.copy_button, gd=game_data: btn.setEnabled(
+                        bool(text.strip()) and SavedataManager.is_savedata_inside_prefix(gd)
+                    )
                 )
-            )
             # savedata_widget.line_edit.textChanged.connect(lambda text, cb=gdrive_widget.checkbox: cb.setEnabled(bool(text.strip())))
 
         self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
@@ -150,6 +162,20 @@ class SavedataManagementDialog(QDialog):
 
         # Restore previous window size
         self._restore_state()
+
+    def _configure_table_columns(self, restored_state: bool):
+        """Keep the useful columns readable independently of the host Qt style."""
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setMinimumSectionSize(110)
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(self.gdrive_column, QHeaderView.ResizeToContents)
+
+        if not restored_state:
+            self.table.setColumnWidth(0, 200)
+            if self.has_prefix_copy:
+                self.table.setColumnWidth(2, 220)
 
     def _filter_table(self, text):
         """Filters the table rows based on the game name."""
@@ -211,7 +237,8 @@ class SavedataManagementDialog(QDialog):
         summary = self._savedata_summary(game_data)
         row_data["savedata_widget"].line_edit.setText(summary)
         row_data["path_item"].setData(Qt.UserRole, summary)
-        row_data["prefix_widget"].copy_button.setEnabled(SavedataManager.is_savedata_inside_prefix(game_data))
+        if row_data["prefix_widget"] is not None:
+            row_data["prefix_widget"].copy_button.setEnabled(SavedataManager.is_savedata_inside_prefix(game_data))
 
     def _configure_savedata(self, line_edit, game_data, path_item=None):
         dialog = SavedataConfigDialog(game_data, self)
@@ -416,23 +443,28 @@ class SavedataManagementDialog(QDialog):
         geometry = self.settings.value("SavedataManagementDialog/geometry")
         if geometry:
             self.restoreGeometry(geometry)
-        header_state = self.settings.value("SavedataManagementDialog/header_state")
-        if header_state:
+        header_state = self.settings.value(f"SavedataManagementDialog/{self.platform.name}/header_state")
+        if header_state is None and self.has_prefix_copy:
+            # Preserve the layout saved before header state became platform-specific.
+            header_state = self.settings.value("SavedataManagementDialog/header_state")
+        restored_state = bool(header_state)
+        if restored_state:
             self.table.setSortingEnabled(False)
             self.table.horizontalHeader().restoreState(header_state)
             self.table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
             self.table.setSortingEnabled(True)
+        self._configure_table_columns(restored_state)
 
     def closeEvent(self, event):
         """Overrides the default close event to save geometry before closing."""
         self.settings.setValue("SavedataManagementDialog/geometry", self.saveGeometry())
-        self.settings.setValue("SavedataManagementDialog/header_state", self.table.horizontalHeader().saveState())
+        self.settings.setValue(f"SavedataManagementDialog/{self.platform.name}/header_state", self.table.horizontalHeader().saveState())
         super().closeEvent(event)
 
     def hideEvent(self, event):
         """Fires whenever the dialog is closed, hidden, accepted, or rejected."""
         self.settings.setValue("SavedataManagementDialog/geometry", self.saveGeometry())
-        self.settings.setValue("SavedataManagementDialog/header_state", self.table.horizontalHeader().saveState())
+        self.settings.setValue(f"SavedataManagementDialog/{self.platform.name}/header_state", self.table.horizontalHeader().saveState())
         super().hideEvent(event)
 
 class SortableItem(QTableWidgetItem):

@@ -15,6 +15,7 @@ from execution_manager import ExecutionManager
 from system_utils import SystemUtils
 from settings_manager import SettingsManager
 from emulation_manager import EmulationManager
+from platform_profile import IS_WINDOWS
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +613,14 @@ class PrefixManager:
     @staticmethod
     def get_all_prefixes() -> dict:
         """All selectable prefixes, emulation and native at bottom."""
+        if IS_WINDOWS:
+            return {
+                config.WINDOWS_PREFIX_NAME: {
+                    "type": config.WINDOWS,
+                    "virtual": True,
+                }
+            }
+
         reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))
         reversed_prefixes.pop(config.NATIVE_PREFIX_NAME, None)
         native_prefix = {
@@ -634,7 +643,7 @@ class PrefixManager:
     @staticmethod
     def is_virtual_prefix_name(prefix_name: str) -> bool:
         """Whether a name is reserved for a built-in virtual prefix."""
-        return prefix_name == config.NATIVE_PREFIX_NAME or prefix_name in EmulationManager.get_emulator_prefixes()
+        return prefix_name in (config.NATIVE_PREFIX_NAME, config.WINDOWS_PREFIX_NAME) or prefix_name in EmulationManager.get_emulator_prefixes()
 
     @staticmethod
     def get_prefix_type(prefix_name: str) -> str | None:

@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtCore import Qt, QTimer, QSize, QEvent
-from ui.prefix_tab import PrefixTab
 from ui.timetracker_dialog import TimetrackerDialog
 from game_manager import GameManager
 from prefix_manager import PrefixManager
@@ -30,6 +29,8 @@ from ui.savedata_config_dialog import SavedataConfigDialog
 from timetracker.log_manager import LogManager
 from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, TrackingSyncStep
 from ui.savedata_conflict_prompt import prompt_savedata_conflict
+from platform_profile import CURRENT_PLATFORM, Feature, IS_WINDOWS, PlatformProfile
+from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,10 @@ class GameSidebar(QFrame):
     EGS_SITE_URL = config.EGS_SITE_URL
     EGS_V2_SITE_URL = config.EGS_V2_SITE_URL
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
         super().__init__(parent)
+        self.platform = platform
+        self.platform_ui = PlatformUi(platform)
         self.setFrameShape(QFrame.StyledPanel)
         self.current_game: Optional[GameCard] = None
         self.prefixes = None
@@ -238,21 +241,21 @@ class GameSidebar(QFrame):
         # Gdrive sync checkbox
         self.gdrive_sync_checkbox = QCheckBox(self.tr("Sync this game's savedata to Google Drive"))
 
-        self.gen_form.addRow(self.tr("Name:"), self.name_edit_stack)
-        self.gen_form.addRow(self.tr("Path:"), path_row)
-        self.gen_form.addRow(self.tr("Prefix:"), prefix_row)
-        self.gen_form.addRow("", self.prefix_warning)
-        self.gen_form.addRow(self.tr("VNDB:"), self.edit_vndb)
-        self.gen_form.addRow(self.tr("Savedata:"), self.savedata_row)
-        self.gen_form.addRow("", self.gdrive_sync_checkbox)
+        self.platform_ui.add_row(self.gen_form, self.tr("Name:"), self.name_edit_stack)
+        self.platform_ui.add_row(self.gen_form, self.tr("Path:"), path_row)
+        self.platform_ui.add_row(self.gen_form, self.tr("Prefix:"), prefix_row, requires=Feature.PREFIXES)
+        self.platform_ui.add_row(self.gen_form, "", self.prefix_warning, requires=Feature.PREFIXES)
+        self.platform_ui.add_row(self.gen_form, self.tr("VNDB:"), self.edit_vndb)
+        self.platform_ui.add_row(self.gen_form, self.tr("Savedata:"), self.savedata_row)
+        self.platform_ui.add_row(self.gen_form, "", self.gdrive_sync_checkbox)
         form.addWidget(gen_group)
 
         self.update_savedata_visibility()
 
         # Gamescope
-        gs_group = QGroupBox(self.tr("Gamescope"))
-        gs_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        self.gs_form = QFormLayout(gs_group)
+        self.gs_group = QGroupBox(self.tr("Gamescope"))
+        self.gs_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        self.gs_form = QFormLayout(self.gs_group)
         self.gs_enabled = QCheckBox(self.tr("Enable Gamescope"))
         self.gs_params = QLineEdit()
         self.gs_form.addRow(self.gs_enabled)
@@ -268,7 +271,7 @@ class GameSidebar(QFrame):
         self.gs_form.addRow(self.upscale_enabled)
         self.gs_form.addRow(self.tr("Params:"), self.upscale_params)
 
-        form.addWidget(gs_group)
+        self.platform_ui.add_widget(form, self.gs_group, requires=Feature.GAMESCOPE)
 
         # Environment Variables
         self.env_group = QGroupBox(self.tr("Environment Variables"))
@@ -287,7 +290,7 @@ class GameSidebar(QFrame):
         
         self.env_layout.addWidget(self.manage_env_btn)
         
-        form.addWidget(self.env_group)
+        self.platform_ui.add_widget(form, self.env_group, requires=Feature.WINE_CONFIGURATION)
 
         # Advanced Settings Button
         self.advanced_btn = QPushButton(self.tr("Advanced Settings"))
@@ -295,7 +298,7 @@ class GameSidebar(QFrame):
         self.advanced_btn.setStyleSheet("margin: 5px; margin-top: 10px;padding: 4px 10px;")
         self.advanced_btn.setCursor(Qt.PointingHandCursor)
         self.advanced_btn.clicked.connect(self._open_advanced_settings)
-        form.addWidget(self.advanced_btn)
+        self.platform_ui.add_widget(form, self.advanced_btn, requires=Feature.ADVANCED_SETTINGS)
 
         form.addStretch(1)
 
@@ -606,7 +609,7 @@ class GameSidebar(QFrame):
         prefix_name = self.combo_prefix.currentText()
         prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
         
-        dialog = AdvancedSettingsDialog(prefix_type, self.current_game, self)
+        dialog = AdvancedSettingsDialog(prefix_type, self.current_game, self, platform=self.platform)
         
         # Advanced dialog already writes into self.current_game
         # So we call save directly after closing to avoid having to double save
@@ -660,7 +663,10 @@ class GameSidebar(QFrame):
         self.combo_prefix.clear()
         self.prefixes = self._get_all_prefixes()
         self.combo_prefix.addItems(self.prefixes.keys())
-        self.combo_prefix.setCurrentIndex(-1) # No selection initially
+        if IS_WINDOWS:
+            self.combo_prefix.setCurrentText(config.WINDOWS_PREFIX_NAME)
+        else:
+            self.combo_prefix.setCurrentIndex(-1) # No selection initially
         self.prefix_warning.setVisible(False)
         self.combo_prefix.blockSignals(False)
 
@@ -703,6 +709,7 @@ class GameSidebar(QFrame):
         game once they've all succeeded or the user chose to proceed anyway after a failure.
         """
         try:
+            self.refresh_runtime_settings()
             game_to_start = GameManager.get_game(name)
             steps = []
  
@@ -809,7 +816,7 @@ class GameSidebar(QFrame):
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
-        self.current_game.prefix = self.combo_prefix.currentText()
+        self.current_game.prefix = config.WINDOWS_PREFIX_NAME if IS_WINDOWS else self.combo_prefix.currentText()
         self.current_game.vndb = self.edit_vndb.text().strip()
         self.current_game.gdrive = self.gdrive_sync_checkbox.isChecked()
 
@@ -1015,7 +1022,10 @@ class GameSidebar(QFrame):
                     QMessageBox.critical(self, self.tr("Failed to export"), self.tr(str(e)))
                     logging.error(f"Failed to export game: {e}")
 
-    def open_create_prefix_dialog(self):        
+    def open_create_prefix_dialog(self):
+        if not self.platform.supports(Feature.PREFIXES):
+            return
+        from ui.prefix_tab import PrefixTab
         created_name = PrefixTab.create_new_prefix_flow(self)
         if created_name:
             self.refresh_prefix_combo()
@@ -1026,7 +1036,7 @@ class GameSidebar(QFrame):
                 self.combo_prefix.setCurrentIndex(index)
 
     def open_open_savedata_dialog(self):
-        dialog = SavedataManagementDialog(self)
+        dialog = SavedataManagementDialog(self, platform=self.platform)
         dialog.exec()
         updated_card = GameManager.get_game(self.current_game.name)
         if updated_card:
@@ -1160,6 +1170,7 @@ class GameSidebar(QFrame):
 
     def launch_timetracker_dialog(self):
         """Logic for the timetracker dialog"""
+        self.refresh_runtime_settings()
         name = self.current_game.name
         tracker = self.process_manager.get_tracker(name)
         
@@ -1168,7 +1179,7 @@ class GameSidebar(QFrame):
             logger.warning(f"No active tracker found for {name}. Creating one.")
             tracker = self.process_manager.start_timetracker(name, self.current_game, self.timetracker_settings)
 
-        dialog = TimetrackerDialog(tracker.tracker)
+        dialog = TimetrackerDialog(tracker.tracker, platform=self.platform)
         result = dialog.exec()
         
         if result == QDialog.Accepted:
@@ -1219,9 +1230,15 @@ class GameSidebar(QFrame):
 
     def update_timetracker_visibility(self):
         """Dynamically show/hide the time tracker based on game state and settings."""
+        self.refresh_runtime_settings()
         is_enabled = self.timetracker_settings.get("timetracking", False)
         should_be_visible = bool(self.is_running and is_enabled)        
         self.tracking_group.setVisible(should_be_visible)
+
+    def refresh_runtime_settings(self):
+        """Reload settings that may have changed while the Games tab was alive."""
+        self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
+        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
             
     def set_ui_stop_state(self):
         self.is_running = True

@@ -4,7 +4,6 @@ import os
 import threading
 import logging
 from PySide6.QtCore import QThread, Signal
-from timetracker.kde_utils import KdeUtils
 from timetracker.system_utils import SystemUtils
 from timetracker.log_manager import LogManager
 
@@ -60,7 +59,7 @@ class TrackerWorker(QThread):
         try:
             # Get all IDs again
             all_ids = self.utils.get_all_window_ids()
-            if self.target_window_id in all_ids:
+            if str(self.target_window_id) in {str(wid) for wid in all_ids}:
                 return True
 
             # Looks up if new PIDs exist
@@ -71,7 +70,7 @@ class TrackerWorker(QThread):
                 # print(f'new_wid {new_wid}')
                 if new_wid and new_wid[0]:
                     logger.info(f"New tracking window found for {self.app_name} - {self.process_name} - {self.target_window_id}")
-                    self.target_window_id = str(new_wid[0])
+                    self.target_window_id = new_wid[0]
                     return True
 
             return False

@@ -128,6 +128,60 @@ class ExecutionManager:
         return proc.returncode
 
     @staticmethod
+    def run_windows(cmd, env, wait=True, check=True, suppress_codes=None, cwd=None, log_callback=None, detached=True):
+        """Execute a native Windows process."""
+        if suppress_codes is None:
+            suppress_codes = []
+
+        final_env = ExecutionManager._get_verbosity_env(env)
+        logger.info("Executing Windows process: %s", subprocess.list2cmdline(cmd))
+        logger.debug("running in cwd %s", cwd)
+
+        creationflags = 0
+        if detached and sys.platform == "win32":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        proc = subprocess.Popen(
+            cmd,
+            env=final_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=False,
+            universal_newlines=False,
+            bufsize=0,
+            cwd=cwd,
+            creationflags=creationflags,
+        )
+
+        def log_reader(pipe):
+            try:
+                for line in iter(pipe.readline, b""):
+                    if not line:
+                        continue
+                    try:
+                        decoded_line = line.decode("utf-8")
+                    except UnicodeDecodeError:
+                        decoded_line = line.decode("cp932", errors="replace")
+                    stripped = decoded_line.strip()
+                    if settings.get(config.USER_CONF_LOGS_WINE, True):
+                        logger.info(stripped)
+                    if log_callback:
+                        log_callback(stripped)
+            except Exception as error:
+                logger.error("Windows log thread error: %s", error)
+            finally:
+                pipe.close()
+
+        threading.Thread(target=log_reader, args=(proc.stdout,), daemon=True).start()
+        if not wait:
+            return proc
+
+        proc.wait()
+        if check and proc.returncode != 0 and proc.returncode not in suppress_codes:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
+        return proc.returncode
+
+    @staticmethod
     def run_detached(cmd, env, cwd=None, startup_grace=5, suppress_stdout=True):
         """
         Launches a fully detached.

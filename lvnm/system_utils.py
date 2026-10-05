@@ -13,10 +13,11 @@ import urllib.request
 import threading
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, QStandardPaths
 from PySide6.QtGui import QDesktopServices
 from steam_manager import SteamManager
 from settings_manager import SettingsManager
+from platform_profile import IS_WINDOWS
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,17 @@ class SystemUtils:
         """Gathers core system, OS, and hardware information."""
         clean_env = SystemUtils.get_clean_env()
 
+        if IS_WINDOWS:
+            return {
+                "app_version": getattr(config, "VERSION", "Unknown"),
+                "os": platform.platform(),
+                "kernel": platform.release(),
+                "desktop_environment": "Windows",
+                "session_type": "Windows",
+                "cpu": platform.processor() or "Unknown CPU",
+                "gpu": "Unknown GPU",
+            }
+
         info = {
             "app_version": getattr(config, "VERSION", "Unknown"),
             "os": "Unknown Linux",
@@ -136,6 +148,13 @@ class SystemUtils:
     @staticmethod
     def init_software_config():
         """Fill system info"""
+        if IS_WINDOWS:
+            config.GAMESCOPE_INSTALLED = False
+            config.VULKAN_INSTALLED = False
+            config.UMU_RUN_INSTALLED = False
+            config.WINETRICKS_INSTALLED = False
+            config.RT_UPSCALING_INSTALLED = False
+            return
         appdir = os.environ.get("APPDIR")
 
         if appdir:
@@ -156,6 +175,19 @@ class SystemUtils:
     @staticmethod
     def get_software_support() -> dict:
         """Checks for necessary binaries, tools, and libraries."""
+        if IS_WINDOWS:
+            return {
+                "vulkan_support": False,
+                "gamescope": False,
+                "gamescope_version": None,
+                "umu_run": False,
+                "umu_run_version": None,
+                "winetricks": False,
+                "winetricks_version": None,
+                "gstreamer_packages": {pkg: False for pkg in SystemUtils.GSTREAMER_PACKAGES},
+                "upscale": False,
+                "upscale_version": None,
+            }
         clean_env = SystemUtils.get_clean_env()
         appdir = os.environ.get("APPDIR")
 
@@ -394,6 +426,8 @@ class SystemUtils:
     @staticmethod
     def get_runtime_type() -> str:
         """Returns the runtime environment type."""
+        if IS_WINDOWS:
+            return "windows"
         if os.environ.get("FLATPAK_ID") or Path("/.flatpak-info").exists():
             return "flatpak"
         if os.environ.get("APPDIR"):
@@ -753,6 +787,9 @@ class SystemUtils:
         Generates a .desktop file on the user's desktop.
         If can't find home Desktop folder ask where to save.
         """
+        if IS_WINDOWS:
+            return SystemUtils._create_windows_desktop_shortcut(game, cover, target_path)
+
         # Define paths
         if target_path:
             shortcut_file = Path(target_path)
@@ -798,6 +835,29 @@ class SystemUtils:
         except Exception as e:
             logging.error(f"Failed to create desktop shortcut: {e}")
             raise RuntimeError(f"Failed to create desktop shortcut: {e}")
+
+    @staticmethod
+    def _create_windows_desktop_shortcut(game, cover, target_path=None):
+        """Create a simple Windows desktop launcher pending native .lnk support."""
+        safe_name = "".join(character for character in game if character not in '<>:"/\\|?*').strip() or "game"
+        if target_path:
+            shortcut_file = Path(target_path)
+        else:
+            desktop = QStandardPaths.writableLocation(QStandardPaths.DesktopLocation)
+            desktop_path = Path(desktop) if desktop else Path.home() / "Desktop"
+            if not desktop_path.is_dir():
+                raise FileNotFoundError(str(desktop_path))
+            shortcut_file = desktop_path / f"LVNM-{safe_name}.cmd"
+
+        if shortcut_file.suffix.lower() != ".cmd":
+            shortcut_file = shortcut_file.with_suffix(".cmd")
+        if not shortcut_file.parent.is_dir():
+            raise RuntimeError(f"Selected folder does not exist: {shortcut_file.parent}")
+
+        exe_cmd, args = SystemUtils.get_launch_command(game)
+        shortcut_file.write_text(f'@echo off\r\nstart "" {exe_cmd} {args}\r\n', encoding="utf-8")
+        logger.info("Windows desktop launcher created at: %s", shortcut_file)
+        return shortcut_file
 
     @staticmethod
     def add_to_steam(game_card):

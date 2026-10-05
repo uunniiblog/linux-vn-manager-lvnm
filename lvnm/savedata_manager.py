@@ -6,14 +6,15 @@ import logging
 import shutil
 import os
 import tempfile
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from PySide6.QtCore import QThread, Signal, QObject
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from datetime import datetime, timezone
 from prefix_manager import PrefixManager
 from settings_manager import SettingsManager
 from gdrive_manager import GdriveManager
 from game_manager import GameManager
+from platform_profile import IS_WINDOWS
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,21 @@ class SavedataManager(QObject):
         "drive_c/users/*/AppData/LocalLow",
         "drive_c/users/*/AppData/Local",
     ]
+    WINDOWS_USER_FOLDER_PARTS = {
+        "saved_games": ("Saved Games",),
+        "documents": ("Documents",),
+        "roaming_app_data": ("AppData", "Roaming"),
+        "local_app_data_low": ("AppData", "LocalLow"),
+        "local_app_data": ("AppData", "Local"),
+    }
+    WINDOWS_KNOWN_FOLDER_IDS = {
+        "saved_games": "4C5C32FF-BB9D-43B0-BF1B-4A39D828C65C",
+        "documents": "FDD39AD0-238F-46AF-ADB4-6C85480369C7",
+        "roaming_app_data": "3EB685DB-65F9-4CF6-A03A-E3EF65729F3D",
+        "local_app_data_low": "A520A1A4-1780-4FF6-BD18-167343C5AF16",
+        "local_app_data": "F1B32785-6FBA-4FCF-9D55-7B8E7F157091",
+    }
+    SAVEDATA_SEARCH_MAX_DEPTH = 4
 
     # More than 70% files deleted safeguard
     DELETION_SAFETY_THRESHOLD = 0.7
@@ -52,7 +68,6 @@ class SavedataManager(QObject):
         super().__init__()
         self._gdrive_sync_workers = {}
         self.user_settings = SettingsManager()
-        self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
 
     @staticmethod
     def get_savedata_config(game_data: dict) -> dict:
@@ -98,10 +113,23 @@ class SavedataManager(QObject):
 
     @staticmethod
     def _safe_relative_path(value: str) -> Path:
-        rel_path = Path(value)
-        if not value or rel_path.is_absolute() or ".." in rel_path.parts:
+        """Turn a portable slash separated path into a local relative Path."""
+        normalized = str(value).replace("\\", "/")
+        portable = PurePosixPath(normalized)
+        windows_path = PureWindowsPath(str(value))
+        if (
+            not normalized
+            or portable.is_absolute()
+            or windows_path.is_absolute()
+            or bool(windows_path.drive)
+            or ".." in portable.parts
+        ):
             raise ValueError(f"Invalid savedata relative path: {value}")
-        return rel_path
+        return Path(*portable.parts)
+
+    @staticmethod
+    def _portable_relative_path(value: str) -> str:
+        return PurePosixPath(str(value).replace("\\", "/")).as_posix()
 
     @staticmethod
     def _cloud_path(source: dict, rel_path: str) -> str:
@@ -120,9 +148,10 @@ class SavedataManager(QObject):
 
     @staticmethod
     def _is_managed_relative_path(source: dict, mode: str, rel_path: str) -> bool:
+        rel_path = SavedataManager._portable_relative_path(rel_path)
         if mode == "files":
-            return rel_path in {Path(path).as_posix() for path in source.get("files", [])}
-        return rel_path not in {Path(path).as_posix() for path in source.get("excluded", [])}
+            return rel_path in {SavedataManager._portable_relative_path(path) for path in source.get("files", [])}
+        return rel_path not in {SavedataManager._portable_relative_path(path) for path in source.get("excluded", [])}
 
     @staticmethod
     def _local_target_for_cloud_path(savedata_config: dict, cloud_path: str) -> Path | None:
@@ -171,7 +200,8 @@ class SavedataManager(QObject):
 
     def start_gdrive_sync(self, name: str, game_data: dict, conflict_resolution: str = "defer"):
         """Runs the Gdrive sync in a background thread so it doesn't block the UI."""
-        if not self.savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
+        savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
+        if not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
             return
 
         # Safety guard: Prevent launching duplicate threads for the same game
@@ -307,23 +337,149 @@ class SavedataManager(QObject):
         return Path(*parts[:2], target_user, *parts[3:])
 
     @staticmethod
+    def _windows_known_folder_path(folder_name: str) -> Path | None:
+        """Resolve a Windows known folder, respecting redirected user folders."""
+        if not IS_WINDOWS or folder_name not in SavedataManager.WINDOWS_KNOWN_FOLDER_IDS:
+            return None
+
+        try:
+            import ctypes
+            import uuid
+            from ctypes import wintypes
+
+            class GUID(ctypes.Structure):
+                _fields_ = [
+                    ("Data1", wintypes.DWORD),
+                    ("Data2", wintypes.WORD),
+                    ("Data3", wintypes.WORD),
+                    ("Data4", ctypes.c_ubyte * 8),
+                ]
+
+                @classmethod
+                def from_string(cls, value: str):
+                    return cls.from_buffer_copy(uuid.UUID(value).bytes_le)
+
+            folder_id = GUID.from_string(SavedataManager.WINDOWS_KNOWN_FOLDER_IDS[folder_name])
+            shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+            ole32 = ctypes.WinDLL("ole32", use_last_error=True)
+            shell32.SHGetKnownFolderPath.argtypes = [
+                ctypes.POINTER(GUID),
+                wintypes.DWORD,
+                wintypes.HANDLE,
+                ctypes.POINTER(ctypes.c_void_p),
+            ]
+            shell32.SHGetKnownFolderPath.restype = ctypes.c_long
+            ole32.CoTaskMemFree.argtypes = [ctypes.c_void_p]
+            ole32.CoTaskMemFree.restype = None
+
+            result = ctypes.c_void_p()
+            status = shell32.SHGetKnownFolderPath(ctypes.byref(folder_id), 0, None, ctypes.byref(result))
+            if status == 0 and result.value:
+                try:
+                    return Path(ctypes.wstring_at(result.value))
+                finally:
+                    ole32.CoTaskMemFree(result)
+        except (AttributeError, OSError, TypeError, ValueError) as error:
+            logger.debug(f"Could not resolve Windows known folder '{folder_name}': {error}")
+
+        user_profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
+        local_app_data = Path(os.environ.get("LOCALAPPDATA", str(user_profile / "AppData" / "Local")))
+        fallbacks = {
+            "saved_games": user_profile / "Saved Games",
+            "documents": user_profile / "Documents",
+            "roaming_app_data": Path(os.environ.get("APPDATA", str(user_profile / "AppData" / "Roaming"))),
+            "local_app_data_low": local_app_data.parent / "LocalLow",
+            "local_app_data": local_app_data,
+        }
+        return fallbacks.get(folder_name)
+
+    @staticmethod
+    def _windows_known_folders() -> dict[str, Path]:
+        folders = {}
+        for name in SavedataManager.WINDOWS_USER_FOLDER_PARTS:
+            path = SavedataManager._windows_known_folder_path(name)
+            if path is not None:
+                folders[name] = path
+        return folders
+
+    @staticmethod
+    def _prefix_user_folder_reference(relative: Path) -> dict | None:
+        """Translate drive_c/users/<user>/... into a portable known-folder reference."""
+        parts = relative.parts
+        if len(parts) < 4 or tuple(part.lower() for part in parts[:2]) != ("drive_c", "users"):
+            return None
+
+        user_relative = parts[3:]
+        for folder_name, folder_parts in SavedataManager.WINDOWS_USER_FOLDER_PARTS.items():
+            length = len(folder_parts)
+            if tuple(part.lower() for part in user_relative[:length]) != tuple(
+                part.lower() for part in folder_parts
+            ):
+                continue
+            remainder = Path(*user_relative[length:]) if user_relative[length:] else Path(".")
+            return {
+                "kind": "windows_user_folder",
+                "folder": folder_name,
+                "rel_path": remainder.as_posix(),
+            }
+        return None
+
+    @staticmethod
+    def _savedata_search_roots(game_data: dict) -> list[Path]:
+        if IS_WINDOWS:
+            return list(SavedataManager._windows_known_folders().values())
+
+        prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+        if not prefix_info or not prefix_info.get("path"):
+            return []
+        prefix_path = Path(prefix_info["path"])
+        if not prefix_path.exists():
+            return []
+
+        roots = []
+        for pattern in SavedataManager.PREFIX_SAVEDATA_SEARCH_DIRS:
+            roots.extend(path for path in prefix_path.glob(pattern) if path.is_dir())
+        return roots
+
+    @staticmethod
+    def _find_savedata_candidates(base_dir: Path, target_names: set[str]) -> list[tuple[Path, bool]]:
+        """Search common roots without walking unbounded Windows cache trees."""
+        candidates = []
+
+        def ignore_error(error):
+            logger.debug(f"Could not search savedata directory '{base_dir}': {error}")
+
+        for current_root, directory_names, _ in os.walk(base_dir, onerror=ignore_error):
+            current = Path(current_root)
+            try:
+                depth = len(current.relative_to(base_dir).parts)
+            except ValueError:
+                continue
+            if depth >= SavedataManager.SAVEDATA_SEARCH_MAX_DEPTH:
+                directory_names.clear()
+                continue
+
+            for directory_name in directory_names:
+                found_dir = current / directory_name
+                lowered = directory_name.lower()
+                if lowered in target_names:
+                    candidates.append((found_dir, True))
+                elif SavedataManager._is_fuzzy_name_match(directory_name, target_names):
+                    candidates.append((found_dir, False))
+        return candidates
+
+    @staticmethod
     def auto_detect_savedata_folder(game_data: dict) -> str | None:
         """
         Attempts to automatically locate a game's savedata folder.
         Looks inside the game's own install folder (next to the .exe) for
            a folder matching one of SAVEDATA_FOLDER_NAMES.
-        Searches common savedata locations inside the game's
-           Wine/Proton prefix for a folder named after the game or its executable.
+        Searches the common native Windows folders or equivalent directories
+           inside Wine/Proton for a folder named after the game or executable.
         """
         game_name = game_data.get("name", "")
         game_og_name = game_data.get("ogtitle", "")
         game_path = game_data.get("path", "")
-        prefix_name = game_data.get("prefix", "")
-        prefix_info = PrefixManager.get_prefix_info(prefix_name)
-
-        if not prefix_info:
-            logging.warning(f"Prefix '{prefix_name}' not found for '{game_name}'. Cannot search prefix.")
-            return None
 
         if not game_path:
             logging.warning(f"No game path set for '{game_name}'. Cannot auto-detect savedata.")
@@ -341,36 +497,25 @@ class SavedataManager(QObject):
                     logger.debug(f"Found savedata folder next to exe: {child}")
                     return str(child)
 
-        # Search inside the prefix
-        prefix_path = Path(prefix_info.get("path", ""))
-        if not prefix_path.exists():
-            logging.warning(f"Prefix path does not exist: {prefix_path}")
-            return None
-
         target_names = {game_name.lower(), exe_stem.lower(), game_og_name.lower()}
         target_names.discard("")
 
         candidates = []
 
-        for pattern in SavedataManager.PREFIX_SAVEDATA_SEARCH_DIRS:
-            for base_dir in prefix_path.glob(pattern):
-                if not base_dir.is_dir():
-                    continue
-                for found_dir in base_dir.rglob("*"):
-                    if found_dir.is_dir() and found_dir.name.lower() in target_names:
-                        candidates.append((found_dir, True))
-                    elif found_dir.is_dir() and SavedataManager._is_fuzzy_name_match(found_dir.name, target_names):
-                        candidates.append((found_dir, False))
+        for base_dir in SavedataManager._savedata_search_roots(game_data):
+            if not base_dir.is_dir():
+                continue
+            candidates.extend(SavedataManager._find_savedata_candidates(base_dir, target_names))
 
         if not candidates:
-            logger.debug(f"No savedata folder found in prefix for '{game_name}'.")
+            logger.debug(f"No savedata folder found in common locations for '{game_name}'.")
             return None
 
         # Prefer the most deeply nested match (most specific location)
         # Prefer exact matches over fuzzy
         candidates.sort(key=lambda c: (c[1], len(c[0].parts)), reverse=True)
         best_match = candidates[0][0]
-        logger.debug(f"Found savedata folder in prefix: {best_match}")
+        logger.debug(f"Found savedata folder in common location: {best_match}")
         return str(best_match)
 
     @staticmethod
@@ -397,7 +542,11 @@ class SavedataManager(QObject):
         is found. Returns True if game_card was modified.
         """
         savedata_settings = SettingsManager().get(config.USER_CONF_SAVEDATA, {})
-        if game_card.savedata_path or not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False):
+        if (
+            game_card.savedata_path
+            or not savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False)
+            or not savedata_settings.get(config.USER_CONF_SAVEDATA_AUTO_DETECT, False)
+        ):
             return False
 
         detected_path = SavedataManager.auto_detect_savedata_folder(game_card.to_dict())
@@ -413,6 +562,9 @@ class SavedataManager(QObject):
     @staticmethod
     def is_savedata_inside_prefix(game_data: dict) -> bool:
         """Checks whether every configured savedata source lives inside the game's prefix."""
+        if IS_WINDOWS:
+            return False
+
         prefix_name = game_data.get("prefix", "")
         savedata_config = SavedataManager.get_savedata_config(game_data)
         sources = SavedataManager._active_sources(savedata_config)
@@ -436,13 +588,6 @@ class SavedataManager(QObject):
     @staticmethod
     def _compute_portable_path_reference(game_data: dict, path: str) -> dict | None:
         src = Path(os.path.abspath(path))
-        prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
-        if prefix_info:
-            prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
-            try:
-                return {"kind": "prefix", "rel_path": src.relative_to(prefix_path).as_posix()}
-            except ValueError:
-                pass
 
         game_path = game_data.get("path", "")
         if game_path:
@@ -451,13 +596,38 @@ class SavedataManager(QObject):
                 return {"kind": "install", "rel_path": src.relative_to(install_dir).as_posix()}
             except ValueError:
                 pass
+
+        if IS_WINDOWS:
+            for folder_name, folder_path in SavedataManager._windows_known_folders().items():
+                try:
+                    relative = src.relative_to(folder_path)
+                    return {
+                        "kind": "windows_user_folder",
+                        "folder": folder_name,
+                        "rel_path": relative.as_posix(),
+                    }
+                except ValueError:
+                    continue
+            return None
+
+        prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+        if prefix_info and prefix_info.get("path"):
+            prefix_path = Path(os.path.abspath(prefix_info["path"]))
+            try:
+                relative = src.relative_to(prefix_path)
+            except ValueError:
+                return None
+            known_folder_reference = SavedataManager._prefix_user_folder_reference(relative)
+            if known_folder_reference is not None:
+                return known_folder_reference
+            return {"kind": "prefix", "rel_path": relative.as_posix()}
         return None
 
     @staticmethod
     def _compute_portable_location_reference(game_data: dict) -> dict | None:
         """
-        Describes all savedata sources relative to the prefix or install folder
-        so another device can reconstruct the same selection.
+        Describes sources relative to the install directory or a portable
+        Windows user folder so another OS can reconstruct the selection.
         """
         savedata_config = SavedataManager.get_savedata_config(game_data)
         mode = savedata_config.get("mode", "folders")
@@ -468,7 +638,7 @@ class SavedataManager(QObject):
                 continue
             location = SavedataManager._compute_portable_path_reference(game_data, root)
             if location is None:
-                logger.warning(f"Savedata source is not in the prefix or game folder: {root}")
+                logger.warning(f"Savedata source has no portable location mapping: {root}")
                 return None
             portable_source = {"source_id": source.get("source_id", "primary"), "location": location}
             if mode == "files":
@@ -481,29 +651,60 @@ class SavedataManager(QObject):
     @staticmethod
     def _resolve_portable_path(game_data: dict, reference: dict) -> Path | None:
         """
-        Resolves game's savedata path in local prefix from _compute_portable_location_reference
+        Resolves a portable savedata path on the current operating system.
         """
         kind = reference.get("kind")
         rel_path = reference.get("rel_path")
-        if not kind or not rel_path:
+        if not kind or rel_path is None:
             return None
         relative = SavedataManager._safe_relative_path(str(rel_path))
-
-        if kind == "prefix":
-            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
-            if not prefix_info:
-                logger.error("_resolve_portable_location: no prefix set for game")
-                raise ValueError("_resolve_portable_location: no prefix set for game")
-
-            prefix_path = Path(os.path.abspath(prefix_info.get("path", "")))
-            remapped = SavedataManager._remap_user_segment(relative, prefix_path)
-            return prefix_path / remapped
 
         if kind == "install":
             game_path = game_data.get("path", "")
             if not game_path:
                 return None
             return Path(os.path.abspath(game_path)).parent / relative
+
+        if kind == "windows_user_folder":
+            folder_name = str(reference.get("folder", ""))
+            if folder_name not in SavedataManager.WINDOWS_USER_FOLDER_PARTS:
+                return None
+            if IS_WINDOWS:
+                root = SavedataManager._windows_known_folder_path(folder_name)
+                return root / relative if root is not None else None
+
+            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+            if not prefix_info or not prefix_info.get("path"):
+                return None
+            prefix_path = Path(os.path.abspath(prefix_info["path"]))
+            target_user = SavedataManager._get_prefix_user_dir(prefix_path)
+            if not target_user:
+                return None
+            return (
+                prefix_path
+                / "drive_c"
+                / "users"
+                / target_user
+                / Path(*SavedataManager.WINDOWS_USER_FOLDER_PARTS[folder_name])
+                / relative
+            )
+
+        if kind == "prefix":
+            if IS_WINDOWS:
+                known_reference = SavedataManager._prefix_user_folder_reference(relative)
+                if known_reference is None:
+                    logger.warning(f"Cannot translate non user Wine prefix savedata location to Windows: {rel_path}")
+                    return None
+                return SavedataManager._resolve_portable_path(game_data, known_reference)
+
+            prefix_info = PrefixManager.get_prefix_info(game_data.get("prefix", ""))
+            if not prefix_info or not prefix_info.get("path"):
+                logger.error("_resolve_portable_location: no prefix set for game")
+                return None
+
+            prefix_path = Path(os.path.abspath(prefix_info["path"]))
+            remapped = SavedataManager._remap_user_segment(relative, prefix_path)
+            return prefix_path / remapped
 
         return None
 
