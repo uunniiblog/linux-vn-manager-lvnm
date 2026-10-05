@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class GameTab(QWidget):
     SETTINGS_FILE = config.UI_SETTINGS
+    LABEL_ORDER_SETTINGS_KEY = "GameTab/LabelOrder"
 
     def __init__(self):
         super().__init__()
@@ -208,15 +209,15 @@ class GameTab(QWidget):
                 # Game has no label, or a label that was deleted from settings
                 groups[""].append(card)
 
-        # Sort labels alphabetically, move uncategorized at the end
-        sorted_labels = sorted([l for l in groups.keys() if l != ""], key=str.lower)
-        final_label_order = sorted_labels + [""]
+        # Custom labels use their persisted UI order. Uncategorized is always last.
+        ordered_labels = self._get_ordered_labels(saved_labels)
+        final_label_order = ordered_labels + [""]
 
         # Process each group
         sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
         log_mgr = LogManager()
 
-        for lbl in final_label_order:
+        for label_index, lbl in enumerate(final_label_order):
             if lbl not in groups: continue
 
             if show_headers:
@@ -229,13 +230,20 @@ class GameTab(QWidget):
                 # Load if it was expanded
                 is_expanded = self.user_settings.get(f"section_expanded_{lbl}", True)
 
-                header_widget = SectionHeader(lbl, is_expanded=is_expanded, zoom_factor=self.zoom)
+                header_widget = SectionHeader(
+                    lbl,
+                    is_expanded=is_expanded,
+                    zoom_factor=self.zoom,
+                    can_move_up=bool(lbl) and label_index > 0,
+                    can_move_down=bool(lbl) and label_index < len(ordered_labels) - 1,
+                )
                 header_item.setSizeHint(header_widget.sizeHint())
                 header_item.setFlags(Qt.NoItemFlags)
                 
                 # Connect Header Signals
                 header_widget.toggled.connect(lambda state, l=lbl: self.toggle_section(l, state))
                 header_widget.deleteRequested.connect(self.delete_label_globally)
+                header_widget.moveRequested.connect(self.move_label)
                 
                 self.game_list.addItem(header_item)
                 self.game_list.setItemWidget(header_item, header_widget)
@@ -282,6 +290,48 @@ class GameTab(QWidget):
                     if not is_expanded:
                         item.setHidden(True)
 
+    def _get_ordered_labels(self, saved_labels):
+        """Return saved labels in their persisted UI order, adding new labels at the end."""
+        stored_order = self.settings.value(self.LABEL_ORDER_SETTINGS_KEY, [])
+        if isinstance(stored_order, str):
+            stored_order = [stored_order] if stored_order else []
+        else:
+            stored_order = list(stored_order or [])
+
+        # Preserve the old alphabetical behavior until labels are ordered.
+        unique_labels = list(dict.fromkeys(saved_labels))
+        ordered_labels = [label for label in stored_order if label in unique_labels]
+        missing_labels = sorted(
+            (label for label in unique_labels if label not in ordered_labels),
+            key=str.lower,
+        )
+        ordered_labels.extend(missing_labels)
+
+        if ordered_labels != stored_order:
+            self.settings.setValue(self.LABEL_ORDER_SETTINGS_KEY, ordered_labels)
+
+        return ordered_labels
+
+    def move_label(self, label_name, offset):
+        """Move a custom label one position and persist the new order in QSettings."""
+        saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+        ordered_labels = self._get_ordered_labels(saved_labels)
+
+        if label_name not in ordered_labels:
+            return
+
+        current_index = ordered_labels.index(label_name)
+        new_index = current_index + offset
+        if new_index < 0 or new_index >= len(ordered_labels):
+            return
+
+        ordered_labels[current_index], ordered_labels[new_index] = (
+            ordered_labels[new_index],
+            ordered_labels[current_index],
+        )
+        self.settings.setValue(self.LABEL_ORDER_SETTINGS_KEY, ordered_labels)
+        self.refresh_list()
+
     def toggle_section(self, label_name, expanded):
         """Hides or shows all QListWidgetItems associated with a label."""
         # Save state
@@ -298,6 +348,9 @@ class GameTab(QWidget):
         if label_name in saved_labels:
             saved_labels.remove(label_name)
             self.user_settings.set(config.USER_CONF_SAVED_LABELS, saved_labels)
+
+        # Drop the deleted label from the persisted UI.
+        self._get_ordered_labels(saved_labels)
 
         # Remove section state from userconfig
         expansion_key = f"section_expanded_{label_name}"
@@ -487,12 +540,17 @@ class SectionHeader(QWidget):
     toggled = Signal(bool)
     # Emits the label name to be deleted
     deleteRequested = Signal(str)
+    # Emits the label name and direction (-1 for up, 1 for down)
+    moveRequested = Signal(str, int)
 
-    def __init__(self, title, is_expanded=True, zoom_factor=1.0, parent=None):
+    def __init__(self, title, is_expanded=True, zoom_factor=1.0, parent=None,
+                 can_move_up=False, can_move_down=False):
         super().__init__(parent)
         self.label_name = title
         self.expanded = is_expanded
         self.zoom = zoom_factor
+        self.can_move_up = can_move_up
+        self.can_move_down = can_move_down
 
         # Allow the widget to receive mouse events
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -538,15 +596,24 @@ class SectionHeader(QWidget):
         self.toggled.emit(self.expanded)
 
     def contextMenuEvent(self, event):
-        """Right-click to delete the section"""
+        """Show actions for reordering or deleting a label section."""
         if not self.label_name: # Don't allow deleting the 'Uncategorized' label itself
             return
 
         menu = QMenu(self)
+        move_up_action = menu.addAction(self.tr("Move Up"))
+        move_up_action.setEnabled(self.can_move_up)
+        move_down_action = menu.addAction(self.tr("Move Down"))
+        move_down_action.setEnabled(self.can_move_down)
+        menu.addSeparator()
         delete_action = menu.addAction(self.tr("Delete Label: {}").format(self.label_name))
         
         action = menu.exec(event.globalPos())
-        if action == delete_action:
+        if action == move_up_action:
+            self.moveRequested.emit(self.label_name, -1)
+        elif action == move_down_action:
+            self.moveRequested.emit(self.label_name, 1)
+        elif action == delete_action:
             self.deleteRequested.emit(self.label_name)
 
     def mousePressEvent(self, event):
