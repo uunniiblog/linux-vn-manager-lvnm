@@ -16,6 +16,11 @@ DXVK_DIR = DATA_DIR / "runners" / "dxvk"
 PREFIXES_DIR = DATA_DIR / "prefixes"
 COVERS_DIR = DATA_DIR / "covers"
 LOG_DIR = DATA_DIR / "tracking"
+PC98_DIR = DATA_DIR / "emulation" / "pc98"
+PC98_SYSTEM_DIR = PC98_DIR / "system"
+PC98_BUNDLED_RETROARCH = Path("/app/libexec/lvnm-pc98/retroarch")
+PC98_BUNDLED_CORE = Path("/app/lib/lvnm/libretro/np2kai_libretro.so")
+PC98_BUNDLED_FONT = Path("/app/share/lvnm/pc98/font.bmp")
 
 # Files
 CODEC_SCRIPT = BASE_DIR / "vn_winestuff" / "codec.sh"
@@ -226,6 +231,11 @@ USER_CONF_EMULATION_PSP_PATH = "psp_path"
 USER_CONF_EMULATION_PSP_CONFIG = "psp_config"
 USER_CONF_EMULATION_SWITCH_PATH = "switch_path"
 USER_CONF_EMULATION_SWITCH_CONFIG = "switch_config"
+USER_CONF_EMULATION_PC98_USE_BUNDLED = "pc98_use_bundled"
+USER_CONF_EMULATION_PC98_PATH = "pc98_path"
+USER_CONF_EMULATION_PC98_CORE_PATH = "pc98_core_path"
+USER_CONF_EMULATION_PC98_SYSTEM_PATH = "pc98_system_path"
+USER_CONF_EMULATION_PC98_CONFIG = "pc98_config"
 
 # Emulation
 EMULATION_PSX = "emulation-psx"
@@ -233,6 +243,7 @@ EMULATION_PS2 = "emulation-ps2"
 EMULATION_PS3 = "emulation-ps3"
 EMULATION_PSP = "emulation-psp"
 EMULATION_SWITCH = "emulation-switch"
+EMULATION_PC98 = "emulation-pc98"
 
 # Native games
 NATIVE_PREFIX_NAME = "Native"

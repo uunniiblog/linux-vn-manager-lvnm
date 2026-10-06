@@ -692,6 +692,71 @@ class SettingsTab(QWidget):
             self.emulation_widgets[path_key] = path_edit
             self.emulation_widgets[cli_key] = config_edit
 
+        emulation_layout.addRow(QLabel(f"<b>{self.tr('PC-98 (NP2kai)')}</b>"))
+        pc98_note = QLabel(self.tr(
+            "The flatpak build includes a small RetroArch frontend, NP2kai core, and a freely distributable japanese font. "
+            "For the better compatatibility include your own bios and font files in the configured folder below. Multi disk games can use an UTF-8 .m3u playlist. "
+            "Press F12 for NP2kai's menu. Press F1 for retroarch menu."
+        ))
+        pc98_note.setWordWrap(True)
+        pc98_note.setStyleSheet("color: #888; font-style: italic;")
+        emulation_layout.addRow(pc98_note)
+
+        is_flatpak = SystemUtils.get_runtime_type() == "flatpak"
+        use_bundled = QCheckBox(self.tr("Use the flatpak bundled RetroArch and NP2kai core"))
+        use_bundled.setChecked(is_flatpak and emulation_settings.get(config.USER_CONF_EMULATION_PC98_USE_BUNDLED, False))
+        use_bundled.setEnabled(is_flatpak)
+        emulation_layout.addRow(use_bundled)
+
+        pc98_path_row = QHBoxLayout()
+        pc98_path_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_PATH, ""))
+        pc98_path_edit.setPlaceholderText(self.tr("/path/to/retroarch or retroarch"))
+        pc98_path_btn = QPushButton(self.tr("Browse..."))
+        pc98_path_row.addWidget(pc98_path_edit)
+        pc98_path_row.addWidget(pc98_path_btn)
+        pc98_path_label = QLabel(self.tr("Custom RetroArch:"))
+        emulation_layout.addRow(pc98_path_label, pc98_path_row)
+
+        pc98_core_row = QHBoxLayout()
+        pc98_core_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_CORE_PATH, ""))
+        pc98_core_edit.setPlaceholderText(self.tr("/path/to/np2kai_libretro.so"))
+        pc98_core_btn = QPushButton(self.tr("Browse..."))
+        pc98_core_row.addWidget(pc98_core_edit)
+        pc98_core_row.addWidget(pc98_core_btn)
+        pc98_core_label = QLabel(self.tr("Custom NP2kai core:"))
+        emulation_layout.addRow(pc98_core_label, pc98_core_row)
+
+        default_system_path = str(config.PC98_SYSTEM_DIR / "np2kai")
+        pc98_system_row = QHBoxLayout()
+        pc98_system_path = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, default_system_path))
+        pc98_system_btn = QPushButton(self.tr("Browse..."))
+        pc98_system_row.addWidget(pc98_system_path)
+        pc98_system_row.addWidget(pc98_system_btn)
+        emulation_layout.addRow(QLabel(self.tr("BIOS/font system folder:")), pc98_system_row)
+
+        pc98_config_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_CONFIG, ""))
+        pc98_config_edit.setPlaceholderText(self.tr("Optional extra RetroArch arguments"))
+        emulation_layout.addRow(QLabel(self.tr("Extra arguments:")), pc98_config_edit)
+
+        def update_pc98_custom_state(checked):
+            for widget in (pc98_path_label, pc98_path_edit, pc98_path_btn, pc98_core_label, pc98_core_edit, pc98_core_btn):
+                widget.setEnabled(not checked)
+
+        update_pc98_custom_state(use_bundled.isChecked())
+        use_bundled.toggled.connect(update_pc98_custom_state)
+        use_bundled.toggled.connect(lambda checked: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_USE_BUNDLED, checked))
+        pc98_path_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_path_edit))
+        pc98_core_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_core_edit))
+        pc98_system_btn.clicked.connect(lambda: self.browse_pc98_system_folder(pc98_system_path))
+        pc98_path_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_PATH, text))
+        pc98_core_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_CORE_PATH, text))
+        pc98_system_path.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, text))
+        pc98_config_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_CONFIG, text))
+        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_PATH] = pc98_path_edit
+        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_CORE_PATH] = pc98_core_edit
+        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_SYSTEM_PATH] = pc98_system_path
+        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_CONFIG] = pc98_config_edit
+
         return emulation_group
 
     def _build_directories_group(self):
@@ -1092,6 +1157,12 @@ class SettingsTab(QWidget):
         )
         if file_path:
             target_edit.setText(file_path)
+
+    def browse_pc98_system_folder(self, target_edit):
+        current_path = target_edit.text().strip()
+        folder = QFileDialog.getExistingDirectory(self, self.tr("Select PC-98 BIOS/font Folder"), current_path)
+        if folder:
+            target_edit.setText(folder)
 
     def _start_background_checks(self):
         self._system_info_worker = SystemInfoWorker()

@@ -18,6 +18,15 @@ class RtUpscaler:
     parameters: str = ""
 
 @dataclass
+class Pc98Settings:
+    model: str = ""
+    base_clock: str = ""
+    cpu_multiplier: str = ""
+    ram_size: str = ""
+    sound_board: str = ""
+    gdc: str = ""
+
+@dataclass
 class SavedataFolder:
     path: str = ""
     excluded: list[str] = field(default_factory=list)
@@ -89,6 +98,7 @@ class GameCard:
     dlloverride: Dict[str, str] = field(default_factory=dict)
     gamescope: GameScope = field(default_factory=GameScope)
     rtUpscaler: RtUpscaler = field(default_factory=RtUpscaler)
+    pc98: Pc98Settings = field(default_factory=Pc98Settings)
     update_date: str = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
     label: str = ""
     pre_launch_args: str = ""
@@ -112,6 +122,9 @@ class GameCard:
         upsaler_data = temp_data.pop("rtUpscaler", {})
         upscaler = RtUpscaler(**upsaler_data)
 
+        pc98_data = temp_data.pop("pc98", {})
+        pc98 = Pc98Settings(**{key: value for key, value in pc98_data.items() if key in {item.name for item in fields(Pc98Settings)}})
+
         legacy_savedata_path = str(temp_data.get("savedata_path", ""))
         savedata = SavedataConfig.from_dict(temp_data.pop("savedata", None), legacy_savedata_path)
         
@@ -125,7 +138,7 @@ class GameCard:
         valid_fields = {f.name for f in fields(cls)}
         temp_data = {k: v for k, v in temp_data.items() if k in valid_fields}
                 
-        card = cls(name=name, gamescope=gs, rtUpscaler=upscaler, savedata=savedata, **temp_data)
+        card = cls(name=name, gamescope=gs, rtUpscaler=upscaler, pc98=pc98, savedata=savedata, **temp_data)
         card.savedata_path = savedata.primary_path() or legacy_savedata_path
         return card
 

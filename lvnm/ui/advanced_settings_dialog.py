@@ -97,6 +97,35 @@ class AdvancedSettingsDialog(QDialog):
         self.edit_arguments = QLineEdit(getattr(self.current_game, "arguments", ""))
         form.addRow(self.tr("Game Arguments:"), self.edit_arguments)
 
+        self.pc98_combos = {}
+        if prefix_type == config.EMULATION_PC98:
+            pc98_group = QGroupBox(self.tr("PC-98 compatibility overrides"))
+            pc98_layout = QFormLayout(pc98_group)
+            pc98_definitions = [
+                ("model", self.tr("Machine model:"), ["PC-9801VX", "PC-286", "PC-9801VM"]),
+                ("base_clock", self.tr("CPU base clock:"), ["2.4576 MHz", "1.9968 MHz"]),
+                ("cpu_multiplier", self.tr("CPU clock multiplier:"), ["4", "5", "6", "8", "10", "12", "16", "20", "24", "30", "36", "40", "42"]),
+                ("ram_size", self.tr("RAM size (MB):"), ["1", "3", "7", "11", "13", "16", "32", "64", "120", "230"]),
+                ("sound_board", self.tr("Sound board:"), ["PC9801-86", "PC9801-26K + 86", "PC9801-26K", "None"]),
+                ("gdc", self.tr("GDC:"), ["uPD7220", "uPD72020"]),
+            ]
+            for field_name, label, values in pc98_definitions:
+                combo = QComboBox()
+                combo.addItem(self.tr("Core default"), "")
+                for value in values:
+                    combo.addItem(value, value)
+                current_value = getattr(self.current_game.pc98, field_name, "")
+                current_index = combo.findData(current_value)
+                combo.setCurrentIndex(max(current_index, 0))
+                pc98_layout.addRow(label, combo)
+                self.pc98_combos[field_name] = combo
+            pc98_note = QLabel(self.tr(
+                "Leave these at Core default unless a game needs a specific PC-98 model, clock, memory, sound board, or graphics controller."
+            ))
+            pc98_note.setWordWrap(True)
+            pc98_layout.addRow(pc98_note)
+            self.scroll_layout.addWidget(pc98_group)
+
         # Pre-launch Script
         self.edit_pre_script = QLineEdit(getattr(self.current_game, "pre_launch_script", ""))
         self.btn_pre_script = QPushButton("...")
@@ -418,6 +447,8 @@ class AdvancedSettingsDialog(QDialog):
         if self.platform.supports(Feature.NETWORK_ISOLATION):
             self.current_game.disable_network = self.chk_disable_network.isChecked()
         self.current_game.arguments = self.edit_arguments.text()
+        for field_name, combo in self.pc98_combos.items():
+            setattr(self.current_game.pc98, field_name, combo.currentData())
         self.current_game.pre_launch_script = self.edit_pre_script.text()
         self.current_game.pre_launch_script_wait = self.chk_pre_script_wait.isChecked()
         self.current_game.exit_script = self.edit_exit_script.text()

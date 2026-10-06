@@ -1,0 +1,12 @@
+diff --git a/pccore.c b/pccore.c
+--- a/pccore.c
++++ b/pccore.c
+@@ -218,8 +218,6 @@ NP2CFG np2cfg = {
+ 				100,
+ 				OEMTEXT(""),
+ 				0,
+-				0,
+-				0,
+ #if defined(SUPPORT_DEBUGSS)
+ 				0,
+ #endif

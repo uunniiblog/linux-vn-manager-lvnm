@@ -84,6 +84,90 @@ cleanup-commands:
   - mkdir -p /app/lib/extensions/vulkan/MangoHud
 
 modules:
+  # Deliberately omit RetroArch's asset, database, shader, overlay and online updater packages. LVNM only needs the frontend binary for the NP2kai core.
+  - name: retroarch-pc98
+    config-opts:
+      - --disable-qt
+      - --disable-ffmpeg
+      - --disable-v4l2
+      - --disable-jack
+      - --disable-sdl
+      - --disable-sdl2
+      - --disable-vulkan
+      - --disable-dbus
+      - --disable-libretrodb
+      - --disable-video_filter
+      - --disable-dsp_filter
+      - --disable-xdelta
+      - --disable-networking
+      - --disable-networkgamepad
+      - --disable-overlay
+      - --disable-runahead
+      - --disable-online_updater
+      - --disable-update_cores
+      - --disable-update_core_info
+      - --disable-update_assets
+      - --disable-cheevos
+      - --disable-cheevos_rvz
+      - --disable-discord
+      - --disable-translate
+      - --disable-accessibility
+      - --disable-imageviewer
+      - --disable-screenshots
+      - --disable-rewind
+      - --disable-bsv_movie
+      - --enable-rgui
+      - --disable-materialui
+      - --disable-xmb
+      - --disable-ozone
+      - --disable-gfx_widgets
+    make-args:
+      - HAVE_UPDATE_ASSETS=0
+      - HAVE_UPDATE_CORE_INFO=0
+    post-install:
+      - install -d /app/libexec/lvnm-pc98 /app/share/licenses/retroarch-pc98
+      - mv /app/bin/retroarch /app/libexec/lvnm-pc98/retroarch
+      - install -Dm644 COPYING /app/share/licenses/retroarch-pc98/COPYING
+    cleanup:
+      - /bin/retroarch-cg2glsl
+      - /share/applications
+      - /share/doc
+      - /share/icons
+      - /share/man
+      - /share/pixmaps
+      - /share/retroarch
+    sources:
+      - type: git
+        url: https://github.com/libretro/RetroArch.git
+        commit: 69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576
+
+  - name: np2kai-libretro
+    buildsystem: simple
+    build-commands:
+      - make -C sdl -f Makefile.libretro platform=unix SUPPORT_NET=0 NP2KAI_VERSION=2026-08-23 NP2KAI_HASH=253ef65
+      - install -Dm755 sdl/np2kai_libretro.so /app/lib/lvnm/libretro/np2kai_libretro.so
+      - install -Dm644 LICENSE /app/share/licenses/np2kai/LICENSE
+    sources:
+      - type: git
+        url: https://github.com/AZO234/NP2kai.git
+        commit: 253ef651c9d5d8f6d11f9cc7326b4f05ce5c9ce4
+        disable-submodules: true
+      - type: patch
+        path: np2kai-config-initializer.patch
+        options:
+          - --binary
+
+  # font.bmp is generated from the freely distributable Shinonome font by the WebNP2 project.
+  - name: np2kai-free-font
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 public/core/font.bmp /app/share/lvnm/pc98/font.bmp
+      - install -Dm644 public/core/LICENSE.NP2kai /app/share/licenses/np2kai-font/LICENSE.NP2kai
+    sources:
+      - type: git
+        url: https://github.com/uraraworks/WebNP2.git
+        commit: b23b8b7af3b130799e5ebd6478faab9b99e7aaaf
+
   - name: swayidle
     buildsystem: meson
     config-opts:
