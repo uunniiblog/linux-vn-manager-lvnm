@@ -14,14 +14,17 @@ def create_launcher(name: str, card_override: GameCard = None, is_steam: bool = 
     if not game:
         raise ValueError(f"Game '{name}' not found in registry.")
 
-    if IS_WINDOWS:
-        from launchers.launcher_windows import LauncherWindows
-        return LauncherWindows(name, card_override)
-
     prefix_info = PrefixManager.resolve_prefix_info(game.prefix)
+    if not prefix_info:
+        raise ValueError(f"Prefix for '{game.name}' not found.")
 
     logger.debug(f"prefix_info {prefix_info}")
-    runner_type = prefix_info.get("type", "wine")
+    runner_type = prefix_info.get("type", config.WINDOWS if IS_WINDOWS else "wine")
+
+    if runner_type == config.WINDOWS:
+        from launchers.launcher_windows import LauncherWindows
+        logger.debug(f"create_launcher: '{name}' -> LauncherWindows")
+        return LauncherWindows(name, card_override)
 
     if runner_type == config.NATIVE:
         from launchers.launcher_native_game import LauncherNativeGame

@@ -1,6 +1,7 @@
 import logging
 
 import config
+from pc98_manager import Pc98Manager
 from settings_manager import SettingsManager
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,9 @@ class EmulationManager:
         use_bundled = emulation_settings.get(config.USER_CONF_EMULATION_PC98_USE_BUNDLED, False)
         custom_path = emulation_settings.get(config.USER_CONF_EMULATION_PC98_PATH, "").strip()
         custom_core = emulation_settings.get(config.USER_CONF_EMULATION_PC98_CORE_PATH, "").strip()
-        system_path = emulation_settings.get(config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, str(config.PC98_SYSTEM_DIR / "np2kai")).strip()
-        if use_bundled and config.PC98_BUNDLED_RETROARCH.is_file() and config.PC98_BUNDLED_CORE.is_file():
+        default_system_path = Pc98Manager.get_managed_system_path_default()
+        system_path = emulation_settings.get(config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, default_system_path).strip()
+        if use_bundled and system_path and config.PC98_BUNDLED_RETROARCH.is_file() and config.PC98_BUNDLED_CORE.is_file():
             virtual_prefixes[PC98_DISPLAY_NAME] = {
                 "type": config.EMULATION_PC98,
                 "path": str(config.PC98_BUNDLED_RETROARCH),
@@ -53,7 +55,7 @@ class EmulationManager:
                 "bundled": True,
                 "virtual": True,
             }
-        elif custom_path and custom_core:
+        elif custom_path and custom_core and system_path:
             virtual_prefixes[PC98_DISPLAY_NAME] = {
                 "type": config.EMULATION_PC98,
                 "path": custom_path,

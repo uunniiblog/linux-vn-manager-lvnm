@@ -19,10 +19,11 @@ import logging
 from settings_manager import SettingsManager
 from game_manager import GameManager
 from logging_manager import setup_logging
+from pc98_manager import Pc98Manager
 from prefix_manager import PrefixManager
 from game_process_manager import GameProcessManager
 from gdrive_manager import GdriveManager, GdriveDeviceFlowWorker
-from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
+from platform_profile import CURRENT_PLATFORM, IS_WINDOWS, Feature, PlatformProfile
 from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class SettingsTab(QWidget):
         self.texthooking_group = self._build_texthooking_group()
         self.platform_ui.add_widget(main_layout, self.texthooking_group, requires=Feature.WINE_CONFIGURATION)
         self.emulation_group = self._build_emulation_group()
-        self.platform_ui.add_widget(main_layout, self.emulation_group, requires=Feature.WINE_CONFIGURATION)
+        self.platform_ui.add_widget(main_layout, self.emulation_group, requires=Feature.EMULATION)
         main_layout.addWidget(self._build_directories_group())
         main_layout.addWidget(self._build_sysinfo_group())
         main_layout.addWidget(self._build_about_group())
@@ -623,36 +624,51 @@ class SettingsTab(QWidget):
         # Retrieve current settings
         emulation_settings = self.user_settings.get(config.USER_CONF_EMULATION, {})
 
+        linux_path_placeholders = [
+            self.tr("/path/to/duckstation.AppImage or duckstation-qt"),
+            self.tr("/path/to/pcsx2.AppImage or pcsx2-qt"),
+            self.tr("/path/to/rpcs3.AppImage or rpcs3"),
+            self.tr("/path/to/emulator.AppImage or process"),
+            self.tr("/path/to/emulator.AppImage or process"),
+        ]
+        windows_path_placeholders = [
+            self.tr("C:\\path\\to\\duckstation-qt.exe"),
+            self.tr("C:\\path\\to\\pcsx2-qt.exe"),
+            self.tr("C:\\path\\to\\rpcs3.exe"),
+            self.tr("C:\\path\\to\\emulator.exe"),
+            self.tr("C:\\path\\to\\emulator.exe"),
+        ]
+        path_placeholders = windows_path_placeholders if IS_WINDOWS else linux_path_placeholders
         emulator_definitions = [
             (
                 self.tr("PSX"),
                 config.USER_CONF_EMULATION_PSX_PATH,
                 config.USER_CONF_EMULATION_PSX_CONFIG,
-                self.tr("/path/to/duckstation.AppImage or duckstation-qt"),
+                path_placeholders[0],
             ),
             (
                 self.tr("PS2"),
                 config.USER_CONF_EMULATION_PS2_PATH,
                 config.USER_CONF_EMULATION_PS2_CONFIG,
-                self.tr("/path/to/pcsx2.AppImage or pcsx2-qt"),
+                path_placeholders[1],
             ),
             (
                 self.tr("PS3"),
                 config.USER_CONF_EMULATION_PS3_PATH,
                 config.USER_CONF_EMULATION_PS3_CONFIG,
-                self.tr("/path/to/rpcs3.AppImage or rpcs3"),
+                path_placeholders[2],
             ),
             (
                 self.tr("PSP"),
                 config.USER_CONF_EMULATION_PSP_PATH,
                 config.USER_CONF_EMULATION_PSP_CONFIG,
-                self.tr("/path/to/emulator.AppImage or process"),
+                path_placeholders[3],
             ),
             (
                 self.tr("Switch"),
                 config.USER_CONF_EMULATION_SWITCH_PATH,
                 config.USER_CONF_EMULATION_SWITCH_CONFIG,
-                self.tr("/path/to/emulator.AppImage or process"),
+                path_placeholders[4],
             ),
         ]
 
@@ -710,7 +726,7 @@ class SettingsTab(QWidget):
 
         pc98_path_row = QHBoxLayout()
         pc98_path_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_PATH, ""))
-        pc98_path_edit.setPlaceholderText(self.tr("/path/to/retroarch or retroarch"))
+        pc98_path_edit.setPlaceholderText(self.tr("C:\\path\\to\\retroarch.exe") if IS_WINDOWS else self.tr("/path/to/retroarch or retroarch"))
         pc98_path_btn = QPushButton(self.tr("Browse..."))
         pc98_path_row.addWidget(pc98_path_edit)
         pc98_path_row.addWidget(pc98_path_btn)
@@ -719,16 +735,17 @@ class SettingsTab(QWidget):
 
         pc98_core_row = QHBoxLayout()
         pc98_core_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_CORE_PATH, ""))
-        pc98_core_edit.setPlaceholderText(self.tr("/path/to/np2kai_libretro.so"))
+        pc98_core_edit.setPlaceholderText(self.tr("C:\\path\\to\\np2kai_libretro.dll") if IS_WINDOWS else self.tr("/path/to/np2kai_libretro.so"))
         pc98_core_btn = QPushButton(self.tr("Browse..."))
         pc98_core_row.addWidget(pc98_core_edit)
         pc98_core_row.addWidget(pc98_core_btn)
         pc98_core_label = QLabel(self.tr("Custom NP2kai core:"))
         emulation_layout.addRow(pc98_core_label, pc98_core_row)
 
-        default_system_path = str(config.PC98_SYSTEM_DIR / "np2kai")
+        default_system_path = Pc98Manager.get_managed_system_path_default()
         pc98_system_row = QHBoxLayout()
         pc98_system_path = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, default_system_path))
+        pc98_system_path.setPlaceholderText(self.tr("Select the folder containing NP2kai BIOS/font files"))
         pc98_system_btn = QPushButton(self.tr("Browse..."))
         pc98_system_row.addWidget(pc98_system_path)
         pc98_system_row.addWidget(pc98_system_btn)
@@ -746,7 +763,7 @@ class SettingsTab(QWidget):
         use_bundled.toggled.connect(update_pc98_custom_state)
         use_bundled.toggled.connect(lambda checked: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_USE_BUNDLED, checked))
         pc98_path_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_path_edit))
-        pc98_core_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_core_edit))
+        pc98_core_btn.clicked.connect(lambda: self.browse_pc98_core_path(pc98_core_edit))
         pc98_system_btn.clicked.connect(lambda: self.browse_pc98_system_folder(pc98_system_path))
         pc98_path_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_PATH, text))
         pc98_core_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_CORE_PATH, text))
@@ -1149,12 +1166,19 @@ class SettingsTab(QWidget):
             self.texthooker_edit.setText(file_path)
 
     def browse_emulator_path(self, target_edit):
+        name_filter = self.tr("Executables (*.exe);;All Files (*)") if IS_WINDOWS else self.tr("Executables (*.AppImage);;All Files (*)")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             self.tr("Select Emulator Executable"),
             "",
-            self.tr("Executables (*.AppImage);;All Files (*)")
+            name_filter
         )
+        if file_path:
+            target_edit.setText(file_path)
+
+    def browse_pc98_core_path(self, target_edit):
+        name_filter = self.tr("Libretro cores (*.dll);;All Files (*)") if IS_WINDOWS else self.tr("Libretro cores (*.so);;All Files (*)")
+        file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select NP2kai Core"), "", name_filter)
         if file_path:
             target_edit.setText(file_path)
 

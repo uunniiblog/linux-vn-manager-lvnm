@@ -618,7 +618,8 @@ class PrefixManager:
                 config.WINDOWS_PREFIX_NAME: {
                     "type": config.WINDOWS,
                     "virtual": True,
-                }
+                },
+                **EmulationManager.get_virtual_prefixes(),
             }
 
         reversed_prefixes = dict(reversed(list(PrefixManager.get_prefix_json().items())))

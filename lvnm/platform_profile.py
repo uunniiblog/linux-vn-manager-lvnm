@@ -7,6 +7,7 @@ from pathlib import Path
 
 class Feature(Enum):
     ADVANCED_SETTINGS = auto()
+    EMULATION = auto()
     PREFIXES = auto()
     RUNNERS = auto()
     WINE_CONFIGURATION = auto()
@@ -32,6 +33,7 @@ IS_WINDOWS = sys.platform == "win32"
 
 _COMMON_FEATURES = frozenset({
     Feature.ADVANCED_SETTINGS,
+    Feature.EMULATION,
     Feature.DESKTOP_SHORTCUTS,
     Feature.TIMETRACKING,
     Feature.SAVEDATA,

@@ -39,6 +39,19 @@ class Pc98Manager:
         return config.PC98_BUNDLED_RETROARCH.is_file() and config.PC98_BUNDLED_CORE.is_file()
 
     @staticmethod
+    def get_managed_system_path_default() -> str:
+        """Use LVNM's managed folder only when Flatpak or it already contains files."""
+        managed_path = config.PC98_SYSTEM_DIR / "np2kai"
+        if Pc98Manager.bundled_backend_available() and config.PC98_BUNDLED_FONT.is_file():
+            return str(managed_path)
+        try:
+            if managed_path.is_dir() and any(managed_path.iterdir()):
+                return str(managed_path)
+        except OSError:
+            pass
+        return ""
+
+    @staticmethod
     def resolve_game_media(game) -> str:
         """Return the selected media or an automatically generated NP2kai command file."""
         selected = Path(game.path).expanduser()
@@ -188,7 +201,10 @@ class Pc98Manager:
     @staticmethod
     def build_launch_args(game, core_path: str, system_path: str | None = None) -> list[str]:
         config.PC98_DIR.mkdir(parents=True, exist_ok=True)
-        np2kai_system_dir = Path(system_path).expanduser() if system_path else config.PC98_SYSTEM_DIR / "np2kai"
+        if not system_path:
+            raise ValueError("Select a PC-98 BIOS/font system folder in Emulation settings before launching the game.")
+            
+        np2kai_system_dir = Path(system_path).expanduser()
         if not np2kai_system_dir.is_absolute():
             np2kai_system_dir = Path.cwd() / np2kai_system_dir
         np2kai_system_dir.mkdir(parents=True, exist_ok=True)

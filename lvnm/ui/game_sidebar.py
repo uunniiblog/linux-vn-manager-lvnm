@@ -202,6 +202,7 @@ class GameSidebar(QFrame):
         add_icon = QIcon.fromTheme("list-add")
         self.btn_add_prefix.setIcon(add_icon)
         self.btn_add_prefix.setFixedSize(43, 32)
+        self.btn_add_prefix.setVisible(self.platform.supports(Feature.PREFIXES))
         self.btn_add_prefix.clicked.connect(self.open_create_prefix_dialog)
 
         # Create a horizontal layout to hold both the combo box and the button
@@ -243,8 +244,8 @@ class GameSidebar(QFrame):
 
         self.platform_ui.add_row(self.gen_form, self.tr("Name:"), self.name_edit_stack)
         self.platform_ui.add_row(self.gen_form, self.tr("Path:"), path_row)
-        self.platform_ui.add_row(self.gen_form, self.tr("Prefix:"), prefix_row, requires=Feature.PREFIXES)
-        self.platform_ui.add_row(self.gen_form, "", self.prefix_warning, requires=Feature.PREFIXES)
+        self.platform_ui.add_row(self.gen_form, self.tr("Prefix:"), prefix_row, requires=Feature.EMULATION)
+        self.platform_ui.add_row(self.gen_form, "", self.prefix_warning, requires=Feature.EMULATION)
         self.platform_ui.add_row(self.gen_form, self.tr("VNDB:"), self.edit_vndb)
         self.platform_ui.add_row(self.gen_form, self.tr("Savedata:"), self.savedata_row)
         self.platform_ui.add_row(self.gen_form, "", self.gdrive_sync_checkbox)
@@ -816,7 +817,8 @@ class GameSidebar(QFrame):
         # Gather ALL data from UI into the card object
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
-        self.current_game.prefix = config.WINDOWS_PREFIX_NAME if IS_WINDOWS else self.combo_prefix.currentText()
+        selected_prefix = self.combo_prefix.currentText()
+        self.current_game.prefix = selected_prefix or (config.WINDOWS_PREFIX_NAME if IS_WINDOWS else "")
         self.current_game.vndb = self.edit_vndb.text().strip()
         self.current_game.gdrive = self.gdrive_sync_checkbox.isChecked()
 
