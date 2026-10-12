@@ -4,6 +4,7 @@ Notable changes for each release are listed below, newest first.
 
 ## [v0.6.1]
 - Added new option in settings to automatically increase the DPI temporaly when running wine utilities like regedit or winecfg in >1080p monitors for better visibility.
+- Fix monitor's detection in flatpak, should work good for KDE, needs testing in other DE.
 
 ## [v0.6.0]
 - Flatpak release:

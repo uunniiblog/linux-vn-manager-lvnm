@@ -183,9 +183,33 @@ class LauncherWineGame(LauncherBaseGame):
             raise RuntimeError(f"Run in prefix failed: {e}")
 
     def _utility_registry_command(self, *args):
-        return [self.umu_path, "reg", *args] if self.is_proton else [self.env["WINE"], "reg", *args]
+        if self.is_proton:
+            reg_exe = Path(self.prefix_info["path"]) / "drive_c" / "windows" / "system32" / "reg.exe"
+            return [self.umu_path, str(reg_exe), *args]
+        return [self.env["WINE"], "reg", *args]
 
     def _query_utility_dpi(self):
+        if self.is_proton:
+            drive_c = Path(self.prefix_info["path"]) / "drive_c"
+            with tempfile.TemporaryDirectory(prefix=".lvnm-dpi-", dir=drive_c) as temp_dir:
+                export_path = Path(temp_dir) / "desktop.reg"
+                windows_path = f"C:\\{Path(temp_dir).name}\\desktop.reg"
+                result = subprocess.run(self._utility_registry_command("export", self._dpi_registry_key, windows_path), env=self.env,
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                if result.returncode or not export_path.exists():
+                    raise RuntimeError("Unable to export the prefix DPI registry key")
+                response = export_path.read_text(encoding="utf-16")
+
+            in_desktop_key = False
+            for line in response.splitlines():
+                if line.startswith("["):
+                    in_desktop_key = line.casefold() == r"[HKEY_CURRENT_USER\Control Panel\Desktop]".casefold()
+                elif in_desktop_key:
+                    match = re.fullmatch(r'"LogPixels"=dword:([0-9a-fA-F]{8})', line)
+                    if match:
+                        return int(match.group(1), 16)
+            return None
+
         with tempfile.TemporaryFile() as output:
             result = subprocess.run(
                 self._utility_registry_command("query", self._dpi_registry_key, "/v", "LogPixels"),
@@ -227,17 +251,21 @@ class LauncherWineGame(LauncherBaseGame):
 
         try:
             original = self._query_utility_dpi()
+        except (OSError, subprocess.TimeoutExpired, RuntimeError, UnicodeError) as error:
+            logger.warning(f"Auto DPI skipped for prefix '{prefix_path}' because its current DPI could not be read: {error}")
+            return None
+
+        try:
             if original == dpi:
                 return None
             self._write_utility_dpi(dpi)
             logger.info(f"Temporarily set prefix '{prefix_path}' DPI to {dpi} for {self.game.path}.")
             return prefix_path, original, dpi
         except Exception:
-            if "original" in locals():
-                try:
-                    self._write_utility_dpi(original)
-                except Exception as error:
-                    logger.error(f"Failed to roll back prefix '{prefix_path}' DPI after setup error: {error}")
+            try:
+                self._write_utility_dpi(original)
+            except Exception as error:
+                logger.error(f"Failed to roll back prefix '{prefix_path}' DPI after setup error: {error}")
             raise
 
     def _restore_utility_dpi(self, prefix_path, original, temporary):
