@@ -85,7 +85,7 @@ cleanup-commands:
 
 modules:
   # Enable SDL2 for controller input and the front binary for the NP2kai core.
-  # RetroArch assets, databases, shaders, overlays and online updaters are omitted.
+  # RetroArch assets, databases, shaders and online updaters are omitted.
   - name: retroarch-pc98
     config-opts:
       - --disable-qt
@@ -102,7 +102,7 @@ modules:
       - --disable-xdelta
       - --disable-networking
       - --disable-networkgamepad
-      - --disable-overlay
+      - --enable-overlay
       - --disable-runahead
       - --disable-online_updater
       - --disable-update_cores
@@ -152,6 +152,17 @@ modules:
       - type: git
         url: https://github.com/libretro/retroarch-joypad-autoconfig.git
         commit: 794a2f18cdb7b5c3565e75c2a663f598e3f90e24
+
+  - name: retroarch-keyboard-overlay
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/lvnm/retroarch/overlays/keyboards
+      - cp -a keyboards/US-101 /app/share/lvnm/retroarch/overlays/keyboards/
+      - install -Dm644 COPYING /app/share/licenses/retroarch-keyboard-overlay/COPYING
+    sources:
+      - type: git
+        url: https://github.com/libretro/common-overlays.git
+        commit: 42c21b998894
 
   - name: np2kai-libretro
     buildsystem: simple

@@ -104,7 +104,8 @@ class LauncherEmulatorGame(LauncherBaseGame):
             return
         try:
             pgid = os.getpgid(self.process.pid)
-            os.killpg(pgid, signal.SIGKILL)
+            emulator_type = getattr(self, "prefix_info", {}).get("type")
+            os.killpg(pgid, signal.SIGTERM if emulator_type == config.EMULATION_PC98 else signal.SIGKILL)
         except ProcessLookupError:
             pass
 

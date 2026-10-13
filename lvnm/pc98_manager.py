@@ -253,27 +253,80 @@ class Pc98Manager:
                     option_lines.append(line)
         options_path.write_text("\n".join(option_lines) + ("\n" if option_lines else ""), encoding="utf-8")
 
-        retroarch_config = profiles_dir / f"{profile_id}.cfg"
-        config_lines = [
-            f'libretro_directory = "{Path(core_path).parent}"',
-            f'libretro_info_path = "{Path(core_path).parent}"',
-            f'system_directory = "{retroarch_system_dir}"',
-            f'savefile_directory = "{saves_dir}"',
-            f'savestate_directory = "{states_dir}"',
-            f'core_options_path = "{options_path}"',
-            'config_save_on_exit = "false"',
-            'input_exit_emulator = "nul"',
-            'menu_driver = "rgui"',
-            'menu_show_core_updater = "false"',
+        default_profile = profiles_dir / "default.cfg"
+        if not default_profile.exists():
+            legacy_profile = profiles_dir / f"{profile_id}.cfg"
+            if legacy_profile.is_file():
+                shutil.copy2(legacy_profile, default_profile)
+
+        profiles = [
+            path for path in profiles_dir.glob("*.cfg")
+            if path.is_file() and path != default_profile and not re.fullmatch(r"[0-9a-f]{16}", path.stem)
         ]
+        retroarch_config = default_profile
+        if default_profile.exists():
+            retroarch_config = max([default_profile, *profiles], key=lambda path: (path.stat().st_mtime_ns, path == default_profile))
+        managed_settings = {
+            "libretro_directory": str(Path(core_path).parent),
+            "libretro_info_path": str(Path(core_path).parent),
+            "system_directory": str(retroarch_system_dir),
+            "core_options_path": str(options_path),
+            "config_save_on_exit": "true",
+            "rgui_config_directory": str(profiles_dir),
+        }
+        defaults = {
+            "savefile_directory": str(saves_dir),
+            "savestate_directory": str(states_dir),
+            "input_exit_emulator": "nul",
+            "menu_driver": "rgui",
+            "menu_show_core_updater": "false",
+        }
         if bundled:
-            config_lines.extend([
-                'input_joypad_driver = "sdl2"',
-                'input_autodetect_enable = "true"',
-                'joypad_autoconfig_dir = "/app/share/lvnm/retroarch/autoconfig"',
-            ])
-        retroarch_config.write_text("\n".join(config_lines) + "\n", encoding="utf-8")
+            bundled_autoconfig = Path("/app/share/lvnm/retroarch/autoconfig")
+            user_autoconfig = config.PC98_DIR / "autoconfig"
+            if bundled_autoconfig.is_dir():
+                shutil.copytree(bundled_autoconfig, user_autoconfig, dirs_exist_ok=True, copy_function=Pc98Manager._copy_missing_autoconfig)
+            else:
+                user_autoconfig.mkdir(parents=True, exist_ok=True)
+            defaults.update({
+                "input_joypad_driver": "sdl2",
+                "input_autodetect_enable": "true",
+                "joypad_autoconfig_dir": str(user_autoconfig),
+                "input_overlay_enable": "true",
+                "input_osk_overlay": "/app/share/lvnm/retroarch/overlays/keyboards/US-101/US-101.cfg",
+                "osk_overlay_directory": "/app/share/lvnm/retroarch/overlays/keyboards",
+                "input_menu_toggle_gamepad_combo": "2",
+            })
+        existing_lines = retroarch_config.read_text(encoding="utf-8").splitlines() if retroarch_config.exists() else []
+        existing_settings = {key.strip(): value.strip().strip('"') for line in existing_lines for key, separator, value in [line.partition("=")] if separator}
+        overlay_marker = profiles_dir / f".{retroarch_config.stem}.keyboard-overlay-v1"
+        first_overlay_launch = bundled and not overlay_marker.exists()
+        initialize_overlay = first_overlay_launch and not existing_settings.get("input_osk_overlay")
+        initialize_keys = set()
+        if initialize_overlay:
+            initialize_keys.update({"input_overlay_enable", "input_osk_overlay"})
+            if existing_settings.get("input_menu_toggle_gamepad_combo", "0") == "0":
+                initialize_keys.add("input_menu_toggle_gamepad_combo")
+        retained_lines = [
+            line for line in existing_lines
+            if line.partition("=")[0].strip() not in managed_settings.keys() | initialize_keys
+            and not (bundled and line.partition("=")[0].strip() == "joypad_autoconfig_dir" and '"/app/share/lvnm/retroarch/autoconfig"' in line)
+        ]
+        existing_keys = {line.partition("=")[0].strip() for line in retained_lines}
+        config_lines = retained_lines + [f'{key} = "{value}"' for key, value in defaults.items() if key not in existing_keys]
+        config_lines.extend(f'{key} = "{value}"' for key, value in managed_settings.items())
+        updated_config = "\n".join(config_lines) + "\n"
+        if not retroarch_config.exists() or retroarch_config.read_text(encoding="utf-8") != updated_config:
+            retroarch_config.write_text(updated_config, encoding="utf-8")
+        if first_overlay_launch:
+            overlay_marker.touch()
         return ["--config", str(retroarch_config), "-L", core_path]
+
+    @staticmethod
+    def _copy_missing_autoconfig(source: str, destination: str) -> str:
+        if not Path(destination).exists():
+            shutil.copy2(source, destination)
+        return destination
 
     @staticmethod
     def _get_retroarch_system_dir(np2kai_system_dir: Path) -> Path:
