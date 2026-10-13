@@ -199,7 +199,7 @@ class Pc98Manager:
         return str(command_path)
 
     @staticmethod
-    def build_launch_args(game, core_path: str, system_path: str | None = None) -> list[str]:
+    def build_launch_args(game, core_path: str, system_path: str | None = None, bundled: bool = False) -> list[str]:
         config.PC98_DIR.mkdir(parents=True, exist_ok=True)
         if not system_path:
             raise ValueError("Select a PC-98 BIOS/font system folder in Emulation settings before launching the game.")
@@ -227,6 +227,7 @@ class Pc98Manager:
         profile_id = hashlib.sha256(game.name.encode("utf-8")).hexdigest()[:16]
         options_path = options_dir / f"{profile_id}.opt"
         option_lines = []
+        configured_keys = set()
         pc98_settings = getattr(game, "pc98", None)
         if pc98_settings:
             for field_name, option_key in Pc98Manager.CORE_OPTION_KEYS.items():
@@ -234,6 +235,12 @@ class Pc98Manager:
                 if value:
                     escaped_value = value.replace('"', '\\"')
                     option_lines.append(f'{option_key} = "{escaped_value}"')
+                    configured_keys.add(option_key)
+        if options_path.is_file():
+            for line in options_path.read_text(encoding="utf-8").splitlines():
+                key = line.partition("=")[0].strip()
+                if key not in configured_keys:
+                    option_lines.append(line)
         options_path.write_text("\n".join(option_lines) + ("\n" if option_lines else ""), encoding="utf-8")
 
         retroarch_config = profiles_dir / f"{profile_id}.cfg"
@@ -249,6 +256,12 @@ class Pc98Manager:
             'menu_driver = "rgui"',
             'menu_show_core_updater = "false"',
         ]
+        if bundled:
+            config_lines.extend([
+                'input_joypad_driver = "sdl2"',
+                'input_autodetect_enable = "true"',
+                'joypad_autoconfig_dir = "/app/share/lvnm/retroarch/autoconfig"',
+            ])
         retroarch_config.write_text("\n".join(config_lines) + "\n", encoding="utf-8")
         return ["--config", str(retroarch_config), "-L", core_path]
 

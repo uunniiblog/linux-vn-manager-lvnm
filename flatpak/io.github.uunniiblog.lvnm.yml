@@ -84,7 +84,8 @@ cleanup-commands:
   - mkdir -p /app/lib/extensions/vulkan/MangoHud
 
 modules:
-  # Deliberately omit RetroArch's asset, database, shader, overlay and online updater packages. LVNM only needs the frontend binary for the NP2kai core.
+  # Enable SDL2 for controller input and the front binary for the NP2kai core.
+  # RetroArch assets, databases, shaders, overlays and online updaters are omitted.
   - name: retroarch-pc98
     config-opts:
       - --disable-qt
@@ -92,7 +93,7 @@ modules:
       - --disable-v4l2
       - --disable-jack
       - --disable-sdl
-      - --disable-sdl2
+      - --enable-sdl2
       - --disable-vulkan
       - --disable-dbus
       - --disable-libretrodb
@@ -140,6 +141,17 @@ modules:
       - type: git
         url: https://github.com/libretro/RetroArch.git
         commit: 69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576
+
+  - name: retroarch-joypad-autoconfig
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/lvnm/retroarch/autoconfig
+      - cp -a sdl2 udev /app/share/lvnm/retroarch/autoconfig/
+      - install -Dm644 COPYING /app/share/licenses/retroarch-joypad-autoconfig/COPYING
+    sources:
+      - type: git
+        url: https://github.com/libretro/retroarch-joypad-autoconfig.git
+        commit: 794a2f18cdb7b5c3565e75c2a663f598e3f90e24
 
   - name: np2kai-libretro
     buildsystem: simple

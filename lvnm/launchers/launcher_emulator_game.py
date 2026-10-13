@@ -32,7 +32,7 @@ class LauncherEmulatorGame(LauncherBaseGame):
         game_path = self.game.path
 
         if emulator_type == config.EMULATION_PC98:
-            extra_args = Pc98Manager.build_launch_args(self.game, self.prefix_info["core"], self.prefix_info.get("system_path")) + extra_args
+            extra_args = Pc98Manager.build_launch_args(self.game, self.prefix_info["core"], self.prefix_info.get("system_path"), self.prefix_info.get("bundled", False)) + extra_args
             game_path = Pc98Manager.resolve_game_media(self.game)
         else:
             self._restore_flatpak_host_xdg_paths()
