@@ -116,6 +116,16 @@ class Pc98Manager:
     def _find_floppy_set(selected: Path) -> list[Path]:
         family, has_disk_marker = Pc98Manager._media_family(selected)
         if not has_disk_marker:
+            numbered = re.fullmatch(r"(.+?)(\d+)", selected.stem)
+            if numbered and not numbered.group(1)[-1].isspace():
+                prefix = re.escape(numbered.group(1))
+                matching = [
+                    path.resolve() for path in selected.parent.iterdir()
+                    if path.is_file() and path.suffix.casefold() == selected.suffix.casefold()
+                    and re.fullmatch(f"{prefix}\\d+", path.stem, re.IGNORECASE)
+                ]
+                if len(matching) > 1:
+                    return sorted(matching, key=Pc98Manager._natural_sort_key)
             return [selected]
 
         candidates = [path.resolve() for path in selected.parent.iterdir() if path.is_file() and path.suffix.lower() in Pc98Manager.FLOPPY_EXTENSIONS]
