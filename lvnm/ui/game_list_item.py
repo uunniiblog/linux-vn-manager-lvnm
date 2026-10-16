@@ -27,6 +27,8 @@ class GameListItem(QWidget):
     requestStop = Signal(object)
     requestRefresh = Signal(object)
     requestExport = Signal(object)
+    requestManageImages = Signal(object)
+    requestAdvancedSettings = Signal(object)
     requestCloseSidebar = Signal()
 
     def __init__(self, game_card, zoom_factor=1.0, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
@@ -193,6 +195,8 @@ class GameListItem(QWidget):
 
         act_log = menu.addAction(self.tr("Show Logs"))
         act_open = menu.addAction(self.tr("Open Sidebar"))
+        act_advanced = menu.addAction(self.tr("Advanced Settings")) if self.platform.supports(Feature.ADVANCED_SETTINGS) else None
+        act_images = menu.addAction(self.tr("Manage Images"))
         act_browse = menu.addAction(self.tr("Browse Files"))
         act_refresh = menu.addAction(self.tr("Refresh List"))
 
@@ -251,6 +255,12 @@ class GameListItem(QWidget):
 
         elif action == act_open:
             self.requestOpen.emit(self.game_card)
+
+        elif action == act_advanced:
+            self.requestAdvancedSettings.emit(self.game_card)
+
+        elif action == act_images:
+            self.requestManageImages.emit(self.game_card)
 
         elif action == act_browse:
             self.browse_game(self.game_card.path)

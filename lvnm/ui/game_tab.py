@@ -12,6 +12,8 @@ from game_manager import GameManager
 from prefix_manager import PrefixManager
 from ui.game_list_item import GameListItem
 from ui.game_sidebar import GameSidebar
+from ui.advanced_settings_dialog import AdvancedSettingsDialog
+from ui.image_management_dialog import ImageManagementDialog
 from ui.import_game_dialog import ImportGameDialog
 from model.game_card import GameCard
 from settings_manager import SettingsManager
@@ -281,6 +283,8 @@ class GameTab(QWidget):
                 widget.requestStop.connect(self.on_game_stop_requested)
                 widget.requestRefresh.connect(self.refresh_list)
                 widget.requestExport.connect(self.on_export_game)
+                widget.requestManageImages.connect(self.on_manage_images)
+                widget.requestAdvancedSettings.connect(self.on_advanced_settings)
                 widget.requestCloseSidebar.connect(self.close_sidebar)
                 
                 self.game_list.addItem(item)
@@ -453,6 +457,40 @@ class GameTab(QWidget):
     def on_game_stop_requested(self, game_card):
         """ Handles stoping game """
         self.sidebar.stop_game(game_card.name)
+
+    def on_manage_images(self, game_card):
+        if self.sidebar.current_game and self.sidebar.current_game.name == game_card.name:
+            self.sidebar._flush_autosave()
+        current_card = GameManager.get_game(game_card.name)
+        if not current_card:
+            return
+        dialog = ImageManagementDialog(current_card, self)
+        if dialog.exec() != QDialog.Accepted or not dialog.image_updates:
+            return
+        GameManager.update_game(game_card.name, dialog.image_updates)
+        self.update_item_metadata(game_card.name)
+        if self.sidebar.current_game and self.sidebar.current_game.name == game_card.name:
+            for field in ("cover_path", "cover_source_url", "layout_path", "layout_source_url"):
+                setattr(self.sidebar.current_game, field, getattr(current_card, field))
+            self.sidebar.update_game_cover()
+
+    def on_advanced_settings(self, game_card):
+        if self.sidebar.current_game and self.sidebar.current_game.name == game_card.name:
+            self.sidebar._flush_autosave()
+        current_card = GameManager.get_game(game_card.name)
+        if not current_card:
+            return
+        prefix_type = PrefixManager.get_all_prefixes().get(current_card.prefix, {}).get("type", "wine")
+        dialog = AdvancedSettingsDialog(prefix_type, current_card, self, platform=self.platform)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        GameManager.update_game(game_card.name, current_card.to_dict())
+        self.update_item_metadata(game_card.name)
+        if self.sidebar.current_game and self.sidebar.current_game.name == game_card.name:
+            fields = ("umu_store", "umu_gameid", "pre_launch_args", "disable_network", "arguments", "pc98", "pre_launch_script",
+                      "pre_launch_script_wait", "exit_script", "registry_path")
+            for field in fields:
+                setattr(self.sidebar.current_game, field, getattr(current_card, field))
 
     def on_export_game(self, game_card):
         """ Handles stoping game """

@@ -22,6 +22,7 @@ from savedata_manager import SavedataManager
 from game_process_manager import GameProcessManager
 from ui.env_var_manager_dialog import EnvVarManagerDialog
 from ui.advanced_settings_dialog import AdvancedSettingsDialog
+from ui.image_management_dialog import ImageManagementDialog
 from ui.vndb_autocomplete import VndbAutocompleteLineEdit
 from ui.sgdb_autocomplete import SgdbAutocompleteLineEdit
 from ui.savedata_management_dialog import SavedataManagementDialog
@@ -304,12 +305,21 @@ class GameSidebar(QFrame):
         self.platform_ui.add_widget(form, self.env_group, requires=Feature.WINE_CONFIGURATION)
 
         # Advanced Settings Button
+        form.addSpacing(10)
+        action_button_style = "padding: 4px 10px;"
         self.advanced_btn = QPushButton(self.tr("Advanced Settings"))
         self.advanced_btn.setMinimumHeight(35)
-        self.advanced_btn.setStyleSheet("margin: 5px; margin-top: 10px;padding: 4px 10px;")
+        self.advanced_btn.setStyleSheet(action_button_style)
         self.advanced_btn.setCursor(Qt.PointingHandCursor)
         self.advanced_btn.clicked.connect(self._open_advanced_settings)
         self.platform_ui.add_widget(form, self.advanced_btn, requires=Feature.ADVANCED_SETTINGS)
+
+        self.image_management_btn = QPushButton(self.tr("Manage Images"))
+        self.image_management_btn.setMinimumHeight(35)
+        self.image_management_btn.setStyleSheet(action_button_style)
+        self.image_management_btn.setCursor(Qt.PointingHandCursor)
+        self.image_management_btn.clicked.connect(self._open_image_management)
+        form.addWidget(self.image_management_btn)
 
         form.addStretch(1)
 
@@ -499,6 +509,7 @@ class GameSidebar(QFrame):
         self._loading_game = True
         self.refresh_name_autocomplete()
         self.current_game = card
+        self.image_management_btn.setEnabled(True)
 
         # Don't preload from global settings in existing game load
         self._create_mode_defaults = None
@@ -655,6 +666,17 @@ class GameSidebar(QFrame):
         if dialog.exec():
             self.save_data()
 
+    def _open_image_management(self):
+        if not self.current_game or getattr(self, "_create_mode_defaults", None) is not None:
+            return
+        self._flush_autosave()
+        dialog = ImageManagementDialog(self.current_game, self)
+        if dialog.exec() and dialog.image_updates:
+            GameManager.update_game(self.current_game.name, dialog.image_updates)
+            self.update_game_cover()
+            if hasattr(self, "on_metadata_updated"):
+                self.on_metadata_updated(self.current_game.name)
+
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
         self._flush_autosave()
@@ -663,6 +685,7 @@ class GameSidebar(QFrame):
         self._loading_game = True
         self.refresh_name_autocomplete()
         self.current_game = card
+        self.image_management_btn.setEnabled(False)
         self.set_ui_start_state()
 
         # Clear Header UI Fields
@@ -927,6 +950,7 @@ class GameSidebar(QFrame):
             # Disable creation mode to avoid weird editing bugs.
             self._create_mode_defaults = None
             self.launch_btn.setVisible(True)
+            self.image_management_btn.setEnabled(True)
         else:
             logger.debug(f"Updating game: {original_name}")
             latest_json_card = GameManager.get_game(original_name)
