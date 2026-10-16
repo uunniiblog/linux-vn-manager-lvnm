@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
     QFormLayout, QLineEdit, QCheckBox, QPushButton, 
-    QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy,
+    QComboBox, QFileDialog, QScrollArea, QFrame, QSizePolicy, QApplication,
     QMessageBox, QDialog, QProgressDialog, QStyle, QStackedWidget
 )
 from PySide6.QtGui import QPixmap, QIcon
@@ -56,6 +56,14 @@ class GameSidebar(QFrame):
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
         self.savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
+        self._loading_game = False
+        self._autosave_in_progress = False
+        self._text_edit_pending = False
+        self._text_edit_active = False
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.setInterval(600)
+        self._autosave_timer.timeout.connect(self._autosave)
 
         # Connect to Game Process Manager
         self.process_manager = GameProcessManager.get_instance()
@@ -136,8 +144,8 @@ class GameSidebar(QFrame):
         layout.addWidget(self.lbl_sync_status)
 
         # Scrollable Edit Section 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
         container = QWidget()
         form = QVBoxLayout(container)
 
@@ -193,6 +201,8 @@ class GameSidebar(QFrame):
         
         # Prefix combo
         self.combo_prefix = QComboBox()
+        self.combo_prefix.setFocusPolicy(Qt.StrongFocus)
+        self.combo_prefix.installEventFilter(self)
         self.combo_prefix.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.combo_prefix.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.combo_prefix.currentTextChanged.connect(self.on_prefix_changed)
@@ -303,8 +313,8 @@ class GameSidebar(QFrame):
 
         form.addStretch(1)
 
-        scroll.setWidget(container)
-        layout.addWidget(scroll, 1)
+        self.scroll_area.setWidget(container)
+        layout.addWidget(self.scroll_area, 1)
 
         # Bottom Buttons
         btns = QHBoxLayout()
@@ -318,24 +328,39 @@ class GameSidebar(QFrame):
         self.export_btn = QPushButton(self.tr("Export"))
         self.export_btn.clicked.connect(self.export_game_action)
 
-        # Save & Cancel (Right side)
+        # Save controls
         self.save_btn = QPushButton(self.tr("Save"))
         self.save_btn.setMinimumWidth(100)
         self.save_btn.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
-        self.save_btn.clicked.connect(self.save_data)
+        self.save_btn.clicked.connect(lambda: self.save_data())
+
+        self.autosave_checkbox = QCheckBox(self.tr("Autosave"))
+        self.autosave_checkbox.setChecked(self.user_settings.get(config.USER_CONF_SIDEBAR_AUTOSAVE, False))
+        self.save_btn.setVisible(not self.autosave_checkbox.isChecked())
+        self.autosave_checkbox.toggled.connect(self._on_autosave_toggled)
 
         self.cancel_btn = QPushButton(self.tr("Cancel"))
-        self.cancel_btn.clicked.connect(lambda: self.on_close())
+        self.cancel_btn.clicked.connect(self._cancel)
 
-
-        # Add them to the layout in the requested order
-        btns.addWidget(self.delete_btn)
-        btns.addWidget(self.export_btn)
-        btns.addStretch() # This pushes everything after it to the far right
+        # Keep Cancel, Export, and Delete together, with Autosave at the right when Save is hidden.
         btns.addWidget(self.cancel_btn)
+        btns.addWidget(self.export_btn)
+        btns.addWidget(self.delete_btn)
+        btns.addStretch()
+        btns.addWidget(self.autosave_checkbox)
         btns.addWidget(self.save_btn)
 
         layout.addLayout(btns)
+
+        for name_edit in self.name_edits.values():
+            name_edit.textEdited.connect(self._mark_text_edit_pending)
+            name_edit.editingFinished.connect(self._finish_text_edit)
+        for text_edit in (self.edit_path, self.edit_vndb, self.gs_params, self.upscale_params):
+            text_edit.textEdited.connect(self._mark_text_edit_pending)
+            text_edit.editingFinished.connect(self._finish_text_edit)
+        for checkbox in (self.gdrive_sync_checkbox, self.gs_enabled, self.upscale_enabled):
+            checkbox.toggled.connect(self._schedule_autosave)
+        self.combo_prefix.currentTextChanged.connect(self._schedule_autosave)
 
     def resizeEvent(self, event):
         """
@@ -431,12 +456,16 @@ class GameSidebar(QFrame):
     def on_vndb_item_selected(self, vn_data):
         """Called when the VndbAutocompleteLineEdit emits a selection."""
         self.edit_vndb.setText(vn_data.get('id', ''))
+        self._text_edit_active = False
+        self._schedule_autosave()
 
     def on_sgdb_item_selected(self, game_data):
         """Store SGDB IDs in the existing VNDB field with an explicit prefix."""
         game_id = game_data.get("id")
         if game_id is not None:
             self.edit_vndb.setText(f"sgdb{game_id}")
+            self._text_edit_active = False
+            self._schedule_autosave()
 
     @staticmethod
     def _get_sgdb_id(metadata_id):
@@ -464,6 +493,10 @@ class GameSidebar(QFrame):
         """
         Loaded from GameTab with the data of the game selected
         """
+        self._flush_autosave()
+        self._text_edit_pending = False
+        self._text_edit_active = False
+        self._loading_game = True
         self.refresh_name_autocomplete()
         self.current_game = card
 
@@ -528,6 +561,7 @@ class GameSidebar(QFrame):
 
         # Load Env Vars
         self.refresh_env_vars(prefix_type, card.envvar)
+        self._loading_game = False
 
     def refresh_env_vars(self, prefix_type, active_vars):
         """Populates the UI checkboxes using the dynamic list from settings."""
@@ -554,9 +588,11 @@ class GameSidebar(QFrame):
                 
             self.env_checkboxes[var["id"]] = cb
             self.env_checkbox_layout.addWidget(cb)
+            cb.toggled.connect(self._schedule_autosave)
 
     def _open_env_manager(self):
         """Opens the dialog to add/remove/edit environment variables."""
+        self._flush_autosave()
         current_vars = self.user_settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
         ui_active_vars = {}
 
@@ -596,11 +632,13 @@ class GameSidebar(QFrame):
             prefix_type = self.prefixes.get(prefix_name, {}).get("type", "wine")
             
             self.refresh_env_vars(prefix_type, active_vars_for_ui)
+            self._schedule_autosave()
             
     def _open_advanced_settings(self):
         if not self.current_game:
             return
 
+        self._flush_autosave()
         # Give current values even if not saved
         self.current_game.name = self.edit_name.text()
         self.current_game.path = self.edit_path.text()
@@ -619,6 +657,10 @@ class GameSidebar(QFrame):
 
     def load_create_game(self, card: GameCard):
         """ Loaded from GameTab to create a new entry """
+        self._flush_autosave()
+        self._text_edit_pending = False
+        self._text_edit_active = False
+        self._loading_game = True
         self.refresh_name_autocomplete()
         self.current_game = card
         self.set_ui_start_state()
@@ -686,11 +728,13 @@ class GameSidebar(QFrame):
 
         # Clear Env Var checkboxes
         self.refresh_env_vars("wine", default_env_vars)
+        self._loading_game = False
     
     def toggle_game(self):
         if not self.current_game:
             return
-        
+
+        self._flush_autosave()
         game_name = self.current_game.name
         if self.process_manager.is_game_running(game_name):
             # Game running, stop it
@@ -776,11 +820,13 @@ class GameSidebar(QFrame):
             selected_files = dialog.selectedFiles()
             if selected_files:
                 self.edit_path.setText(selected_files[0])
+                self._schedule_autosave()
 
     def browse_savedata(self):
         """Opens the shared savedata source editor."""
         if not self.current_game:
             return
+        self._flush_autosave()
         game_data = self.current_game.to_dict()
         game_data["path"] = self.edit_path.text()
         dialog = SavedataConfigDialog(game_data, self)
@@ -802,7 +848,7 @@ class GameSidebar(QFrame):
         excluded = sum(len(folder.get("excluded", [])) for folder in folders)
         return self.tr("{0} folders ({1} excluded)").format(len(folders), excluded) if folders else ""
 
-    def save_data(self):
+    def save_data(self, autosave=False):
         """
         Updates the GameCard object and sends it to the manager.
         """
@@ -810,7 +856,7 @@ class GameSidebar(QFrame):
             return
 
         # Record if this is a new game before we overwrite the original name
-        is_new_game = not self.current_game.name 
+        is_new_game = getattr(self, "_create_mode_defaults", None) is not None or not self.current_game.name
         original_name = self.current_game.name
         old_vndb = (self.current_game.vndb or "").strip()
 
@@ -831,7 +877,7 @@ class GameSidebar(QFrame):
             )
             return
 
-        if not self.current_game.path or not self.current_game.prefix:
+        if (not self.current_game.path or not self.current_game.prefix) and not autosave:
             logger.debug("Trying to edit game without necessary data.")
             reply = QMessageBox.question(
                 self, 
@@ -896,11 +942,11 @@ class GameSidebar(QFrame):
         sgdb_id = self._get_sgdb_id(new_vndb)
         if sgdb_id is not None:
             current_cover = SystemUtils.get_cover_path(self.current_game.cover_path, self.current_game.vndb)
-            if new_vndb != old_vndb or not current_cover:
+            if new_vndb != old_vndb or (not autosave and not current_cover):
                 self.fetch_sgdb_cover_async(self.current_game.name, sgdb_id)
         elif new_vndb.lower().startswith("sgdb"):
             logger.warning(f"Invalid SteamGridDB ID: {new_vndb}")
-        elif new_vndb and (new_vndb != old_vndb or not self.current_game.ogtitle):
+        elif new_vndb and (new_vndb != old_vndb or (not autosave and not self.current_game.ogtitle)):
             logger.debug("Fetching VNDB data")
             self.fetch_vndb_async(self.current_game.name, new_vndb)
 
@@ -908,7 +954,8 @@ class GameSidebar(QFrame):
         self.update_game_cover()
         self.lbl_display_name.setText(self.current_game.name)
         self.on_saved()
-        self.show_saved_feedback()
+        if not self.autosave_checkbox.isChecked():
+            self.show_saved_feedback()
         self.update_savedata_visibility()
 
     def on_prefix_changed(self, prefix_name):
@@ -973,6 +1020,7 @@ class GameSidebar(QFrame):
         if not self.current_game or not self.current_game.name:
             return
 
+        self._flush_autosave()
         # Quick confirmation dialog
         reply = QMessageBox.question(
             self, 
@@ -997,6 +1045,7 @@ class GameSidebar(QFrame):
 
     def export_game_action(self):
         """Call Game Manager to create json data and call file browser to save it"""
+        self._flush_autosave()
         json_data = GameManager.export_game(self.current_game.name)
         if not json_data:
             logger.error("No json data to export")
@@ -1259,8 +1308,68 @@ class GameSidebar(QFrame):
         self.lbl_session_play.setText("00:00:00")
         self.lbl_total_play.setText("00:00:00")
 
+    def _on_autosave_toggled(self, enabled):
+        self.user_settings.set(config.USER_CONF_SIDEBAR_AUTOSAVE, enabled)
+        self.save_btn.setVisible(not enabled)
+        if enabled:
+            self._schedule_autosave()
+        else:
+            self._autosave_timer.stop()
+            self._text_edit_pending = False
+            self._text_edit_active = False
+
+    def _mark_text_edit_pending(self, *args):
+        if self.autosave_checkbox.isChecked() and self.current_game and not self._loading_game:
+            self._text_edit_pending = True
+            self._text_edit_active = True
+            self._autosave_timer.stop()
+
+    def _finish_text_edit(self):
+        self._text_edit_active = False
+        if self._text_edit_pending:
+            self._schedule_autosave()
+
+    def _schedule_autosave(self, *args):
+        if self.autosave_checkbox.isChecked() and self.current_game and not self._loading_game and not self._autosave_in_progress and not self._text_edit_active:
+            self._autosave_timer.start()
+
+    def _autosave(self):
+        if not self.autosave_checkbox.isChecked() or not self.current_game or self._loading_game or self._autosave_in_progress:
+            return
+        if not self.edit_name.text().strip():
+            return
+        if getattr(self, "_create_mode_defaults", None) is not None and (not self.edit_path.text().strip() or not (self.combo_prefix.currentText() or IS_WINDOWS)):
+            return
+        self._autosave_in_progress = True
+        try:
+            self.save_data(autosave=True)
+            self._text_edit_pending = False
+            self._text_edit_active = False
+        finally:
+            self._autosave_in_progress = False
+
+    def _flush_autosave(self):
+        if self._autosave_timer.isActive() or self._text_edit_pending:
+            self._autosave_timer.stop()
+            self._text_edit_active = False
+            self._autosave()
+
+    def _cancel(self):
+        self._flush_autosave()
+        self.on_close()
+
+    def hideEvent(self, event):
+        self._flush_autosave()
+        super().hideEvent(event)
+
     def eventFilter(self, obj, event):
-        """Close autocomplete popup if clicked somewhere outside"""
+        """Pass prefix wheel events to the sidebar and handle autocomplete clicks."""
+        if obj is self.combo_prefix:
+            if event.type() == QEvent.Wheel:
+                event.ignore()
+                QApplication.sendEvent(self.scroll_area.viewport(), event)
+                return True
+            return super().eventFilter(obj, event)
         if event.type() == QEvent.MouseButtonPress:
             if self.autocomplete_list.isVisible():
                 # Check if the click occurred inside the list or the edit box
