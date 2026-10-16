@@ -2,9 +2,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton,
     QDialog, QTableWidget, QTableWidgetItem, 
     QHeaderView, QAbstractItemView, QComboBox,
-    QCheckBox, QWidget
+    QCheckBox, QWidget, QLabel, QLineEdit
 )
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QModelIndex, QSettings, Qt
 import config
 from settings_manager import SettingsManager
 
@@ -22,6 +22,17 @@ class EnvVarManagerDialog(QDialog):
         self.settings = QSettings(str(self.SETTINGS_FILE), QSettings.IniFormat)
 
         layout = QVBoxLayout(self)
+
+        filter_layout = QHBoxLayout()
+        filter_label = QLabel(self.tr("Filter:"))
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setMaximumWidth(260)
+        self.filter_edit.setClearButtonEnabled(True)
+        filter_label.setBuddy(self.filter_edit)
+        filter_layout.addWidget(filter_label)
+        filter_layout.addWidget(self.filter_edit)
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
 
         # Table Setup
         self.table = QTableWidget(len(self.env_vars), 5)
@@ -46,6 +57,11 @@ class EnvVarManagerDialog(QDialog):
         self.table.setColumnWidth(2, 220)
         self.table.setColumnWidth(3, 100)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        row_header = self.table.verticalHeader()
+        row_header.setSectionsMovable(True)
+        row_header.setToolTip(self.tr("Drag a row number to reorder variables"))
+        row_header.sectionPressed.connect(self.table.selectRow)
+        row_header.sectionMoved.connect(self._update_row_numbers)
 
         for row, var in enumerate(self.env_vars):
             self.table.setItem(row, 0, QTableWidgetItem(var.get("name", var.get("id", ""))))
@@ -71,6 +87,7 @@ class EnvVarManagerDialog(QDialog):
         layout.addLayout(btn_layout)
 
         # Connections
+        self.filter_edit.textChanged.connect(self._filter_rows)
         add_btn.clicked.connect(self.add_row)
         remove_btn.clicked.connect(self.remove_row)
         save_btn.clicked.connect(self.accept)
@@ -80,6 +97,7 @@ class EnvVarManagerDialog(QDialog):
         self._restore_state()
 
     def add_row(self):
+        self.filter_edit.clear()
         row = self.table.rowCount()
         self.table.insertRow(row)
         self.table.setItem(row, 0, QTableWidgetItem(self.tr("New Variable")))
@@ -87,16 +105,43 @@ class EnvVarManagerDialog(QDialog):
         self.table.setItem(row, 2, QTableWidgetItem("1"))
         self.table.setCellWidget(row, 3, self._create_type_combo(""))
         self.table.setCellWidget(row, 4, self._create_global_checkbox(False))
+        self._update_row_numbers()
+        name_item = self.table.item(row, 0)
+        self.table.setCurrentCell(row, 0)
+        self.table.scrollToItem(name_item, QAbstractItemView.PositionAtBottom)
+        self.table.editItem(name_item)
 
     def remove_row(self):
         current_row = self.table.currentRow()
         if current_row >= 0:
             self.table.removeRow(current_row)
+            self._update_row_numbers()
+
+    def _update_row_numbers(self, *args):
+        """Keep the numbered drag handles in the same order as the visible rows."""
+        header = self.table.verticalHeader()
+        visible_row = 0
+        for visual_row in range(self.table.rowCount()):
+            logical_row = header.logicalIndex(visual_row)
+            if not self.table.isRowHidden(logical_row):
+                visible_row += 1
+                self.table.setVerticalHeaderItem(logical_row, QTableWidgetItem(str(visible_row)))
+
+    def _filter_rows(self, text):
+        query = text.strip().casefold()
+        self.table.clearSelection()
+        self.table.setCurrentIndex(QModelIndex())
+        for row in range(self.table.rowCount()):
+            name = self.table.item(row, 0).text() if self.table.item(row, 0) else ""
+            key = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+            self.table.setRowHidden(row, query not in name.casefold() and query not in key.casefold())
+        self._update_row_numbers()
 
     def get_vars(self):
         new_vars = []
         global_vars = {}
-        for row in range(self.table.rowCount()):
+        for visual_row in range(self.table.rowCount()):
+            row = self.table.verticalHeader().logicalIndex(visual_row)
             name = self.table.item(row, 0).text().strip() if self.table.item(row, 0) else ""
             key = self.table.item(row, 1).text().strip() if self.table.item(row, 1) else ""
             value = self.table.item(row, 2).text().strip() if self.table.item(row, 2) else ""

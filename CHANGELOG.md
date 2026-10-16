@@ -6,6 +6,7 @@ Notable changes for each release are listed below, newest first.
 - Added new option in settings to automatically increase the DPI temporaly when running wine utilities like regedit or winecfg in >1080p monitors for better visibility.
 - Fix monitor's detection in flatpak, should work good for KDE, needs testing in other DE.
 - PC-98 fixes: Enable retroarch SDL for controller support in flatpak PC-98 config, enables virtual keyboard, save all configuration to the `/home/uni/.local/share/lvnm/emulation/pc98/profiles/`folder to keep it tracked, improve multi disk naming detection.
+- Manage environment variable dialog improvements: Can Rearrange variable order by holding and dragging by the row number. Adding a search at the top and clicking new variable will automatically select the row.
 
 ## [v0.6.0]
 - Flatpak release:
