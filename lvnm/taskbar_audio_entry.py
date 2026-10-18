@@ -16,8 +16,9 @@ stream with that entry when the stream's `application.name` equals the entry's
 Launch lifecycle
 ----------------
 1. Before launching the game, create a temporary desktop entry under the host's
-   ~/.local/share/applications directory. Plain Wine windows use the executable
-   name as their WM class; umu/Proton windows use `steam_app_default`.
+   ~/.local/share/applications directory. XWayland Proton windows use
+   `steam_app_default`; native Wayland windows use the lowercased executable
+   name as their app ID, so their desktop entry needs the same basename.
 2. After launch, poll the active sink inputs. The game stream is identified from
    the sandbox process tree and the `NSpid` values exposed for its host process.
    Its `WINEPREFIX` is a final fallback for detached Wine/umu children.
@@ -49,7 +50,7 @@ from timetracker.system_utils import SystemUtils as TimeTrackUtils
 logger = logging.getLogger(__name__)
 
 _APP_ID = "io.github.uunniiblog.lvnm"
-_PULSE_PROP_RE = re.compile(r'^\s*(application\.name|application\.process\.id)\s*=\s*"(.*)"\s*$')
+_PULSE_PROP_RE = re.compile(r'^\s*(application\.name|application\.process\.id|application\.process\.binary)\s*=\s*"(.*)"\s*$')
 
 class TaskbarAudioEntry:
     def __init__(self, launcher):
@@ -72,6 +73,8 @@ class TaskbarAudioEntry:
         return Path.home() / ".local" / "share" / "applications"
 
     def _taskbar_entry_path(self) -> Path:
+        if self._uses_proton_wayland():
+            return self._host_applications_dir() / f"{Path(self.launcher.game.path).name.lower()}.desktop"
         slug = re.sub(
             r"[^a-z0-9]+", "-", Path(self.launcher.game.path).name.lower()
         ).strip("-")
@@ -79,9 +82,14 @@ class TaskbarAudioEntry:
 
     def _taskbar_wm_class(self) -> str:
         """Return the WM class used by the game window."""
+        if self._uses_proton_wayland():
+            return Path(self.launcher.game.path).name.lower()
         if self.launcher.is_proton:
             return "steam_app_default"
         return Path(self.launcher.game.path).name
+
+    def _uses_proton_wayland(self) -> bool:
+        return self.launcher.is_proton and (self.launcher.env.get("PROTON_ENABLE_WAYLAND") == "1" or self.launcher.env.get("PROTON_USE_WAYLAND") == "1")
 
     # Entry file
     @staticmethod
@@ -98,6 +106,13 @@ class TaskbarAudioEntry:
         name = re.search(r"^Name=(.*)$", text, re.M)
         learned = re.search(r"^X-LVNM-Learned=true$", text, re.M) is not None
         return (name.group(1) if name else None), learned
+
+    @staticmethod
+    def _entry_is_ours(path: Path) -> bool:
+        try:
+            return re.search(r"^X-LVNM-Learned=(?:true|false)$", path.read_text(encoding="utf-8"), re.M) is not None
+        except OSError:
+            return False
 
     def _write_taskbar_entry(self, path: Path, wm_class: str, stream_name: str, learned: bool):
         content = (
@@ -260,11 +275,13 @@ class TaskbarAudioEntry:
 
     @staticmethod
     def _remove_entry(path: Path):
+        if not TaskbarAudioEntry._entry_is_ours(path):
+            return
         try:
             path.unlink(missing_ok=True)
-            logger.debug("Removed taskbar audio entry %s", path)
+            logger.debug(f"Removed taskbar audio entry {path}")
         except OSError as e:
-            logger.warning("Could not remove taskbar audio entry %s: %s", path, e)
+            logger.warning(f"Could not remove taskbar audio entry {path}: {e}")
 
     def _learn_stream_name(self, path: Path, wm_class: str, timeout: float = 900):
         deadline = time.monotonic() + timeout
@@ -281,6 +298,8 @@ class TaskbarAudioEntry:
                 continue
             name = self._find_stream_app_name(pids)
             if name:
+                if not self._entry_is_ours(path):
+                    return
                 self._write_taskbar_entry(path, wm_class, name, learned=True)
                 logger.info(f"Learned audio stream name {name!r} for {wm_class}")
                 return
@@ -293,6 +312,9 @@ class TaskbarAudioEntry:
         try:
             wm_class = self._taskbar_wm_class()
             path = self._taskbar_entry_path()
+            if path.exists() and not self._entry_is_ours(path):
+                logger.warning(f"Could not prepare taskbar audio entry: {path} belongs to another application")
+                return
             name, learned = self._read_taskbar_entry(path)
             if name is None:
                 # Placeholder until the real stream name is learned.
@@ -311,6 +333,8 @@ class TaskbarAudioEntry:
         try:
             wm_class = self._taskbar_wm_class()
             path = self._taskbar_entry_path()
+            if not self._entry_is_ours(path):
+                return
             _, learned = self._read_taskbar_entry(path)
             if not learned:
                 threading.Thread(
