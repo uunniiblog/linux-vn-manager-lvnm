@@ -90,7 +90,10 @@ class SettingsTab(QWidget):
         # Gamescope
         gs_layout = QHBoxLayout()
         self.gs_checkbox = QCheckBox(self.tr("Enable"))
-        self.gs_checkbox.setChecked(self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False))
+        gs_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
+        if gs_enabled and not config.GAMESCOPE_INSTALLED:
+            self.user_settings.set(config.USER_CONF_GAMESCOPE_ENABLED, False)
+        self.gs_checkbox.setChecked(gs_enabled and config.GAMESCOPE_INSTALLED)
         self.gs_params = QLineEdit(self.user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, ""))
         self.gs_params.setPlaceholderText(self.tr("Parameters (e.g., -W 1920 -H 1080)"))
         if not config.GAMESCOPE_INSTALLED:

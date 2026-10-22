@@ -1,6 +1,7 @@
 import os
 import json
 import shlex
+import shutil
 import logging
 import config
 import time
@@ -68,7 +69,7 @@ class LauncherBaseGame(ABC):
 
     def apply_gamescope(self, cmd: list) -> list:
         """Wraps a command with gamescope if enabled"""
-        if self.game.gamescope.enabled.lower() == "true":
+        if self.game.gamescope.enabled.lower() == "true" and shutil.which("gamescope"):
             gs_params = self.game.gamescope.parameters.split()
             return ["gamescope"] + gs_params + ["--"] + cmd
         return cmd

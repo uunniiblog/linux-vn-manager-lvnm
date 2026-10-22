@@ -538,7 +538,7 @@ class GameSidebar(QFrame):
         self.update_savedata_visibility()
 
         # Filling Gamescope (using the nested dataclass)
-        self.gs_enabled.setChecked(card.gamescope.enabled == "true")
+        self.gs_enabled.setChecked(config.GAMESCOPE_INSTALLED and card.gamescope.enabled == "true")
         self.gs_params.setText(card.gamescope.parameters)
 
         # linux-rt-upscaler
@@ -708,7 +708,7 @@ class GameSidebar(QFrame):
             self.gdrive_sync_checkbox.setChecked(True)
         
         # Apply Gamescope Defaults from Settings or leave empty
-        gs_default_enabled = self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
+        gs_default_enabled = config.GAMESCOPE_INSTALLED and self.user_settings.get(config.USER_CONF_GAMESCOPE_ENABLED, False)
         gs_default_params = self.user_settings.get(config.USER_CONF_GAMESCOPE_PARAMS, "")
         
         self.gs_enabled.setChecked(gs_default_enabled)
