@@ -5,6 +5,8 @@ Notable changes for each release are listed below, newest first.
 ## [v0.6.1]
 - Added new option in settings to automatically increase the DPI temporaly when running wine utilities like regedit or winecfg in >1080p monitors for better visibility.
 - Fix monitor's detection in flatpak, should work good for KDE, needs testing in other DEs.
+- Add a small popup when umu is downloading steam's runtime after launching a game.
+- Disable gamescope if it's not detected as installed anymore to avoid it being lock on enabled.
 - PC-98 fixes: 
     - Enabled retroarch SDL for controller support in flatpak PC-98 config, 
     - Enabled virtual keyboard.

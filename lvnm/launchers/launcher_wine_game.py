@@ -9,6 +9,7 @@ import threading
 import atexit
 import tempfile
 from pathlib import Path
+from PySide6.QtCore import QObject, Signal
 from model.game_card import GameCard, GameScope
 from execution_manager import ExecutionManager
 from system_utils import SystemUtils
@@ -590,7 +591,6 @@ class LauncherWineGame(LauncherBaseGame):
         )
         
         try:
-
             # Grab global env vars
             global_env_status = self.settings.get(config.USER_CONF_GLOBAL_VARIABLES, {})
             env_definitions = self.settings.get(config.USER_CONF_ENV_VARIABLE_LIST, config.ENV_VARIABLES)
@@ -620,11 +620,20 @@ class LauncherWineGame(LauncherBaseGame):
             logging.debug(f"Opening {term} in {self.game_dir} with game environment.")
             self.process = ExecutionManager.run(term, self.env, wait=False, cwd=self.game_dir)
             return True
-
         except Exception as e:
             logging.error(f"Failed to open terminal: {e}")
             raise RuntimeError(f"Failed to open terminal: {e}")
     
+    def _add_log_line(self, line):
+        """Check for umu's download of steam runtime"""
+        super()._add_log_line(line)
+        if not self.is_proton:
+            return
+        if any(message in line for message in ("Setting up Unified Launcher for Windows Games on Linux", "Updating steamrt", "Restoring Runtime Platform")):
+            umu_runtime_events.setup_started.emit(self.name)
+        elif re.search(r"(?:Using steamrt\d|steamrt\d(?:-arm64)? is up to date)", line):
+            umu_runtime_events.setup_finished.emit(self.name)
+
     def scrub_appimage_environment(self):
         """Remove APPIMAGE ENVIRONMENT when running a game"""
         appimage_vars = [
@@ -681,3 +690,10 @@ class LauncherWineGame(LauncherBaseGame):
             logging.debug("Execution Command:")
             logging.debug(f"   {' '.join(self.cmd)}")
             logging.debug("="*60)
+
+# Signal object to send events when umu is downloading steam runtime
+class UmuRuntimeEvents(QObject):
+    setup_started = Signal(str)
+    setup_finished = Signal(str)
+
+umu_runtime_events = UmuRuntimeEvents()

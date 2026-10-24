@@ -32,6 +32,7 @@ from pregame_sync_pipeline import PreLaunchSyncPipeline, SavedataSyncStep, Track
 from ui.savedata_conflict_prompt import prompt_savedata_conflict
 from platform_profile import CURRENT_PLATFORM, Feature, IS_WINDOWS, PlatformProfile
 from ui.platform_ui import PlatformUi
+from launchers.launcher_wine_game import umu_runtime_events
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class GameSidebar(QFrame):
         self._pending_pipeline = None
         self._pending_savedata_name = None
         self._pending_tracking_path = None
+        self._runtime_progress = {}
 
         self.user_settings = SettingsManager()
         self.timetracker_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
@@ -70,6 +72,8 @@ class GameSidebar(QFrame):
         self.process_manager = GameProcessManager.get_instance()
         self.process_manager.game_started.connect(self.on_game_started_signal)
         self.process_manager.game_stopped.connect(self.on_game_stopped_signal)
+        umu_runtime_events.setup_started.connect(self._show_runtime_progress)
+        umu_runtime_events.setup_finished.connect(self._hide_runtime_progress)
         self.process_manager.tracking_updated.connect(self.on_tracking_updated_signal)
         SavedataManager.get_instance().gdrive_sync_failed.connect(self.on_gdrive_sync_failed)
         SavedataManager.get_instance().gdrive_sync_succeeded.connect(self.on_gdrive_sync_succeeded)
@@ -387,6 +391,7 @@ class GameSidebar(QFrame):
 
     def on_game_stopped_signal(self, name):
         """ Triggered by GameProcessManager when ANY game finishes """
+        self._hide_runtime_progress(name)
         # Notify GameTab list item to refresh last played text
         if hasattr(self, 'on_metadata_updated'):
             self.on_metadata_updated(name)
@@ -825,6 +830,24 @@ class GameSidebar(QFrame):
         except Exception as e:
             logger.error(f"Error in _execute_game_launch {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Error"), str(e))
+
+    def _show_runtime_progress(self, name):
+        if name in self._runtime_progress:
+            return
+        dialog = QProgressDialog(self.tr("Downloading and setting up Steam Runtime..."), "", 0, 0, self)
+        dialog.setWindowTitle(self.tr("Preparing game runtime"))
+        dialog.setCancelButton(None)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setWindowModality(Qt.NonModal)
+        self._runtime_progress[name] = dialog
+        dialog.show()
+
+    def _hide_runtime_progress(self, name):
+        dialog = self._runtime_progress.pop(name, None)
+        if dialog is not None:
+            dialog.close()
+            dialog.deleteLater()
 
     def browse_path(self):
         """File system browser"""
