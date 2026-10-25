@@ -9,6 +9,7 @@ Notable changes for each release are listed below, newest first.
 - Disable gamescope if it's not detected as installed anymore to avoid it being lock on enabled.
 - Set XDG_CONFIG_HOME for emulators to use the "real" native home settings paths when running lvnm flatpak and non flatpatk emulators.
 - Added Japanese translation config to LVNM. Actual translation is still pending to do in locale/lvnm_jp.ts.
+- Add QoL improvements like sort, filter and right click menu context to prefix and runner tabs.
 - PC-98 fixes: 
     - Enabled retroarch SDL for controller support in flatpak PC-98 config, 
     - Enabled virtual keyboard.

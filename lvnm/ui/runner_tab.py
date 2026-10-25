@@ -1,10 +1,11 @@
 import logging
+import re
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QTabWidget, QGroupBox, QListWidget, QPushButton, 
-    QDialog, QMessageBox, QProgressBar, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
+    QTabWidget, QTabBar, QGroupBox, QListWidget, QPushButton,
+    QDialog, QMessageBox, QProgressBar, QApplication, QMenu
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from runner_manager_kron4ek import RunnerManagerKron4ek
 from runner_manager_protonge import RunnerManagerProtonGE
 from runner_manager import RunnerManagerInterface
@@ -12,6 +13,10 @@ from prefix_manager import PrefixManager
 from ui.console_dialog import ConsoleDialog
 
 logger = logging.getLogger(__name__)
+
+class RunnerTabBar(QTabBar):
+    def tabSizeHint(self, index):
+        return super().tabSizeHint(index).expandedTo(QSize(120, 46))
 
 class DownloadDialog(QDialog):
     """Popup to list available releases from GitHub"""
@@ -121,14 +126,28 @@ class RunnerSubTab(QWidget):
         self.base_dir = base_dir
         self.runner_type = runner_type
         self.get_prefixes_func = PrefixManager.get_prefix_json
+        self._runners = []
         
         layout = QVBoxLayout(self)
         
         # GroupBox for installed runners
         self.group = QGroupBox(self.tr("Installed {} Runners").format(runner_type.capitalize()))
+        self.group.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.group.customContextMenuRequested.connect(lambda position: self._show_context_menu(self.group.mapToGlobal(position)))
         group_layout = QVBoxLayout(self.group)
+
+        controls = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText(self.tr("Search installed runners..."))
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItems([self.tr("Newest version first"), self.tr("Oldest version first")])
+        controls.addWidget(self.search_edit, 1)
+        controls.addWidget(self.sort_combo)
+        group_layout.addLayout(controls)
         
         self.list_widget = QListWidget()
+        self.list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self.open_context_menu)
         group_layout.addWidget(self.list_widget)
         layout.addWidget(self.group)
         
@@ -144,14 +163,46 @@ class RunnerSubTab(QWidget):
         # Signals
         self.add_btn.clicked.connect(self.on_add)
         self.del_btn.clicked.connect(self.on_delete)
+        self.search_edit.textChanged.connect(self._filter_runners)
+        self.sort_combo.currentIndexChanged.connect(self._populate_runners)
         
         self.refresh_list()
 
     def refresh_list(self):
-        self.list_widget.clear()
         prefixes_data = PrefixManager.get_prefix_json()
-        runners = RunnerManagerInterface.get_local_runners(self.base_dir, prefixes_data)
+        self._runners = RunnerManagerInterface.get_local_runners(self.base_dir, prefixes_data)
+        self._populate_runners()
+
+    def _populate_runners(self):
+        current = self.list_widget.currentItem()
+        selected_name = current.text() if current else None
+        self.list_widget.clear()
+        versions = [(self._runner_version(name), name) for name in self._runners]
+        versioned = [entry for entry in versions if entry[0]]
+        unversioned = [name for version, name in versions if not version]
+        versioned.sort(key=lambda entry: (entry[0], entry[1].casefold()), reverse=self.sort_combo.currentIndex() == 0)
+        runners = [name for _, name in versioned] + sorted(unversioned, key=str.casefold)
         self.list_widget.addItems(runners)
+        if selected_name:
+            matches = self.list_widget.findItems(selected_name, Qt.MatchExactly)
+            if matches:
+                self.list_widget.setCurrentItem(matches[0])
+        self._filter_runners()
+
+    @staticmethod
+    def _runner_version(display_name):
+        runner_name = display_name.split(" (", 1)[0]
+        match = re.search(r"\d+(?:[._-]\d+)*", runner_name)
+        return tuple(int(part) for part in re.split(r"[._-]", match.group())) if match else ()
+
+    def _filter_runners(self):
+        query = self.search_edit.text().strip().casefold()
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            item.setHidden(query not in item.text().casefold())
+        current = self.list_widget.currentItem()
+        if current and current.isHidden():
+            self.list_widget.setCurrentRow(-1)
 
     def on_add(self):
         dialog = DownloadDialog(self.manager, self.runner_type, self)
@@ -246,12 +297,32 @@ class RunnerSubTab(QWidget):
         self.progress_bar.setValue(value)
         QApplication.processEvents()
 
+    def open_context_menu(self, position):
+        item = self.list_widget.itemAt(position)
+        self._show_context_menu(self.list_widget.viewport().mapToGlobal(position), item)
+
+    def contextMenuEvent(self, event):
+        self._show_context_menu(event.globalPos())
+        event.accept()
+
+    def _show_context_menu(self, global_position, item=None):
+        menu = QMenu(self)
+        action = menu.addAction(self.tr("Delete Runner") if item is not None else self.tr("Add New"))
+        if menu.exec(global_position) == action:
+            if item is None:
+                self.on_add()
+            else:
+                self._delete_runner(item)
+
     def on_delete(self):
-        current = self.list_widget.currentItem()
-        if not current: return
-        
+        self._delete_runner(self.list_widget.currentItem())
+
+    def _delete_runner(self, item):
+        if item is None:
+            return
+
         # Select runner name without prefixes attached
-        folder = current.text().split(" (")[0]
+        folder = item.text().split(" (")[0]
         confirm = QMessageBox.question(self, self.tr("Delete?"),
                                      self.tr("Delete runner {}?").format(folder))
         
@@ -272,6 +343,7 @@ class RunnerTab(QWidget):
         layout = QVBoxLayout(self)
         
         self.tabs = QTabWidget()
+        self.tabs.setTabBar(RunnerTabBar())
         
         # Instantiate managers
         self.wine_manager = RunnerManagerKron4ek()

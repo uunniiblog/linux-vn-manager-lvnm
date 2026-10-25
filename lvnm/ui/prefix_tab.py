@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, 
-    QListWidget, QPushButton, QDialog, QMessageBox, QFormLayout,
+    QListWidget, QListWidgetItem, QPushButton, QDialog, QMessageBox, QFormLayout,
     QLineEdit, QFileDialog, QCheckBox, QScrollArea, QFrame, 
     QPlainTextEdit, QGridLayout, QComboBox, QSizePolicy, QMenu
 )
@@ -22,12 +22,24 @@ logger = logging.getLogger(__name__)
 class PrefixTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.prefixes_data = []
+        self.prefixes_data = {}
+        self._prefix_usage = {}
         main_layout = QVBoxLayout(self)
 
         # GroupBox prefixes
         prefix_group = QGroupBox(self.tr("Prefixes"))
+        prefix_group.setContextMenuPolicy(Qt.CustomContextMenu)
+        prefix_group.customContextMenuRequested.connect(lambda position: self._show_create_menu(prefix_group.mapToGlobal(position)))
         group_layout = QVBoxLayout(prefix_group)
+
+        controls = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText(self.tr("Search prefixes..."))
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItems([self.tr("Latest updated"), self.tr("Name (A-Z)")])
+        controls.addWidget(self.search_edit, 1)
+        controls.addWidget(self.sort_combo)
+        group_layout.addLayout(controls)
         
         self.prefixes_list = QListWidget()
         group_layout.addWidget(self.prefixes_list)
@@ -80,41 +92,54 @@ class PrefixTab(QWidget):
 
         self.prefixes_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.prefixes_list.customContextMenuRequested.connect(self.open_context_menu)
+        self.search_edit.textChanged.connect(self._filter_prefixes)
+        self.sort_combo.currentIndexChanged.connect(self._populate_prefixes)
 
         self.refresh_list()
 
     def refresh_list(self):
-        self.prefixes_list.clear()
         self.prefixes_data = PrefixManager.get_prefix_json()
         self.game_data = GameManager.list_games()
 
-        prefix_usage = {}
+        self._prefix_usage = {}
         for game_name, game_card in self.game_data.items():
             p_name = game_card.prefix
             if p_name:
-                if p_name not in prefix_usage:
-                    prefix_usage[p_name] = []
-                prefix_usage[p_name].append(game_name)
+                self._prefix_usage.setdefault(p_name, []).append(game_name)
 
-        sorted_prefix_names = sorted(
-            self.prefixes_data.keys(),
-            key=lambda name: self.prefixes_data[name].get('update_date', ''),
-            reverse=True
-        )
+        self._populate_prefixes()
 
-        display_list = []
-        for prefix_name in sorted_prefix_names:
-            games = prefix_usage.get(prefix_name, [])
-            
-            if games:
-                display_list.append(f"{prefix_name} ({', '.join(games)})")
-            else:
-                display_list.append(prefix_name)
-        
-        self.prefixes_list.addItems(display_list)
+    def _populate_prefixes(self):
+        selected_prefix = self.get_selected_prefix()
+        self.prefixes_list.clear()
+        if self.sort_combo.currentIndex() == 0:
+            prefix_names = sorted(self.prefixes_data, key=lambda name: self.prefixes_data[name].get("update_date", "") or "", reverse=True)
+        else:
+            prefix_names = sorted(self.prefixes_data, key=str.casefold)
+
+        for prefix_name in prefix_names:
+            games = self._prefix_usage.get(prefix_name, [])
+            display_name = f"{prefix_name} ({', '.join(games)})" if games else prefix_name
+            item = QListWidgetItem(display_name, self.prefixes_list)
+            item.setData(Qt.UserRole, prefix_name)
+            if prefix_name == selected_prefix:
+                self.prefixes_list.setCurrentItem(item)
+
+        self._filter_prefixes()
+
+    def _filter_prefixes(self):
+        query = self.search_edit.text().strip().casefold()
+        for index in range(self.prefixes_list.count()):
+            item = self.prefixes_list.item(index)
+            item.setHidden(query not in item.text().casefold())
+        current = self.prefixes_list.currentItem()
+        if current and current.isHidden():
+            self.prefixes_list.setCurrentRow(-1)
 
     def on_delete(self):
         prefix_str = self.get_selected_prefix()
+        if not prefix_str:
+            return
         
         prefix = PrefixManager(prefix_str)
         confirm = QMessageBox.question(self, self.tr("Delete?"),
@@ -133,6 +158,8 @@ class PrefixTab(QWidget):
 
     def on_edit(self):
         prefix_str = self.get_selected_prefix()
+        if not prefix_str:
+            return
         prefix = PrefixManager(prefix_str)
 
         dialog = EditPrefixDialog(prefix, self)
@@ -284,8 +311,7 @@ class PrefixTab(QWidget):
         current = self.prefixes_list.currentItem()
         if not current:
             return None
-        # Split to handle the "PrefixName (Game1, Game2)" display format
-        return current.text().split(" (")[0]
+        return current.data(Qt.UserRole)
 
     def run_utility(self, command: str):
         prefix_name = self.get_selected_prefix()
@@ -305,6 +331,8 @@ class PrefixTab(QWidget):
 
     def browse_files(self):
         prefix_name = self.get_selected_prefix()
+        if not prefix_name:
+            return
         prefix = PrefixManager(prefix_name)
         logger.debug(prefix.prefix_path)
         SystemUtils.browse_files(prefix.prefix_path)
@@ -313,9 +341,10 @@ class PrefixTab(QWidget):
         """Creates and shows the right-click menu for prefixes"""
         item = self.prefixes_list.itemAt(position)
         if not item:
+            self._show_create_menu(self.prefixes_list.viewport().mapToGlobal(position))
             return
 
-        prefix_name = self.get_selected_prefix()
+        self.prefixes_list.setCurrentItem(item)
         menu = QMenu(self)
 
         # Management Actions
@@ -348,6 +377,16 @@ class PrefixTab(QWidget):
             self.run_utility("wineconsole")
         elif action == act_bash:
             self.run_bash_utility()
+
+    def contextMenuEvent(self, event):
+        self._show_create_menu(event.globalPos())
+        event.accept()
+
+    def _show_create_menu(self, global_position):
+        menu = QMenu(self)
+        create_action = menu.addAction(self.tr("Create Prefix"))
+        if menu.exec(global_position) == create_action:
+            self.on_add()
     
     def refresh_active_tab(self):
         """Forces the currently visible sub-tab to reload its data"""
