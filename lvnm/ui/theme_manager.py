@@ -24,16 +24,16 @@ class ThemeManager(QObject):
     }}
 
     /* ── Left sidebar ───────────────────────────────────────────── */
-    QListWidget#sidebar {{
+    QTreeWidget#sidebar {{
         background-color: {bg_sidebar};
         color: {text_sidebar};
         border: none;
         outline: none;
     }}
-    QListWidget#sidebar::item {{
+    QTreeWidget#sidebar::item {{
         padding: 15px 20px;
     }}
-    QListWidget#sidebar::item:selected {{
+    QTreeWidget#sidebar::item:selected {{
         background-color: {bg_sidebar_sel};
         color: {text_highlight};
         border-left: 3px solid {accent};

@@ -1,34 +1,28 @@
+import config
+import logging
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QComboBox, 
     QLabel, QGroupBox, QFormLayout,
     QHBoxLayout, QLineEdit, QPushButton,
     QCheckBox, QFileDialog, QScrollArea, QFrame,
     QGridLayout, QMessageBox, QStyle, QSizePolicy,
-    QToolButton, QProgressBar, QDialog, QApplication,
     QRadioButton, QButtonGroup
 )
 from ui.env_var_manager_dialog import EnvVarManagerDialog
-from ui.savedata_management_dialog import SavedataManagementDialog
-from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QIntValidator
+from ui.settings_page import SettingsPage
+from PySide6.QtCore import Qt
 from system_utils import SystemUtils
-from timetracker.system_utils import SystemUtils as TimeTrackerSystemUtils
 from execution_manager import ExecutionManager
-import config
-import logging
-from settings_manager import SettingsManager
 from game_manager import GameManager
 from logging_manager import setup_logging
-from pc98_manager import Pc98Manager
 from prefix_manager import PrefixManager
 from game_process_manager import GameProcessManager
-from gdrive_manager import GdriveManager, GdriveDeviceFlowWorker
-from platform_profile import CURRENT_PLATFORM, IS_WINDOWS, Feature, PlatformProfile
+from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
 from ui.platform_ui import PlatformUi
 
 logger = logging.getLogger(__name__)
 
-class SettingsTab(QWidget):
+class SettingsTab(SettingsPage):
     CONFIG_FILE = config.USER_SETTINGS
 
     def __init__(self, theme_manager, platform: PlatformProfile = CURRENT_PLATFORM):
@@ -37,10 +31,7 @@ class SettingsTab(QWidget):
         self.platform = platform
         self.platform_ui = PlatformUi(platform)
         self.theme_manager = theme_manager
-        self.user_settings = SettingsManager()
         self.global_env_checkboxes = {}
-        self._pending_text_save = False
-        self._gdrive_cache_dirty = False
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -55,23 +46,15 @@ class SettingsTab(QWidget):
         
         main_layout.addWidget(self._build_settings_group())
         main_layout.addWidget(self._build_appearance_group())
-        main_layout.addWidget(self._build_timetracking_group())
-        main_layout.addWidget(self._build_savedata_group())
+        main_layout.addWidget(self._build_directories_group())
         self.texthooking_group = self._build_texthooking_group()
         self.platform_ui.add_widget(main_layout, self.texthooking_group, requires=Feature.WINE_CONFIGURATION)
-        self.emulation_group = self._build_emulation_group()
-        self.platform_ui.add_widget(main_layout, self.emulation_group, requires=Feature.EMULATION)
-        main_layout.addWidget(self._build_directories_group())
-        main_layout.addWidget(self._build_sysinfo_group())
-        main_layout.addWidget(self._build_about_group())
         main_layout.addStretch()
 
         scroll.setWidget(container)
         outer_layout.addWidget(scroll)
 
         self._connect_signals()
-        QApplication.instance().aboutToQuit.connect(self.flush_pending_text_settings)
-        self._start_background_checks()
 
     # ==========================================
     # Interface methods
@@ -348,262 +331,6 @@ class SettingsTab(QWidget):
 
         return appearance_group
 
-    def _build_timetracking_group(self):
-        timetracker_group = QGroupBox(self.tr("Timetracker"))
-        timetracker_layout = QFormLayout(timetracker_group)
-        timetracker_layout.setLabelAlignment(Qt.AlignLeft)
-
-        tt_settings = self.user_settings.get(config.USER_CONF_TIMETRACKER, {})
-        self.tt_dependent_widgets = []
-
-        # Warning Message
-        if self.platform.name != "windows":
-            tracking_help = self.tr(
-                "Native Wayland tracking is supported on KDE, Hyprland, and GNOME "
-                "with the LVNM Shell extension. Other desktops use XWayland."
-            )
-            self.tt_warning_label = QLabel(tracking_help)
-            self.tt_warning_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
-            self.tt_warning_label.setWordWrap(True)
-            timetracker_layout.addRow(self.tt_warning_label)
-            self.tt_dependent_widgets.append(self.tt_warning_label)
-
-        if SystemUtils.is_gnome_desktop():
-            self.gnome_extension_message = QLabel(self.tr(
-                "GNOME native Wayland tracking requires the LVNM Shell extension. "
-                "After installing or updating it, log out and log back in to restart the session."
-            ))
-            self.gnome_extension_message.setWordWrap(True)
-            self.gnome_extension_install_btn = QPushButton(self.tr("Install / Update GNOME Extension"))
-            self.gnome_extension_install_btn.setCursor(Qt.PointingHandCursor)
-            self.gnome_extension_install_btn.clicked.connect(self._install_gnome_extension)
-
-            gnome_extension_layout = QVBoxLayout()
-            gnome_extension_layout.addWidget(self.gnome_extension_message)
-            gnome_extension_layout.addWidget(self.gnome_extension_install_btn, 0, Qt.AlignLeft)
-            timetracker_layout.addRow(QLabel(self.tr("GNOME integration:")), gnome_extension_layout)
-
-        # Enable Checkbox
-        self.timetracking_enable = QCheckBox(self.tr("Enable"))
-        self.timetracking_enable.setChecked(tt_settings.get("timetracking", False))
-        timetracker_layout.addRow(QLabel(self.tr("Enable timetracking:")), self.timetracking_enable)
-
-        # AFK Idle Timer
-        afk_layout = QHBoxLayout()
-        self.afk_timer_edit = QLineEdit()
-        self.afk_timer_edit.setValidator(QIntValidator(0, 999))
-        self.afk_timer_edit.setFixedWidth(60)
-        self.afk_timer_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_AFK_TIMER, 0)))
-        if self.platform.name == "windows":
-            afk_suffix = self.tr("minutes")
-        else:
-            afk_suffix = self.tr("minutes (requires swayidle)")
-        self.afk_label_suffix = QLabel(afk_suffix)
-        afk_layout.addWidget(self.afk_timer_edit)
-        afk_layout.addWidget(self.afk_label_suffix)
-        afk_layout.addStretch()
-        
-        self.afk_label_prefix = QLabel(self.tr("AFK Idle Timer:"))
-        timetracker_layout.addRow(self.afk_label_prefix, afk_layout)
-
-        # Periodic Save Interval
-        save_interval_layout = QHBoxLayout()
-        self.save_interval_edit = QLineEdit()
-        self.save_interval_edit.setValidator(QIntValidator(1, 999))
-        self.save_interval_edit.setFixedWidth(60)
-        self.save_interval_edit.setText(str(tt_settings.get(config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, 3)))
-        self.save_label_suffix = QLabel(self.tr("minutes"))
-        save_interval_layout.addWidget(self.save_interval_edit)
-        save_interval_layout.addWidget(self.save_label_suffix)
-        save_interval_layout.addStretch()
-        
-        self.save_label_prefix = QLabel(self.tr("Periodic Save Interval:"))
-        timetracker_layout.addRow(self.save_label_prefix, save_interval_layout)
-
-        # Auto Start timetracking
-        self.timetracking_autostart = QCheckBox(self.tr("Automatically Start Time Tracking When Game Launches"))
-        self.timetracking_autostart.setChecked(tt_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False))
-        self.autostart_label = QLabel(self.tr("Auto Start"))
-        timetracker_layout.addRow(self.autostart_label, self.timetracking_autostart)
-
-        # Gdrive sync timetracking
-        self.timetracking_sync = QCheckBox(self.tr("Automatically sync timetracker files for games with Gdrive savedata sync enabled"))
-        self.timetracking_sync.setChecked(tt_settings.get(config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, False))
-        self.tt_sync_label = QLabel(self.tr("Gdrive sync"))
-        timetracker_layout.addRow(self.tt_sync_label, self.timetracking_sync)
-
-        self.tt_dependent_widgets.extend([
-            self.afk_timer_edit,
-            self.afk_label_prefix,
-            self.afk_label_suffix,
-            self.save_interval_edit,
-            self.save_label_prefix,
-            self.save_label_suffix,
-            self.timetracking_autostart,
-            self.autostart_label,
-        ])
-
-        # Connect the checkbox signal
-        self.timetracking_enable.toggled.connect(self._on_timetracking_toggled)
-        
-        # Set initial state
-        self._on_timetracking_toggled(self.timetracking_enable.isChecked())
-
-        return timetracker_group
-
-    def _build_savedata_group(self):
-        savedata_group = QGroupBox(self.tr("Savedata Management"))
-        savedata_layout = QFormLayout(savedata_group)
-        savedata_layout.setLabelAlignment(Qt.AlignLeft)
-
-        # Retrieve current settings
-        savedata_settings = self.user_settings.get(config.USER_CONF_SAVEDATA, {})
-
-        # Enable Checkbox
-        self.savedata_enable = QCheckBox(self.tr("Enable"))
-        self.savedata_enable.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_ENABLED, False))
-        savedata_layout.addRow(QLabel(self.tr("Savedata management:")), self.savedata_enable)
-
-        # Auto detect checkbox
-        auto_detect_label = QLabel(self.tr("Auto Detect Save:"))
-        auto_detect_label.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
-        self.auto_detect_save = QCheckBox(self.tr("Enable"))
-        self.auto_detect_save.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_AUTO_DETECT, False))
-        self.auto_detect_save.setToolTip(self.tr("Automatically tries to auto detect the save data folder for the game after closing the game if it hasn't been set"))
-        savedata_layout.addRow(auto_detect_label, self.auto_detect_save)
-
-        # Savedata dialog
-        self.manage_savedata_btn = QPushButton(self.tr("Manage Savedata"))
-        self.manage_savedata_btn.setCursor(Qt.PointingHandCursor)
-        self.manage_savedata_btn.clicked.connect(self._open_savedata_manager)
-        manage_row = QHBoxLayout()
-        manage_row.addWidget(self.manage_savedata_btn)
-        manage_row.addStretch()
-        savedata_layout.addRow(QLabel(self.tr("Manage savedata:")), manage_row)
-
-        # Separator for Gdrive section
-        header_widget = QWidget()
-        header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(0, 15, 0, 5)
-
-        gdrive_section_title = QLabel(self.tr("Google Drive Options"))
-        gdrive_section_title.setStyleSheet("font-weight: bold;color: palette(link);")
-
-        trailing_line = QFrame()
-        trailing_line.setFrameShape(QFrame.Shape.HLine)
-        trailing_line.setFrameShadow(QFrame.Shadow.Sunken)
-        trailing_line.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        trailing_line.setStyleSheet("color: rgba(255, 255, 255, 0.1); margin-left: 1em; color: palette(mid);border: none;min-height: 1px;max-height: 1px;")
-
-        header_layout.addWidget(gdrive_section_title)
-        header_layout.addWidget(trailing_line)
-        savedata_layout.addRow(header_widget)
-
-        # Guide link
-        gdrive_guide_label = QLabel(f'<a href="{config.GDRIVE_SETUP_GUIDE}" style="color: #3498db; text-decoration: none;">Google cloud setup guide:</a>')
-        gdrive_guide_label = QLabel(f'Google cloud setup guide: <a href="{config.GDRIVE_SETUP_GUIDE}"> {config.GDRIVE_SETUP_GUIDE} </a>')
-        gdrive_guide_label.linkActivated.connect(SystemUtils.open_url)
-        gdrive_guide_label.setStyleSheet("color: #888; font-style: italic; margin-bottom: 5px;")
-        gdrive_guide_label.setWordWrap(True)
-        savedata_layout.addRow(gdrive_guide_label)
-
-        # Auto enable Gsync games checkbox
-        all_gdrive_label = QLabel(self.tr("Automatically enable:"))
-        all_gdrive_label.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
-        self.all_gdrive_ckbox = QCheckBox(self.tr("Automatically enables GDrive Sync for all new games (Recommended)"))
-        self.all_gdrive_ckbox.setChecked(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False))
-        self.all_gdrive_ckbox.setToolTip(self.tr("Recommended to enable the sync from the start in secondary devices. Will autofetch and create the savedata folder and avoid conflicts"))
-        savedata_layout.addRow(all_gdrive_label, self.all_gdrive_ckbox)
-
-        # Gdrive Client ID
-        gdrive_id_label = QLabel(self.tr("Gdrive Client ID:"))
-        self.gdrive_client_id_edit, gdrive_id_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, ""))
-        savedata_layout.addRow(gdrive_id_label, gdrive_id_row)
-
-        # Gdrive Client Secret
-        gdrive_secret_label = QLabel(self.tr("Gdrive Client Secret:"))
-        self.gdrive_client_secret_edit, gdrive_secret_row = self._create_secret_field(savedata_settings.get(config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, ""))
-        savedata_layout.addRow(gdrive_secret_label, gdrive_secret_row)
-
-        # Gdrive status + single toggling button (Sign in <-> Log out)
-        status_label = QLabel(self.tr("Gdrive Account:"))
-
-        self.gdrive_status_dot = QLabel("●")
-        self.gdrive_status_dot.setFixedWidth(14)
-
-        self.gdrive_status_text = QLabel()
-
-        self.gdrive_auth_btn = QPushButton()
-        self.gdrive_auth_btn.setFlat(True)
-        self.gdrive_auth_btn.setStyleSheet("text-align: left; color: palette(link); padding: 4px 10px;")
-        self.gdrive_auth_btn.setCursor(Qt.PointingHandCursor)
-        self.gdrive_auth_btn.clicked.connect(self._on_gdrive_auth_clicked)
-
-        status_row = QHBoxLayout()
-        status_row.setContentsMargins(0, 0, 0, 0)
-        status_row.addWidget(self.gdrive_status_dot)
-        status_row.addWidget(self.gdrive_status_text)
-        status_row.addWidget(self.gdrive_auth_btn)
-        status_row.addStretch()
-        savedata_layout.addRow(status_label, status_row)
-
-        self._update_gdrive_ui_state()
-
-        # Widgets that only make sense when savedata management is enabled
-        self.savedata_dependent_widgets = [
-            auto_detect_label,
-            self.auto_detect_save,
-            gdrive_id_label,
-            self.gdrive_client_id_edit,
-            gdrive_secret_label,
-            self.gdrive_client_secret_edit,
-            status_label,
-            self.gdrive_status_dot,
-            self.gdrive_status_text,
-            self.gdrive_auth_btn,
-            self.manage_savedata_btn,
-            all_gdrive_label,
-            self.all_gdrive_ckbox
-        ]
-
-        # Connect the checkbox signal
-        self.savedata_enable.toggled.connect(self._on_savedata_toggled)
-
-        # Set initial state
-        self._on_savedata_toggled(self.savedata_enable.isChecked())
-
-        return savedata_group
-
-
-    def _open_savedata_manager(self):
-        """Opens the dialog to manage savedata."""
-
-        dialog = SavedataManagementDialog(self, platform=self.platform)
-        if dialog.exec():
-            log.debug("Save data closed")
-
-    def _create_secret_field(self, initial_value=""):
-        """Creates a password-style QLineEdit with a toggle button to reveal/hide the text.
-        Returns (line_edit, container_layout)."""
-        line_edit = QLineEdit(initial_value)
-        line_edit.setEchoMode(QLineEdit.Password)
-
-        toggle_btn = QToolButton()
-        toggle_btn.setCheckable(True)
-        toggle_btn.setText("👁")
-        toggle_btn.setToolTip(self.tr("Show/Hide"))
-        toggle_btn.setFixedWidth(28)
-        toggle_btn.toggled.connect(
-            lambda checked, e=line_edit: e.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
-        )
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(line_edit)
-        row.addWidget(toggle_btn)
-
-        return line_edit, row
-
     def _build_texthooking_group(self):
         texthooker_group = QGroupBox(self.tr("Texthooker"))
         texthooker_layout = QFormLayout(texthooker_group)
@@ -630,162 +357,6 @@ class SettingsTab(QWidget):
         texthooker_layout.addRow(QLabel(self.tr("Texthooker Path:")), path_layout)
 
         return texthooker_group
-
-    def _build_emulation_group(self):
-        emulation_group = QGroupBox(self.tr("Emulation"))
-        emulation_layout = QFormLayout(emulation_group)
-        emulation_layout.setLabelAlignment(Qt.AlignLeft)
-
-        # Retrieve current settings
-        emulation_settings = self.user_settings.get(config.USER_CONF_EMULATION, {})
-
-        linux_path_placeholders = [
-            self.tr("/path/to/duckstation.AppImage or duckstation-qt"),
-            self.tr("/path/to/pcsx2.AppImage or pcsx2-qt"),
-            self.tr("/path/to/rpcs3.AppImage or rpcs3"),
-            self.tr("/path/to/emulator.AppImage or process"),
-            self.tr("/path/to/emulator.AppImage or process"),
-        ]
-        windows_path_placeholders = [
-            self.tr("C:\\path\\to\\duckstation-qt.exe"),
-            self.tr("C:\\path\\to\\pcsx2-qt.exe"),
-            self.tr("C:\\path\\to\\rpcs3.exe"),
-            self.tr("C:\\path\\to\\emulator.exe"),
-            self.tr("C:\\path\\to\\emulator.exe"),
-        ]
-        path_placeholders = windows_path_placeholders if IS_WINDOWS else linux_path_placeholders
-        emulator_definitions = [
-            (
-                self.tr("PSX"),
-                config.USER_CONF_EMULATION_PSX_PATH,
-                config.USER_CONF_EMULATION_PSX_CONFIG,
-                path_placeholders[0],
-            ),
-            (
-                self.tr("PS2"),
-                config.USER_CONF_EMULATION_PS2_PATH,
-                config.USER_CONF_EMULATION_PS2_CONFIG,
-                path_placeholders[1],
-            ),
-            (
-                self.tr("PS3"),
-                config.USER_CONF_EMULATION_PS3_PATH,
-                config.USER_CONF_EMULATION_PS3_CONFIG,
-                path_placeholders[2],
-            ),
-            (
-                self.tr("PSP"),
-                config.USER_CONF_EMULATION_PSP_PATH,
-                config.USER_CONF_EMULATION_PSP_CONFIG,
-                path_placeholders[3],
-            ),
-            (
-                self.tr("Switch"),
-                config.USER_CONF_EMULATION_SWITCH_PATH,
-                config.USER_CONF_EMULATION_SWITCH_CONFIG,
-                path_placeholders[4],
-            ),
-        ]
-
-        self.emulation_widgets = {}
-
-        for i, (display_name, path_key, cli_key, path_placeholder) in enumerate(emulator_definitions):
-            # if i > 0:
-            #     divider = QFrame()
-            #     divider.setFrameShape(QFrame.HLine)
-            #     divider.setFrameShadow(QFrame.Sunken)
-            #     emulation_layout.addRow(divider)
-
-            emulation_layout.addRow(QLabel(f"<b>{display_name}</b>"))
-
-            # Path or Command
-            path_row = QHBoxLayout()
-            path_edit = QLineEdit(emulation_settings.get(path_key, ""))
-            path_edit.setPlaceholderText(path_placeholder)
-            browse_btn = QPushButton(self.tr("Browse..."))
-            path_row.addWidget(path_edit)
-            path_row.addWidget(browse_btn)
-            emulation_layout.addRow(QLabel(self.tr("Path or Command:")), path_row)
-
-            # CLI / config parameters
-            config_edit = QLineEdit(emulation_settings.get(cli_key, ""))
-            config_edit.setPlaceholderText(self.tr("-fullscreen -batch"))
-            emulation_layout.addRow(QLabel(self.tr("Config:")), config_edit)
-
-            browse_btn.clicked.connect(lambda _checked=False, e=path_edit: self.browse_emulator_path(e))
-            self._bind_text_setting(path_edit, path_key, parent_key=config.USER_CONF_EMULATION)
-            self._bind_text_setting(config_edit, cli_key, parent_key=config.USER_CONF_EMULATION)
-
-            self.emulation_widgets[path_key] = path_edit
-            self.emulation_widgets[cli_key] = config_edit
-
-        emulation_layout.addRow(QLabel(f"<b>{self.tr('PC-98 (NP2kai)')}</b>"))
-        pc98_note = QLabel(self.tr(
-            "The flatpak build includes a small RetroArch frontend, NP2kai core, and a freely distributable japanese font. "
-            "For the better compatatibility include your own bios and font files in the configured folder below. Multi disk games can use an UTF-8 .m3u playlist. "
-            "Press F12 for NP2kai's menu. Press F1 for retroarch menu."
-        ))
-        pc98_note.setWordWrap(True)
-        pc98_note.setStyleSheet("color: #888; font-style: italic;")
-        emulation_layout.addRow(pc98_note)
-
-        is_flatpak = SystemUtils.get_runtime_type() == "flatpak"
-        use_bundled = QCheckBox(self.tr("Use the flatpak bundled RetroArch and NP2kai core"))
-        use_bundled.setChecked(is_flatpak and emulation_settings.get(config.USER_CONF_EMULATION_PC98_USE_BUNDLED, False))
-        use_bundled.setEnabled(is_flatpak)
-        emulation_layout.addRow(use_bundled)
-
-        pc98_path_row = QHBoxLayout()
-        pc98_path_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_PATH, ""))
-        pc98_path_edit.setPlaceholderText(self.tr("C:\\path\\to\\retroarch.exe") if IS_WINDOWS else self.tr("/path/to/retroarch or retroarch"))
-        pc98_path_btn = QPushButton(self.tr("Browse..."))
-        pc98_path_row.addWidget(pc98_path_edit)
-        pc98_path_row.addWidget(pc98_path_btn)
-        pc98_path_label = QLabel(self.tr("Custom RetroArch:"))
-        emulation_layout.addRow(pc98_path_label, pc98_path_row)
-
-        pc98_core_row = QHBoxLayout()
-        pc98_core_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_CORE_PATH, ""))
-        pc98_core_edit.setPlaceholderText(self.tr("C:\\path\\to\\np2kai_libretro.dll") if IS_WINDOWS else self.tr("/path/to/np2kai_libretro.so"))
-        pc98_core_btn = QPushButton(self.tr("Browse..."))
-        pc98_core_row.addWidget(pc98_core_edit)
-        pc98_core_row.addWidget(pc98_core_btn)
-        pc98_core_label = QLabel(self.tr("Custom NP2kai core:"))
-        emulation_layout.addRow(pc98_core_label, pc98_core_row)
-
-        default_system_path = Pc98Manager.get_managed_system_path_default()
-        pc98_system_row = QHBoxLayout()
-        pc98_system_path = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, default_system_path))
-        pc98_system_path.setPlaceholderText(self.tr("Select the folder containing NP2kai BIOS/font files"))
-        pc98_system_btn = QPushButton(self.tr("Browse..."))
-        pc98_system_row.addWidget(pc98_system_path)
-        pc98_system_row.addWidget(pc98_system_btn)
-        emulation_layout.addRow(QLabel(self.tr("BIOS/font system folder:")), pc98_system_row)
-
-        pc98_config_edit = QLineEdit(emulation_settings.get(config.USER_CONF_EMULATION_PC98_CONFIG, ""))
-        pc98_config_edit.setPlaceholderText(self.tr("Optional extra RetroArch arguments"))
-        emulation_layout.addRow(QLabel(self.tr("Extra arguments:")), pc98_config_edit)
-
-        def update_pc98_custom_state(checked):
-            for widget in (pc98_path_label, pc98_path_edit, pc98_path_btn, pc98_core_label, pc98_core_edit, pc98_core_btn):
-                widget.setEnabled(not checked)
-
-        update_pc98_custom_state(use_bundled.isChecked())
-        use_bundled.toggled.connect(update_pc98_custom_state)
-        use_bundled.toggled.connect(lambda checked: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_USE_BUNDLED, checked))
-        pc98_path_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_path_edit))
-        pc98_core_btn.clicked.connect(lambda: self.browse_pc98_core_path(pc98_core_edit))
-        pc98_system_btn.clicked.connect(lambda: self.browse_pc98_system_folder(pc98_system_path))
-        self._bind_text_setting(pc98_path_edit, config.USER_CONF_EMULATION_PC98_PATH, parent_key=config.USER_CONF_EMULATION)
-        self._bind_text_setting(pc98_core_edit, config.USER_CONF_EMULATION_PC98_CORE_PATH, parent_key=config.USER_CONF_EMULATION)
-        self._bind_text_setting(pc98_system_path, config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, parent_key=config.USER_CONF_EMULATION)
-        self._bind_text_setting(pc98_config_edit, config.USER_CONF_EMULATION_PC98_CONFIG, parent_key=config.USER_CONF_EMULATION)
-        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_PATH] = pc98_path_edit
-        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_CORE_PATH] = pc98_core_edit
-        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_SYSTEM_PATH] = pc98_system_path
-        self.emulation_widgets[config.USER_CONF_EMULATION_PC98_CONFIG] = pc98_config_edit
-
-        return emulation_group
 
     def _build_directories_group(self):
         directories_group = QGroupBox(self.tr("Directories"))
@@ -866,79 +437,6 @@ class SettingsTab(QWidget):
 
         return directories_group
 
-    def _build_sysinfo_group(self):
-        sysinfo_group = QGroupBox(self.tr("System Info"))
-        sysinfo_layout = QFormLayout(sysinfo_group)
-        sysinfo_layout.setLabelAlignment(Qt.AlignLeft)
-
-        runtime = SystemUtils.get_runtime_type()
-        version_label = config.VERSION
-
-        if runtime == "appimage":
-            version_label += "  📦 AppImage"
-        elif runtime == "flatpak":
-            version_label += "  📦 Flatpak"
-        elif runtime == "windows":
-            version_label += "  Windows"
-        else:
-            version_label += "  (native)"
-
-        self._sysinfo_values = {}
-
-        def add_value(label, key, value="…", requires=None):
-            value_label = QLabel(value)
-            if self.platform_ui.add_row(
-                sysinfo_layout,
-                QLabel(label),
-                value_label,
-                requires=requires,
-            ):
-                self._sysinfo_values[key] = value_label
-
-        add_value(self.tr("LVNM Version:"), "app_version", version_label)
-        add_value(self.tr("OS:"), "os")
-        add_value(self.tr("Kernel:"), "kernel")
-        add_value(self.tr("Desktop:"), "desktop")
-        add_value(self.tr("CPU:"), "cpu")
-        add_value(self.tr("GPU:"), "gpu")
-        add_value(self.tr("Vulkan Support:"), "vulkan_support", requires=Feature.WINE_CONFIGURATION)
-        add_value(self.tr("Gamescope:"), "gamescope", requires=Feature.GAMESCOPE)
-        add_value(self.tr("linux-rt-upscaler:"), "upscale", requires=Feature.RT_UPSCALER)
-        add_value(self.tr("Umu-run:"), "umu_run", requires=Feature.WINE_CONFIGURATION)
-        add_value(self.tr("Winetricks:"), "winetricks", requires=Feature.WINE_CONFIGURATION)
-
-        for pkg in SystemUtils.GSTREAMER_PACKAGES:
-            add_value(
-                f"{pkg}:",
-                f"gstreamer:{pkg}",
-                requires=Feature.WINE_CONFIGURATION,
-            )
-        
-        return sysinfo_group
-
-    def _build_about_group(self):
-        about_group = QGroupBox(self.tr("About"))
-        about_layout = QFormLayout(about_group)
-        about_layout.setLabelAlignment(Qt.AlignLeft)
-
-        self.version_label_val = QLabel(config.VERSION)
-        about_layout.addRow(QLabel(self.tr("LVNM version:")), self.version_label_val)
-        
-        github_label = QLabel(f'<a href="{config.GIT_URL}">{config.GIT_URL}</a>')
-        github_label.linkActivated.connect(SystemUtils.open_url)
-        about_layout.addRow(QLabel(self.tr("Github:")), github_label)
-
-        wineprefixes_label = QLabel(f'<a href="{config.WINEPREFIX_URL}">{config.WINEPREFIX_URL}</a>')
-        wineprefixes_label.linkActivated.connect(SystemUtils.open_url)
-        self.platform_ui.add_row(
-            about_layout,
-            QLabel(self.tr("Wineprefixes guide:")),
-            wineprefixes_label,
-            requires=Feature.WINE_CONFIGURATION,
-        )
-
-        return about_group
-
     # ==========================================
     # Real Methods
 
@@ -960,19 +458,9 @@ class SettingsTab(QWidget):
         self.upscaler_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_RT_UPSCALER_ENABLED, bool(s)))
         self._bind_text_setting(self.upscaler_params, config.USER_CONF_RT_UPSCALER_PARAMS)
         self.upscaler_gui_btn.clicked.connect(self._open_upscaler_gui)
-        self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
-        self._bind_text_setting(self.afk_timer_edit, config.USER_CONF_TIMETRACKER_AFK_TIMER, parent_key=config.USER_CONF_TIMETRACKER, convert=self._int_or_zero)
-        self._bind_text_setting(self.save_interval_edit, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, parent_key=config.USER_CONF_TIMETRACKER, convert=self._int_or_zero)
-        self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
-        self.timetracking_sync.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
         self._bind_text_setting(self.texthooker_edit, "path", parent_key=config.USER_CONF_TEXTHOOKER)
-        self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_ENABLED, bool(s)))
-        self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
-        self._bind_text_setting(self.gdrive_client_id_edit, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, parent_key=config.USER_CONF_SAVEDATA, convert=str.strip, reset_gdrive_cache=True)
-        self._bind_text_setting(self.gdrive_client_secret_edit, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, parent_key=config.USER_CONF_SAVEDATA, convert=str.strip, reset_gdrive_cache=True)
-        self.all_gdrive_ckbox.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, bool(s)))
 
         # Connect signals for dynamic folder inputs
         for key, edit_widget, btn_widget in self.folder_inputs:
@@ -993,72 +481,10 @@ class SettingsTab(QWidget):
             QMessageBox.warning(self, self.tr("Unable to Open GUI"),
                 self.tr("linux-rt-upscaler GUI could not be started:\n{}").format(error))
 
-    def _install_gnome_extension(self):
-        """Install or update the bundled GNOME Shell extension."""
-        self.gnome_extension_install_btn.setEnabled(False)
-        try:
-            TimeTrackerSystemUtils.install_gnome_shell_extension()
-        except RuntimeError as error:
-            logger.error("Failed to install GNOME Shell extension: %s", error)
-            QMessageBox.critical(
-                self,
-                self.tr("GNOME Extension Installation Failed"),
-                self.tr("The GNOME Shell extension could not be installed:\n{}").format(error),
-            )
-        else:
-            QMessageBox.information(
-                self,
-                self.tr("GNOME Extension Installed"),
-                self.tr(
-                    "The LVNM GNOME Shell extension was installed successfully. "
-                    "Log out and log back in to restart your GNOME session before using native Wayland tracking."
-                ),
-            )
-        finally:
-            self.gnome_extension_install_btn.setEnabled(True)
-
     def _connect_folder_signal(self, key, edit_widget, btn_widget):
         """Helper to bind signals without loop closure issues."""
         btn_widget.clicked.connect(lambda: self.browse_directory_for_widget(edit_widget, key))
         self._bind_text_setting(edit_widget, key)
-
-    @staticmethod
-    def _int_or_zero(text):
-        return int(text) if text else 0
-
-    def _bind_text_setting(self, edit_widget, key, parent_key=None, convert=None, reset_gdrive_cache=False):
-        """Keep text settings current in memory and batch disk writes."""
-        def changed(text):
-            value = convert(text) if convert else text
-            if parent_key:
-                self.save_nested_setting(parent_key, key, value, deferred=True)
-            else:
-                self.save_setting(key, value, deferred=True)
-            if reset_gdrive_cache:
-                self._gdrive_cache_dirty = True
-
-        edit_widget.textChanged.connect(changed)
-        edit_widget.editingFinished.connect(self.flush_pending_text_settings)
-
-    def _finish_text_save(self):
-        self._pending_text_save = False
-        if self._gdrive_cache_dirty:
-            self._gdrive_cache_dirty = False
-            GdriveManager.reset_service_cache()
-
-    def flush_pending_text_settings(self):
-        if not self._pending_text_save:
-            return
-        self.user_settings.flush()
-        self._finish_text_save()
-
-    def hideEvent(self, event):
-        self.flush_pending_text_settings()
-        super().hideEvent(event)
-
-    def closeEvent(self, event):
-        self.flush_pending_text_settings()
-        super().closeEvent(event)
 
     def _on_delete_covers_clicked(self):
         """Show confirmation dialog then delete all cover images in the selected folder."""
@@ -1131,28 +557,6 @@ class SettingsTab(QWidget):
         if len(GameProcessManager.get_instance().active_runners) == 0:
             self._set_folders_enabled(True)
     
-    def _on_timetracking_toggled(self, checked):
-        """Helper to enable/disable all timetracking sub-widgets"""
-        for widget in self.tt_dependent_widgets:
-            widget.setEnabled(checked)
-
-        self._update_timetracking_sync_state()
-
-    def _update_timetracking_sync_state(self):
-        """Evaluates both TT and GDrive state to enable/disable the sync checkbox."""
-        is_tt_enabled = self.timetracking_enable.isChecked()
-        is_gdrive_connected = GdriveManager.is_logged_in()        
-        can_enable = is_tt_enabled and is_gdrive_connected
-        self.timetracking_sync.setEnabled(can_enable)
-        self.tt_sync_label.setEnabled(can_enable)
-
-    def _on_savedata_toggled(self, checked):
-        """Helper to enable/disable all savedata sub-widgets"""
-        for widget in self.savedata_dependent_widgets:
-            widget.setEnabled(checked)
-        if checked:
-            self._update_gdrive_ui_state()
-
     def _toggle_env_extra(self, force_hide=False):
         """Toggles the visibility of checkboxes beyond the first row."""
         if not hasattr(self, '_extra_checkboxes') or not self._extra_checkboxes:
@@ -1188,15 +592,6 @@ class SettingsTab(QWidget):
         config.LOG_LEVEL = new_level
         setup_logging(new_level)
 
-    def check(self, val): 
-        return "✅" if val else "❌"
-
-    def check_with_version(self, installed: bool, version: str | None) -> str:
-        mark = self.check(installed)
-        if installed and version:
-            return f"{mark}  (v{version})"
-        return mark
-
     def browse_font_folder(self):
         folder = QFileDialog.getExistingDirectory(self, self.tr("Select Font Folder"), "")
         if folder:
@@ -1213,271 +608,3 @@ class SettingsTab(QWidget):
         if file_path:
             self.texthooker_edit.setText(file_path)
             self.flush_pending_text_settings()
-
-    def browse_emulator_path(self, target_edit):
-        name_filter = self.tr("Executables (*.exe);;All Files (*)") if IS_WINDOWS else self.tr("Executables (*.AppImage);;All Files (*)")
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            self.tr("Select Emulator Executable"),
-            "",
-            name_filter
-        )
-        if file_path:
-            target_edit.setText(file_path)
-            self.flush_pending_text_settings()
-
-    def browse_pc98_core_path(self, target_edit):
-        name_filter = self.tr("Libretro cores (*.dll);;All Files (*)") if IS_WINDOWS else self.tr("Libretro cores (*.so);;All Files (*)")
-        file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select NP2kai Core"), "", name_filter)
-        if file_path:
-            target_edit.setText(file_path)
-            self.flush_pending_text_settings()
-
-    def browse_pc98_system_folder(self, target_edit):
-        current_path = target_edit.text().strip()
-        folder = QFileDialog.getExistingDirectory(self, self.tr("Select PC-98 BIOS/font Folder"), current_path)
-        if folder:
-            target_edit.setText(folder)
-            self.flush_pending_text_settings()
-
-    def _start_background_checks(self):
-        self._system_info_worker = SystemInfoWorker()
-        self._system_info_worker.results_ready.connect(self._on_system_info_ready)
-        self._system_info_worker.start()
-
-        self._update_check_worker = UpdateCheckWorker()
-        self._update_check_worker.results_ready.connect(self._on_update_check_ready)
-        self._update_check_worker.start()
-
-    def _on_update_check_ready(self, tag, url):
-        if tag and url:
-            current = config.VERSION.lstrip('v')
-            latest = tag.lstrip('v')
-            if latest != current:
-                self._on_update_found(tag, url)
-
-    def _on_system_info_ready(self, system_info, software_info):
-        if not system_info and not software_info:
-            for key, label in self._sysinfo_values.items():
-                if key != "app_version":
-                    label.setText("?")
-            return
-
-        system_values = {
-            "os": system_info.get("os", "?"),
-            "kernel": system_info.get("kernel", "?"),
-            "desktop": (
-                f'{system_info.get("desktop_environment", "?")} - '
-                f'{system_info.get("session_type", "?")}'
-            ),
-            "cpu": system_info.get("cpu", "?"),
-            "gpu": system_info.get("gpu", "?"),
-        }
-        for key, value in system_values.items():
-            self._sysinfo_values[key].setText(str(value))
-
-        software_values = {
-            "vulkan_support": self.check(software_info.get("vulkan_support")),
-            "gamescope": self.check_with_version(
-                software_info.get("gamescope"), software_info.get("gamescope_version")
-            ),
-            "upscale": self.check_with_version(
-                software_info.get("upscale"), software_info.get("upscale_version")
-            ),
-            "umu_run": self.check_with_version(
-                software_info.get("umu_run"), software_info.get("umu_run_version")
-            ),
-            "winetricks": self.check_with_version(
-                software_info.get("winetricks"), software_info.get("winetricks_version")
-            ),
-        }
-        for key, value in software_values.items():
-            if key in self._sysinfo_values:
-                self._sysinfo_values[key].setText(value)
-
-        gstreamer = software_info.get("gstreamer_packages", {})
-        for pkg in SystemUtils.GSTREAMER_PACKAGES:
-            key = f"gstreamer:{pkg}"
-            if key in self._sysinfo_values:
-                self._sysinfo_values[key].setText(self.check(gstreamer.get(pkg)))
-
-    def _sign_in_gdrive(self):
-        """Starts the Google Drive device-flow sign-in using the configured client id/secret."""
-        self.flush_pending_text_settings()
-        client_id = self.gdrive_client_id_edit.text().strip()
-        client_secret = self.gdrive_client_secret_edit.text().strip()
-
-        if not client_id or not client_secret:
-            QMessageBox.warning(
-                self,
-                self.tr("Missing Credentials"),
-                self.tr("Please enter both the Google Client ID and Client Secret before signing in.")
-            )
-            return
-
-        self.gdrive_worker = GdriveDeviceFlowWorker(client_id, client_secret)
-
-        self._gdrive_dialog = QDialog(self)
-        self._gdrive_dialog.setWindowTitle(self.tr("Sign in to Google Drive"))
-        self._gdrive_dialog.resize(400, 250)
-        layout = QVBoxLayout(self._gdrive_dialog)
-
-        self._gdrive_status_label = QLabel(self.tr("Requesting device code..."))
-        layout.addWidget(self._gdrive_status_label)
-
-        self._gdrive_code_label = QLabel("")
-        self._gdrive_copy_btn = QPushButton(self.tr("Copy"))
-        self._gdrive_copy_btn.clicked.connect(self._copy_gdrive_code)
-
-        code_row = QHBoxLayout()
-        code_row.addWidget(self._gdrive_code_label)
-        code_row.addWidget(self._gdrive_copy_btn)
-        code_row.addStretch()
-        layout.addLayout(code_row)
-
-        self._gdrive_link_label = QLabel("")
-        self._gdrive_link_label.linkActivated.connect(SystemUtils.open_url)
-        layout.addWidget(self._gdrive_link_label)
-
-        progress = QProgressBar()
-        progress.setRange(0, 0)  # indeterminate spinner
-        layout.addWidget(progress)
-
-        self.gdrive_worker.device_code_ready.connect(self._on_gdrive_device_code_ready)
-        self.gdrive_worker.login_success.connect(self._on_gdrive_login_success)
-        self.gdrive_worker.login_failed.connect(self._on_gdrive_login_failed)
-        self.gdrive_worker.login_timeout.connect(self._on_gdrive_login_timeout)
-
-        self._gdrive_dialog.finished.connect(self._cancel_gdrive_worker)
-
-        self.gdrive_worker.start()
-        self._gdrive_dialog.exec()
-        self._update_gdrive_ui_state() 
-
-    def _copy_gdrive_code(self):
-        code = getattr(self, "_gdrive_user_code", "")
-        if code:
-            QApplication.clipboard().setText(code)
-
-    def _cancel_gdrive_worker(self):
-        if hasattr(self, "gdrive_worker") and self.gdrive_worker.isRunning():
-            self.gdrive_worker.cancel()
-
-    def _on_gdrive_device_code_ready(self, device_info):
-        user_code = device_info.get("user_code", "")
-        verification_url = device_info.get("verification_url", "")
-
-        self._gdrive_status_label.setText(self.tr("Enter this code at the link below:"))
-        self._gdrive_user_code = user_code
-
-        self._gdrive_code_label.setText(f"<b style='font-size: 18px;'>{user_code}</b>")
-        self._gdrive_link_label.setText(f'<a href="{verification_url}" style="color: #3498db;">🔗 {verification_url}</a>')
-
-    def _on_gdrive_login_success(self, token_data):
-        GdriveManager.save_credentials(token_data)
-        self._gdrive_dialog.accept()
-        self._update_gdrive_ui_state()
-        QMessageBox.information(self, self.tr("Connected"), self.tr("Successfully signed in to Google Drive."))
-
-    def _on_gdrive_login_failed(self, error_message):
-        self._gdrive_dialog.reject()
-        QMessageBox.critical(self, self.tr("Sign-in Failed"), error_message)
-
-    def _on_gdrive_login_timeout(self):
-        self._gdrive_dialog.reject()
-        QMessageBox.warning(self, self.tr("Timed Out"), self.tr("Sign-in timed out. Please try again."))
-
-    def _on_gdrive_auth_clicked(self):
-        """Routes to sign-in or logout depending on current state."""
-        if GdriveManager.is_logged_in():
-            self._logout_gdrive()
-            self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, False)
-        else:
-            self._sign_in_gdrive()
-
-    def _logout_gdrive(self):
-        client_id = self.gdrive_client_id_edit.text().strip()
-        client_secret = self.gdrive_client_secret_edit.text().strip()
-        GdriveManager.logout(client_id, client_secret)
-        self._update_gdrive_ui_state()
-
-    def _update_gdrive_ui_state(self):
-        """Updates the status dot/text and toggles the auth button between Sign in / Log out."""
-        connected = GdriveManager.is_logged_in()
-
-        if connected:
-            self.gdrive_status_dot.setStyleSheet("color: #4caf50;")
-            self.gdrive_status_text.setText(self.tr("Connected"))
-            self.gdrive_auth_btn.setText(self.tr("Log out"))
-            self.all_gdrive_ckbox.setEnabled(True)
-        else:
-            self.gdrive_status_dot.setStyleSheet("color: #888888;")
-            self.gdrive_status_text.setText(self.tr("Not connected"))
-            self.gdrive_auth_btn.setText(self.tr("Sign in to Google Drive"))
-            self.all_gdrive_ckbox.setEnabled(False)
-            self.all_gdrive_ckbox.setChecked(False)
-
-        self._update_timetracking_sync_state()
-
-    def _on_update_found(self, tag, url):
-        """Updates the UI label with the link to the new release"""
-        new_text = f'{config.VERSION} <a href="{url}" font-weight: bold;"> {self.tr("Newest version available:")} {tag} </a>'
-        self.version_label_val.setText(new_text)
-
-    def save_setting(self, key, value, deferred=False):
-        try:
-            if deferred:
-                self.user_settings.set_deferred(key, value)
-                self._pending_text_save = True
-            else:
-                self.user_settings.set(key, value)
-                if self._pending_text_save:
-                    self._finish_text_save()
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                self.tr("Error"),
-                self.tr(str(e))
-            )
-
-    def save_nested_setting(self, parent_key, child_key, value, deferred=False):
-        try:
-            parent_dict = self.user_settings.get(parent_key, {})
-            if not isinstance(parent_dict, dict):
-                parent_dict = {}
-            updated_parent = dict(parent_dict)
-            updated_parent[child_key] = value
-            if deferred:
-                self.user_settings.set_deferred(parent_key, updated_parent)
-                self._pending_text_save = True
-            else:
-                self.user_settings.set(parent_key, updated_parent)
-                if self._pending_text_save:
-                    self._finish_text_save()
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                self.tr("Error"),
-                self.tr(str(e))
-            )
-
-class SystemInfoWorker(QThread):
-    results_ready = Signal(dict, dict)
-
-    def run(self):
-        try:
-            system_info = SystemUtils.get_system_info()
-            software_info = SystemUtils.get_software_support()
-            self.results_ready.emit(system_info, software_info)
-        except Exception:
-            logger.exception("Failed to load Settings system information")
-            self.results_ready.emit({}, {})
-
-
-class UpdateCheckWorker(QThread):
-    results_ready = Signal(str, str)
-
-    def run(self):
-        tag, url = SystemUtils.get_latest_release_info()
-        if tag and url:
-            self.results_ready.emit(tag, url)

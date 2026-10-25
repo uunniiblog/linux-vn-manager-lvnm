@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, 
-    QListWidget, QStackedWidget, QSplitter,
+    QMainWindow, QWidget, QHBoxLayout, QTreeWidget,
+    QTreeWidgetItem, QStackedWidget, QSplitter,
     QApplication
 )
 from PySide6.QtCore import Qt, QSettings, QByteArray
@@ -35,10 +35,12 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Horizontal)
 
         # LEFT SIDEBAR
-        self.sidebar = QListWidget()
+        self.sidebar = QTreeWidget()
         self.sidebar.setObjectName("sidebar")
-        self.sidebar.setMinimumWidth(120)
-
+        self.sidebar.setMinimumWidth(180)
+        self.sidebar.setHeaderHidden(True)
+        self.sidebar.setRootIsDecorated(True)
+        self.sidebar.setIndentation(18)
                 
         self.tab_definitions = [
             (self.tr("Games"), lambda: GameTab(platform=self.platform), None),
@@ -51,22 +53,37 @@ class MainWindow(QMainWindow):
             definition for definition in self.tab_definitions
             if self.platform_ui.supported(definition[2])
         ]
-        for label, _, _ in self.tab_definitions:
-            self.sidebar.addItem(label)
+
+        # Settings subtabs
+        self.settings_subtabs = [
+            (self.tr("Timetracker"), self._create_timetracker_tab),
+            (self.tr("Savedata"), self._create_savedata_tab),
+        ]
+
+        if self.platform_ui.supported(Feature.EMULATION):
+            self.settings_subtabs.append((self.tr("Emulation"), self._create_emulation_tab))
+        self.settings_subtabs.append((self.tr("System Info"), self._create_system_info_tab))
+        self.settings_subtabs.append((self.tr("About"), self._create_about_tab))
+
+        for index, (label, _, _) in enumerate(self.tab_definitions):
+            item = QTreeWidgetItem(self.sidebar, [label])
+            item.setData(0, Qt.UserRole, index)
+            if label == self.tr("Settings"):
+                for subtab_index, (subtab_label, _) in enumerate(self.settings_subtabs, start=len(self.tab_definitions)):
+                    child = QTreeWidgetItem(item, [subtab_label])
+                    child.setData(0, Qt.UserRole, subtab_index)
+                item.setExpanded(True)
 
         # RIGHT CONTENT AREA
         self.content_stack = QStackedWidget()
-        for _ in self.tab_definitions:
+        self._loaded_pages = set()
+        for _ in range(len(self.tab_definitions) + len(self.settings_subtabs)):
             self.content_stack.addWidget(QWidget())
-        # self.content_stack.addWidget(GameTab())
-        # self.content_stack.addWidget(PrefixTab())
-        # self.content_stack.addWidget(RunnerTab())
-        # self.content_stack.addWidget(StatsTab(self.theme_manager))
-        # self.content_stack.addWidget(SettingsTab(self.theme_manager))
 
         # Add widgets to the splitter
         self.splitter.addWidget(self.sidebar)
         self.splitter.addWidget(self.content_stack)
+        self.splitter.setSizes([240, 960])
         
         # Avoid full collapsed
         self.splitter.setCollapsible(0, False) # Index 0 (sidebar) won't hide
@@ -76,9 +93,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.splitter)
 
         # Connect signals
-        #self.sidebar.currentRowChanged.connect(self.content_stack.setCurrentIndex)
-        self.sidebar.currentRowChanged.connect(self.on_sidebar_change)
-        self.sidebar.setCurrentRow(0)
+        self.sidebar.currentItemChanged.connect(self.on_sidebar_change)
+        self.sidebar.setCurrentItem(self.sidebar.topLevelItem(0))
 
         self.restore_ui_state()
 
@@ -98,26 +114,30 @@ class MainWindow(QMainWindow):
             # We cast to QByteArray because QSettings sometimes returns it as a different type
             self.splitter.restoreState(QByteArray(splitter_state))
 
-    def on_sidebar_change(self, index):
+    def on_sidebar_change(self, item, previous=None):
+        if item is None:
+            return
+        index = item.data(0, Qt.UserRole)
 
         # Load widget when selected
         current_widget = self.content_stack.widget(index)
 
-        if type(current_widget) is QWidget:
-            new_tab = None
+        if index not in self._loaded_pages:
             if 0 <= index < len(self.tab_definitions):
                 new_tab = self.tab_definitions[index][1]()
+            else:
+                new_tab = self.settings_subtabs[index - len(self.tab_definitions)][1]()
 
             if new_tab:
                 # Remove the placeholder and insert the real tab
                 self.content_stack.removeWidget(current_widget)
+                current_widget.deleteLater()
                 self.content_stack.insertWidget(index, new_tab)
                 current_widget = new_tab
+                self._loaded_pages.add(index)
 
         # Switch to new tab
         self.content_stack.setCurrentIndex(index)
-        widget = self.content_stack.widget(index)
-
         # Call refresh_active_tab method in each tab
         if hasattr(current_widget, 'refresh_active_tab'):
             current_widget.refresh_active_tab()
@@ -140,6 +160,26 @@ class MainWindow(QMainWindow):
         from ui.settings_tab import SettingsTab
         return SettingsTab(self.theme_manager, platform=self.platform)
 
+    def _create_timetracker_tab(self):
+        from ui.timetracker_tab import TimetrackerTab
+        return TimetrackerTab(platform=self.platform)
+
+    def _create_savedata_tab(self):
+        from ui.savedata_tab import SavedataTab
+        return SavedataTab(platform=self.platform)
+
+    def _create_emulation_tab(self):
+        from ui.emulation_tab import EmulationTab
+        return EmulationTab()
+
+    def _create_system_info_tab(self):
+        from ui.system_info_tab import SystemInfoTab
+        return SystemInfoTab(platform=self.platform)
+
+    def _create_about_tab(self):
+        from ui.about_tab import AboutTab
+        return AboutTab(platform=self.platform)
+
     def closeEvent(self, event):
         """
         Triggered when the user closes the window.
@@ -154,3 +194,10 @@ class MainWindow(QMainWindow):
         app_font = QApplication.instance().font()
         app_font.setPointSizeF(app_font.pointSizeF() * 1.5)
         self.sidebar.setFont(app_font)
+
+        subtab_font = self.sidebar.font()
+        subtab_font.setPointSizeF(subtab_font.pointSizeF() * 0.88)
+        for index in range(self.sidebar.topLevelItemCount()):
+            item = self.sidebar.topLevelItem(index)
+            for child_index in range(item.childCount()):
+                item.child(child_index).setFont(0, subtab_font)

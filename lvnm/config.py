@@ -3,7 +3,6 @@ import tempfile
 from platform_profile import IS_WINDOWS, get_data_dir
 
 VERSION = 'v0.6.0'
-GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
@@ -38,6 +37,8 @@ GNOME_EXTENSION_UUID = "lvnm-window-tracker@linux-vn-manager-lvnm"
 KWIN_SCRIPT_NAME = "timetracker-live-notifier"
 
 # URLS
+GIT_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm'
+GIT_WIKI_URL = 'https://github.com/uunniiblog/linux-vn-manager-lvnm/wiki'
 LVNM_API_URL = "https://api.github.com/repos/uunniiblog/linux-vn-manager-lvnm/releases"
 KRON4EK_API_URL = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
 PROTONGE_API_URL = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases"

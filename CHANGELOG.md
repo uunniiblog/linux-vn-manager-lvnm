@@ -11,6 +11,7 @@ Notable changes for each release are listed below, newest first.
 - Added Japanese translation config to LVNM. Actual translation is still pending to do in locale/lvnm_jp.ts.
 - Add QoL improvements like sort, filter and right click menu context to prefix and runner tabs.
 - Added a new tab in statistics tab to freely manipulate log files from inside the application.
+- Moved some settings sections to sub-tabs for it to be less clutered.
 - PC-98 fixes: 
     - Enabled retroarch SDL for controller support in flatpak PC-98 config, 
     - Enabled virtual keyboard.
