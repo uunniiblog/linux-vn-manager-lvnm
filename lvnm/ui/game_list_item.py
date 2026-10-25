@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
     QMenu, QDialog, QPlainTextEdit, QPushButton,
     QLineEdit, QMessageBox, QFileDialog
 )
-from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QImageReader, QPixmap
+from PySide6.QtCore import Qt, Signal, QTimer, QSize
 from pathlib import Path
 from game_manager import GameManager
 from system_utils import SystemUtils
@@ -26,12 +26,13 @@ class GameListItem(QWidget):
     requestRun = Signal(object)
     requestStop = Signal(object)
     requestRefresh = Signal(object)
+    requestGameUpdated = Signal(object)
     requestExport = Signal(object)
     requestManageImages = Signal(object)
     requestAdvancedSettings = Signal(object)
     requestCloseSidebar = Signal()
 
-    def __init__(self, game_card, zoom_factor=1.0, parent=None, platform: PlatformProfile = CURRENT_PLATFORM):
+    def __init__(self, game_card, zoom_factor=1.0, parent=None, platform: PlatformProfile = CURRENT_PLATFORM, total_seconds=None):
         super().__init__(parent)
         self.platform = platform
         self.user_settings = SettingsManager()
@@ -39,6 +40,7 @@ class GameListItem(QWidget):
         self.setMouseTracking(True)
         self.zoom = zoom_factor
         self.game_card = game_card
+        self._cover_signature = None
         self.log_manager = LogManager() 
         self.selected = False
         self._hovered = False
@@ -106,7 +108,7 @@ class GameListItem(QWidget):
         layout.addLayout(stats_layout)
 
         # --- INITIAL DATA FILL ---
-        self.update_ui(game_card)
+        self.update_ui(game_card, total_seconds=total_seconds)
 
     def enterEvent(self, event):
         if not self.selected:
@@ -126,7 +128,7 @@ class GameListItem(QWidget):
         self.style().unpolish(self)
         self.style().polish(self)
 
-    def update_ui(self, game_card):
+    def update_ui(self, game_card, total_seconds=None):
         """The 'Hot-Swap' method that updates only the data-driven parts."""
         self.game_card = game_card
         
@@ -140,8 +142,9 @@ class GameListItem(QWidget):
         self.date_label.setText(last_played)
 
         # Get total playtime
-        log_file = self.log_manager.get_log_name_from_path(game_card)
-        total_seconds = self.log_manager.get_total_app_playtime(log_file)
+        if total_seconds is None:
+            log_file = self.log_manager.get_log_name_from_path(game_card)
+            total_seconds = self.log_manager.get_total_app_playtime(log_file)
         if total_seconds > 60:
             time_str = self._format_total_time(total_seconds)
             self.time_label.setText(time_str)
@@ -156,8 +159,21 @@ class GameListItem(QWidget):
 
         # Update Cover
         local_cover = SystemUtils.get_cover_path(game_card.cover_path, game_card.vndb)
+        try:
+            cover_stat = Path(local_cover).stat() if local_cover else None
+            cover_signature = (local_cover, cover_stat.st_mtime_ns, cover_stat.st_size) if cover_stat else None
+        except OSError:
+            cover_signature = None
+        if cover_signature == self._cover_signature:
+            return
+        self._cover_signature = cover_signature
         if local_cover:
-            pix = QPixmap(local_cover)
+            reader = QImageReader(local_cover)
+            image_size = reader.size()
+            if image_size.isValid():
+                image_size.scale(QSize(self.cover_w, self.cover_h), Qt.KeepAspectRatioByExpanding)
+                reader.setScaledSize(image_size)
+            pix = QPixmap.fromImageReader(reader)
             if not pix.isNull():
                 scaled = pix.scaled(
                     self.cover_w, self.cover_h,
@@ -167,6 +183,8 @@ class GameListItem(QWidget):
                 x = (scaled.width() - self.cover_w) // 2
                 y = (scaled.height() - self.cover_h) // 2
                 self.cover.setPixmap(scaled.copy(x, y, self.cover_w, self.cover_h))
+            else:
+                self.cover.clear()
         else:
             self.cover.clear()
 
@@ -427,7 +445,7 @@ class GameListItem(QWidget):
         else:
             self.game_card.label = ""
         GameManager.update_game(self.game_card.name, self.game_card.to_dict())
-        self.requestRefresh.emit(self.game_card)
+        self.requestGameUpdated.emit(self.game_card)
 
     def _format_total_time(self, seconds):
         """Custom formatter: 10h 50m or 30m"""

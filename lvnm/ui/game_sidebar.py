@@ -1000,7 +1000,7 @@ class GameSidebar(QFrame):
         # Finalize UI
         self.update_game_cover()
         self.lbl_display_name.setText(self.current_game.name)
-        self.on_saved()
+        self.on_saved(original_name if not is_new_game else None, self.current_game.name, self.current_game)
         if not self.autosave_checkbox.isChecked():
             self.show_saved_feedback()
         self.update_savedata_visibility()

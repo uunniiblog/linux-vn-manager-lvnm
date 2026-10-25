@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QPushButton, QComboBox, QFileDialog, QDialog,
     QMenu, QFrame, QLabel
 )
-from PySide6.QtCore import Qt, QSettings, QByteArray, Signal
+from PySide6.QtCore import Qt, QSettings, QByteArray, Signal, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QAction, QActionGroup
 from game_manager import GameManager
 from prefix_manager import PrefixManager
@@ -58,7 +58,11 @@ class GameTab(QWidget):
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText(self.tr("Search games..."))
         self.search_bar.setClearButtonEnabled(True)
-        self.search_bar.textChanged.connect(self.refresh_list)
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.setInterval(150)
+        self.search_timer.timeout.connect(self.refresh_list)
+        self.search_bar.textChanged.connect(self.search_timer.start)
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self.search_shortcut.activated.connect(self.search_bar.setFocus)
 
@@ -122,7 +126,7 @@ class GameTab(QWidget):
         self.sidebar = GameSidebar(self, platform=self.platform)
         self.sidebar.setVisible(False)
         self.sidebar.on_close = self.close_sidebar
-        self.sidebar.on_saved = self.refresh_list
+        self.sidebar.on_saved = self.on_game_saved
         self.sidebar.on_metadata_updated = self.update_item_metadata
 
         # Add widgets to the splitter
@@ -169,30 +173,162 @@ class GameTab(QWidget):
 
     def update_item_metadata(self, game_name):
         """Updates only the widget of a specific game without reloading the whole list."""
-        for i in range(self.game_list.count()):
-            item = self.game_list.item(i)
-            card = item.data(Qt.UserRole)
-            if card is None:
-                continue
+        if game_name not in self._items_by_name:
+            return
+        updated_card = GameManager.get_game(game_name)
+        if not updated_card:
+            return
+        self.on_game_saved(game_name, game_name, updated_card)
+        logger.debug(f"Targeted UI update for {game_name} complete.")
 
-            if card.name == game_name:
-                # Get the latest data from the Manager
-                updated_card = GameManager.get_game(game_name)
-                if not updated_card:
-                    return
+    def on_game_saved(self, original_name=None, game_name=None, card=None):
+        """Update or move one row after a game changes."""
+        if not game_name:
+            self.refresh_list()
+            return
 
-                # Update the data stored in the item
-                item.setData(Qt.UserRole, updated_card)
-                widget = self.game_list.itemWidget(item)
-                widget.update_ui(updated_card)
-                
-                logger.debug(f"Targeted UI update for {game_name} complete.")
-                return
+        card = card or GameManager.get_game(game_name)
+        if not card:
+            self.refresh_list()
+            return
+
+        old_name = original_name or game_name
+        item = self._items_by_name.get(old_name)
+        query = self.search_bar.text().lower()
+        matches_search = not query or query in game_name.lower()
+        if item is None:
+            if game_name in self._items_by_name:
+                self.refresh_list()
+            elif matches_search:
+                self._insert_game(card)
+            return
+
+        if old_name != game_name and game_name in self._items_by_name:
+            self.refresh_list()
+            return
+
+        old_prefix, old_label, old_last_played, old_path = self._row_state[old_name]
+        sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
+        if not matches_search:
+            self._take_game_item(old_name)
+            return
+
+        log_mgr = LogManager()
+        total_seconds = log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(card))
+        old_total = item.data(Qt.UserRole + 1)
+        needs_move = (old_name != game_name or card.label != old_label or
+                      (sort_pref == "prefix" and card.prefix != old_prefix) or
+                      (sort_pref == "latest" and card.last_played != old_last_played) or
+                      (sort_pref == "playtime" and (total_seconds != old_total or card.path != old_path)))
+
+        if needs_move:
+            was_selected = item.isSelected()
+            self._take_game_item(old_name)
+            self._insert_game(card, total_seconds)
+            if was_selected and game_name in self._items_by_name:
+                self._items_by_name[game_name].setSelected(True)
+            return
+
+        item.setData(Qt.UserRole, card)
+        item.setData(Qt.UserRole + 1, total_seconds)
+        self.game_list.itemWidget(item).update_ui(card, total_seconds=total_seconds)
+        self._row_state[game_name] = (card.prefix, card.label, card.last_played, card.path)
+
+    def _take_game_item(self, name):
+        item = self._items_by_name.pop(name)
+        self._row_state.pop(name)
+        section_label = self._row_groups.pop(name)
+        self.section_items[section_label].remove(item)
+        self.game_list.takeItem(self.game_list.row(item))
+
+    def _sort_key(self, card, total_seconds, sort_pref):
+        if sort_pref == "name":
+            return card.name.lower()
+        if sort_pref == "prefix":
+            return card.prefix.lower(), card.name.lower()
+        if sort_pref == "playtime":
+            return total_seconds
+        return card.last_played or "0"
+
+    def _make_game_item(self, card, total_seconds):
+        item = QListWidgetItem()
+        widget = GameListItem(card, zoom_factor=self.zoom, platform=self.platform, total_seconds=total_seconds)
+        item.setSizeHint(widget.sizeHint())
+        item.setData(Qt.UserRole, card)
+        item.setData(Qt.UserRole + 1, total_seconds)
+        widget.doubleClicked.connect(self.on_game_launch_requested)
+        widget.requestOpen.connect(self.on_game_selected_from_card)
+        widget.requestRun.connect(self.on_game_launch_requested)
+        widget.requestStop.connect(self.on_game_stop_requested)
+        widget.requestRefresh.connect(self.refresh_list)
+        widget.requestGameUpdated.connect(self.on_game_card_updated)
+        widget.requestExport.connect(self.on_export_game)
+        widget.requestManageImages.connect(self.on_manage_images)
+        widget.requestAdvancedSettings.connect(self.on_advanced_settings)
+        widget.requestCloseSidebar.connect(self.close_sidebar)
+        self._items_by_name[card.name] = item
+        self._row_state[card.name] = (card.prefix, card.label, card.last_played, card.path)
+        return item, widget
+
+    def on_game_card_updated(self, card):
+        self.on_game_saved(card.name, card.name, card)
+
+    def _insert_game(self, card, total_seconds=None):
+        if total_seconds is None:
+            log_mgr = LogManager()
+            total_seconds = log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(card))
+        item, widget = self._make_game_item(card, total_seconds)
+        if not self._place_game_item(item, widget, card, total_seconds):
+            self.refresh_list()
+
+    def _place_game_item(self, item, widget, card, total_seconds):
+        saved_labels = self.user_settings.get(config.USER_CONF_SAVED_LABELS, [])
+        label = card.label if card.label in saved_labels else ""
+        if label not in self.section_items:
+            return False
+
+        sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
+        new_key = self._sort_key(card, total_seconds, sort_pref)
+        reverse = sort_pref in ("latest", "playtime")
+        section = self.section_items[label]
+        position = len(section)
+        for index, existing in enumerate(section):
+            existing_card = existing.data(Qt.UserRole)
+            existing_key = self._sort_key(existing_card, existing.data(Qt.UserRole + 1), sort_pref)
+            should_insert = new_key > existing_key if reverse else new_key < existing_key
+            if should_insert:
+                position = index
+                break
+
+        if position < len(section):
+            row = self.game_list.row(section[position])
+        elif section:
+            row = self.game_list.row(section[-1]) + 1
+        else:
+            header = self._section_headers.get(label)
+            row = self.game_list.row(header) + 1 if header else 0
+
+        self.game_list.insertItem(row, item)
+        self.game_list.setItemWidget(item, widget)
+        section.insert(position, item)
+        self._items_by_name[card.name] = item
+        self._row_state[card.name] = (card.prefix, card.label, card.last_played, card.path)
+        self._row_groups[card.name] = label
+        if saved_labels and not self.user_settings.get(f"section_expanded_{label}", True):
+            item.setHidden(True)
+        else:
+            item.setHidden(False)
+        return True
 
     def refresh_list(self):
         """Clears and repopulates the game list, grouped by labels."""
+        self.search_timer.stop()
         self.game_list.clear()
         self.section_items = {}
+        self._section_headers = {}
+        self._items_by_name = {}
+        self._row_state = {}
+        self._row_groups = {}
         
         query = self.search_bar.text() if hasattr(self, 'search_bar') else None
         games_dict = GameManager.list_games(name_query=query)
@@ -221,12 +357,18 @@ class GameTab(QWidget):
         # Process each group
         sort_pref = self.user_settings.get(config.USER_CONF_SORT_BY_LIST, "latest")
         log_mgr = LogManager()
+        playtime_by_log = {}
+
+        def get_playtime(card):
+            log_name = log_mgr.get_log_name_from_path(card)
+            if log_name not in playtime_by_log:
+                playtime_by_log[log_name] = log_mgr.get_total_app_playtime(log_name)
+            return playtime_by_log[log_name]
 
         for label_index, lbl in enumerate(final_label_order):
             if lbl not in groups: continue
 
-            if show_headers:
-                self.section_items[lbl] = []
+            self.section_items[lbl] = []
 
             # Header
             is_expanded = True # Default if headers are off
@@ -244,6 +386,7 @@ class GameTab(QWidget):
                 )
                 header_item.setSizeHint(header_widget.sizeHint())
                 header_item.setFlags(Qt.NoItemFlags)
+                self._section_headers[lbl] = header_item
                 
                 # Connect Header Signals
                 header_widget.toggled.connect(lambda state, l=lbl: self.toggle_section(l, state))
@@ -264,38 +407,22 @@ class GameTab(QWidget):
                 group_cards.sort(key=lambda c: (c.prefix.lower(), c.name.lower()))
             elif sort_pref == "playtime":
                 # Sort by total playtime
-                group_cards.sort(key=lambda c: log_mgr.get_total_app_playtime(log_mgr.get_log_name_from_path(c)), reverse=True)
+                group_cards.sort(key=get_playtime, reverse=True)
             else: 
                 # Default: Latest
                 group_cards.sort(key=lambda c: c.last_played if c.last_played else "0", reverse=True)
 
             # Add the Game Items
             for card in group_cards:
-                item = QListWidgetItem(self.game_list)
-                widget = GameListItem(card, zoom_factor=self.zoom, platform=self.platform)
-                item.setSizeHint(widget.sizeHint())
-                item.setData(Qt.UserRole, card)
-                
-                # Connect signals
-                widget.doubleClicked.connect(self.on_game_launch_requested)
-                widget.requestOpen.connect(self.on_game_selected_from_card)
-                widget.requestRun.connect(self.on_game_launch_requested)
-                widget.requestStop.connect(self.on_game_stop_requested)
-                widget.requestRefresh.connect(self.refresh_list)
-                widget.requestExport.connect(self.on_export_game)
-                widget.requestManageImages.connect(self.on_manage_images)
-                widget.requestAdvancedSettings.connect(self.on_advanced_settings)
-                widget.requestCloseSidebar.connect(self.close_sidebar)
-                
+                item, widget = self._make_game_item(card, get_playtime(card))
                 self.game_list.addItem(item)
                 self.game_list.setItemWidget(item, widget)
                 
                 # Register list to its section
-                if show_headers:
-                    self.section_items[lbl].append(item)
-                     # Apply initial collapsed state
-                    if not is_expanded:
-                        item.setHidden(True)
+                self.section_items[lbl].append(item)
+                self._row_groups[card.name] = lbl
+                if not is_expanded:
+                    item.setHidden(True)
 
     def _get_ordered_labels(self, saved_labels):
         """Return saved labels in their persisted UI order, adding new labels at the end."""

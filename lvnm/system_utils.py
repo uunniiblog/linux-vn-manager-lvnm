@@ -167,7 +167,7 @@ class SystemUtils:
 
         # Update the config module variables
         config.GAMESCOPE_INSTALLED = bool(shutil.which("gamescope"))
-        config.VULKAN_INSTALLED = SystemUtils._check_vulkan(SystemUtils.get_clean_env())
+        config.VULKAN_INSTALLED = False
         config.UMU_RUN_INSTALLED = umu_available
         config.WINETRICKS_INSTALLED = winetricks_available
         config.RT_UPSCALING_INSTALLED = bool(shutil.which("upscale"))
@@ -331,6 +331,7 @@ class SystemUtils:
             logger.debug(f"GPU         : {sys_info['gpu']}")
 
             software = SystemUtils.get_software_support()
+            config.VULKAN_INSTALLED = software["vulkan_support"]
             logger.debug("--- Software & Compatibility ---")
 
             gamescope_ver = f" (v{software['gamescope_version']})" if software.get('gamescope_version') else ""

@@ -92,20 +92,51 @@ class LogManager(QObject):
                     f.write(line)
                 self._update_last_played_cache(app_name, session_data['title'])
             else:
-                # Overwrite the last line (Periodic Save)
-                content = log_file.read_text(encoding="utf-8").splitlines()
-                if len(content) > 1: # Don't overwrite header
-                    content[-1] = line.strip()
-                    log_file.write_text("\n".join(content) + "\n", encoding="utf-8")
-                else:
-                    # Fallback if file was somehow cleared
-                    with open(log_file, "a", encoding="utf-8") as f:
-                        f.write(line)
+                self._replace_last_session(log_file, line.encode("utf-8"))
             
             return log_file
         except Exception as e:
             logger.error(f"Error saving logging session {e}")
             return None
+
+    @staticmethod
+    def _replace_last_session(log_file: Path, line: bytes):
+        """Replace the last CSV record."""
+        with open(log_file, "r+b") as file:
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            if file_size == 0:
+                file.write(line)
+                return
+            file.seek(file_size - 1)
+            has_trailing_newline = file.read(1) == b"\n"
+            scan_end = file_size - 1 if has_trailing_newline else file_size
+            line_start = 0
+
+            while scan_end > 0:
+                chunk_start = max(0, scan_end - 4096)
+                file.seek(chunk_start)
+                newline_index = file.read(scan_end - chunk_start).rfind(b"\n")
+                if newline_index >= 0:
+                    line_start = chunk_start + newline_index + 1
+                    break
+                scan_end = chunk_start
+
+            newline_position = file_size - 1 if has_trailing_newline else line_start - 1
+            if newline_position > 0:
+                file.seek(newline_position - 1)
+                if file.read(1) == b"\r":
+                    line = line[:-1] + b"\r\n"
+
+            if line_start == 0:
+                # Append the first record
+                file.seek(0, os.SEEK_END)
+                if not has_trailing_newline:
+                    file.write(b"\n")
+            else:
+                file.seek(line_start)
+            file.write(line)
+            file.truncate()
 
     def get_total_app_playtime(self, app_name):
         """

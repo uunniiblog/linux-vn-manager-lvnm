@@ -39,6 +39,14 @@ class SettingsManager:
         self._settings[key] = value
         self._save_to_disk()
 
+    def set_deferred(self, key, value):
+        """Update memory now; the caller will persist a batch of changes later."""
+        self._settings[key] = value
+
+    def flush(self):
+        """Persist values previously set with set_deferred."""
+        self._save_to_disk()
+
     def _save_to_disk(self):
         """Persist memory state to disk."""
         try:

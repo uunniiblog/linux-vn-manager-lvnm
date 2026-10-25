@@ -39,6 +39,8 @@ class SettingsTab(QWidget):
         self.theme_manager = theme_manager
         self.user_settings = SettingsManager()
         self.global_env_checkboxes = {}
+        self._pending_text_save = False
+        self._gdrive_cache_dirty = False
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -68,6 +70,7 @@ class SettingsTab(QWidget):
         outer_layout.addWidget(scroll)
 
         self._connect_signals()
+        QApplication.instance().aboutToQuit.connect(self.flush_pending_text_settings)
         self._start_background_checks()
 
     # ==========================================
@@ -710,12 +713,8 @@ class SettingsTab(QWidget):
             emulation_layout.addRow(QLabel(self.tr("Config:")), config_edit)
 
             browse_btn.clicked.connect(lambda _checked=False, e=path_edit: self.browse_emulator_path(e))
-            path_edit.textChanged.connect(
-                lambda text, k=path_key: self.save_nested_setting(config.USER_CONF_EMULATION, k, text)
-            )
-            config_edit.textChanged.connect(
-                lambda text, k=cli_key: self.save_nested_setting(config.USER_CONF_EMULATION, k, text)
-            )
+            self._bind_text_setting(path_edit, path_key, parent_key=config.USER_CONF_EMULATION)
+            self._bind_text_setting(config_edit, cli_key, parent_key=config.USER_CONF_EMULATION)
 
             self.emulation_widgets[path_key] = path_edit
             self.emulation_widgets[cli_key] = config_edit
@@ -777,10 +776,10 @@ class SettingsTab(QWidget):
         pc98_path_btn.clicked.connect(lambda: self.browse_emulator_path(pc98_path_edit))
         pc98_core_btn.clicked.connect(lambda: self.browse_pc98_core_path(pc98_core_edit))
         pc98_system_btn.clicked.connect(lambda: self.browse_pc98_system_folder(pc98_system_path))
-        pc98_path_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_PATH, text))
-        pc98_core_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_CORE_PATH, text))
-        pc98_system_path.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, text))
-        pc98_config_edit.textChanged.connect(lambda text: self.save_nested_setting(config.USER_CONF_EMULATION, config.USER_CONF_EMULATION_PC98_CONFIG, text))
+        self._bind_text_setting(pc98_path_edit, config.USER_CONF_EMULATION_PC98_PATH, parent_key=config.USER_CONF_EMULATION)
+        self._bind_text_setting(pc98_core_edit, config.USER_CONF_EMULATION_PC98_CORE_PATH, parent_key=config.USER_CONF_EMULATION)
+        self._bind_text_setting(pc98_system_path, config.USER_CONF_EMULATION_PC98_SYSTEM_PATH, parent_key=config.USER_CONF_EMULATION)
+        self._bind_text_setting(pc98_config_edit, config.USER_CONF_EMULATION_PC98_CONFIG, parent_key=config.USER_CONF_EMULATION)
         self.emulation_widgets[config.USER_CONF_EMULATION_PC98_PATH] = pc98_path_edit
         self.emulation_widgets[config.USER_CONF_EMULATION_PC98_CORE_PATH] = pc98_core_edit
         self.emulation_widgets[config.USER_CONF_EMULATION_PC98_SYSTEM_PATH] = pc98_system_path
@@ -945,8 +944,8 @@ class SettingsTab(QWidget):
 
     def _connect_signals(self):
         self.font_btn.clicked.connect(self.browse_font_folder)
-        self.font_edit.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_FONT_FOLDER, t))
-        self.sgdb_key_edit.textChanged.connect(lambda text: self.save_setting(config.USER_CONF_SGDB_API_KEY, text))
+        self._bind_text_setting(self.font_edit, config.USER_CONF_FONT_FOLDER)
+        self._bind_text_setting(self.sgdb_key_edit, config.USER_CONF_SGDB_API_KEY)
         for source, button in self.name_autocomplete_buttons.items():
             button.toggled.connect(
                 lambda checked, value=source: checked
@@ -957,27 +956,23 @@ class SettingsTab(QWidget):
         self.log_wine_traces.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_LOGS_WINE, bool(s)))
         self.gs_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_GAMESCOPE_ENABLED, bool(s)))
         self.auto_dpi_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_AUTO_DPI_UTILITIES, bool(s)))
-        self.gs_params.textChanged.connect(lambda t: self.save_setting("gamescope_params", t))
+        self._bind_text_setting(self.gs_params, config.USER_CONF_GAMESCOPE_PARAMS)
         self.upscaler_checkbox.stateChanged.connect(lambda s: self.save_setting(config.USER_CONF_RT_UPSCALER_ENABLED, bool(s)))
-        self.upscaler_params.textChanged.connect(lambda t: self.save_setting(config.USER_CONF_RT_UPSCALER_PARAMS, t))
+        self._bind_text_setting(self.upscaler_params, config.USER_CONF_RT_UPSCALER_PARAMS)
         self.upscaler_gui_btn.clicked.connect(self._open_upscaler_gui)
         self.timetracking_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, "timetracking", bool(s)))
-        self.afk_timer_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AFK_TIMER, int(t) if t else 0))
-        self.save_interval_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, int(t) if t else 0))
+        self._bind_text_setting(self.afk_timer_edit, config.USER_CONF_TIMETRACKER_AFK_TIMER, parent_key=config.USER_CONF_TIMETRACKER, convert=self._int_or_zero)
+        self._bind_text_setting(self.save_interval_edit, config.USER_CONF_TIMETRACKER_PERIODIC_SAVE, parent_key=config.USER_CONF_TIMETRACKER, convert=self._int_or_zero)
         self.timetracking_autostart.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_AUTOSTART, bool(s)))
         self.timetracking_sync.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TIMETRACKER, config.USER_CONF_TIMETRACKER_GDRIVE_SYNC, bool(s)))
         self.texthooker_btn.clicked.connect(self.browse_texthooker_path)
         self.texthooker_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "enabled", bool(s)))
-        self.texthooker_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_TEXTHOOKER, "path", t))
+        self._bind_text_setting(self.texthooker_edit, "path", parent_key=config.USER_CONF_TEXTHOOKER)
         self.savedata_enable.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_ENABLED, bool(s)))
         self.auto_detect_save.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_AUTO_DETECT, bool(s)))
-        self.gdrive_client_id_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t.strip()))
-        self.gdrive_client_secret_edit.textChanged.connect(lambda t: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t.strip()))
+        self._bind_text_setting(self.gdrive_client_id_edit, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, parent_key=config.USER_CONF_SAVEDATA, convert=str.strip, reset_gdrive_cache=True)
+        self._bind_text_setting(self.gdrive_client_secret_edit, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, parent_key=config.USER_CONF_SAVEDATA, convert=str.strip, reset_gdrive_cache=True)
         self.all_gdrive_ckbox.stateChanged.connect(lambda s: self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_ALL_GAMES, bool(s)))
-
-        # Reset gdrive if credentials changed, maybe using new acc or something
-        self.gdrive_client_id_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_ID, t),GdriveManager.reset_service_cache()))
-        self.gdrive_client_secret_edit.textChanged.connect(lambda t: (self.save_nested_setting(config.USER_CONF_SAVEDATA, config.USER_CONF_SAVEDATA_GDRIVE_CLIENT_SECRET, t),GdriveManager.reset_service_cache()))
 
         # Connect signals for dynamic folder inputs
         for key, edit_widget, btn_widget in self.folder_inputs:
@@ -1025,8 +1020,46 @@ class SettingsTab(QWidget):
     def _connect_folder_signal(self, key, edit_widget, btn_widget):
         """Helper to bind signals without loop closure issues."""
         btn_widget.clicked.connect(lambda: self.browse_directory_for_widget(edit_widget, key))
-        edit_widget.textChanged.connect(lambda t: self.save_setting(key, t))
-        
+        self._bind_text_setting(edit_widget, key)
+
+    @staticmethod
+    def _int_or_zero(text):
+        return int(text) if text else 0
+
+    def _bind_text_setting(self, edit_widget, key, parent_key=None, convert=None, reset_gdrive_cache=False):
+        """Keep text settings current in memory and batch disk writes."""
+        def changed(text):
+            value = convert(text) if convert else text
+            if parent_key:
+                self.save_nested_setting(parent_key, key, value, deferred=True)
+            else:
+                self.save_setting(key, value, deferred=True)
+            if reset_gdrive_cache:
+                self._gdrive_cache_dirty = True
+
+        edit_widget.textChanged.connect(changed)
+        edit_widget.editingFinished.connect(self.flush_pending_text_settings)
+
+    def _finish_text_save(self):
+        self._pending_text_save = False
+        if self._gdrive_cache_dirty:
+            self._gdrive_cache_dirty = False
+            GdriveManager.reset_service_cache()
+
+    def flush_pending_text_settings(self):
+        if not self._pending_text_save:
+            return
+        self.user_settings.flush()
+        self._finish_text_save()
+
+    def hideEvent(self, event):
+        self.flush_pending_text_settings()
+        super().hideEvent(event)
+
+    def closeEvent(self, event):
+        self.flush_pending_text_settings()
+        super().closeEvent(event)
+
     def _on_delete_covers_clicked(self):
         """Show confirmation dialog then delete all cover images in the selected folder."""
         folder_path = self.covers_edit.text().strip()
@@ -1081,6 +1114,7 @@ class SettingsTab(QWidget):
                     QMessageBox.warning(self, self.tr("Error"), self.tr("Failed to move some files. Check logs."))
 
             edit_widget.setText(new_path)
+            self.flush_pending_text_settings()
 
     def _set_folders_enabled(self, enabled: bool):
         """Disables or enables all folder selection widgets."""
@@ -1167,6 +1201,7 @@ class SettingsTab(QWidget):
         folder = QFileDialog.getExistingDirectory(self, self.tr("Select Font Folder"), "")
         if folder:
             self.font_edit.setText(folder)
+            self.flush_pending_text_settings()
     
     def browse_texthooker_path(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1177,6 +1212,7 @@ class SettingsTab(QWidget):
         )
         if file_path:
             self.texthooker_edit.setText(file_path)
+            self.flush_pending_text_settings()
 
     def browse_emulator_path(self, target_edit):
         name_filter = self.tr("Executables (*.exe);;All Files (*)") if IS_WINDOWS else self.tr("Executables (*.AppImage);;All Files (*)")
@@ -1188,18 +1224,21 @@ class SettingsTab(QWidget):
         )
         if file_path:
             target_edit.setText(file_path)
+            self.flush_pending_text_settings()
 
     def browse_pc98_core_path(self, target_edit):
         name_filter = self.tr("Libretro cores (*.dll);;All Files (*)") if IS_WINDOWS else self.tr("Libretro cores (*.so);;All Files (*)")
         file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select NP2kai Core"), "", name_filter)
         if file_path:
             target_edit.setText(file_path)
+            self.flush_pending_text_settings()
 
     def browse_pc98_system_folder(self, target_edit):
         current_path = target_edit.text().strip()
         folder = QFileDialog.getExistingDirectory(self, self.tr("Select PC-98 BIOS/font Folder"), current_path)
         if folder:
             target_edit.setText(folder)
+            self.flush_pending_text_settings()
 
     def _start_background_checks(self):
         self._system_info_worker = SystemInfoWorker()
@@ -1264,6 +1303,7 @@ class SettingsTab(QWidget):
 
     def _sign_in_gdrive(self):
         """Starts the Google Drive device-flow sign-in using the configured client id/secret."""
+        self.flush_pending_text_settings()
         client_id = self.gdrive_client_id_edit.text().strip()
         client_secret = self.gdrive_client_secret_edit.text().strip()
 
@@ -1384,9 +1424,15 @@ class SettingsTab(QWidget):
         new_text = f'{config.VERSION} <a href="{url}" font-weight: bold;"> {self.tr("Newest version available:")} {tag} </a>'
         self.version_label_val.setText(new_text)
 
-    def save_setting(self, key, value):
+    def save_setting(self, key, value, deferred=False):
         try:
-            self.user_settings.set(key, value)
+            if deferred:
+                self.user_settings.set_deferred(key, value)
+                self._pending_text_save = True
+            else:
+                self.user_settings.set(key, value)
+                if self._pending_text_save:
+                    self._finish_text_save()
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -1394,13 +1440,20 @@ class SettingsTab(QWidget):
                 self.tr(str(e))
             )
 
-    def save_nested_setting(self, parent_key, child_key, value):
+    def save_nested_setting(self, parent_key, child_key, value, deferred=False):
         try:
             parent_dict = self.user_settings.get(parent_key, {})
             if not isinstance(parent_dict, dict):
                 parent_dict = {}
-            parent_dict[child_key] = value
-            self.user_settings.set(parent_key, parent_dict)
+            updated_parent = dict(parent_dict)
+            updated_parent[child_key] = value
+            if deferred:
+                self.user_settings.set_deferred(parent_key, updated_parent)
+                self._pending_text_save = True
+            else:
+                self.user_settings.set(parent_key, updated_parent)
+                if self._pending_text_save:
+                    self._finish_text_save()
         except Exception as e:
             QMessageBox.critical(
                 self,
