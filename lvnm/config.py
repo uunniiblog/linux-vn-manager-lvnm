@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 from platform_profile import IS_WINDOWS, get_data_dir
 
-VERSION = 'v0.6.0'
+VERSION = 'v0.6.1'
 
 # Paths
 BASE_DIR = Path(__file__).parent.resolve()
