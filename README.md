@@ -244,7 +244,8 @@ flatpak run io.github.uunniiblog.lvnm
 
 ## Translation
 ```bash
-- pyside6-lupdate lvnm/**/*.py -ts lvnm/locale/lvnm_en.ts lvnm/locale/lvnm_de.ts
+- pyside6-lupdate lvnm/**/*.py -ts lvnm/locale/lvnm_en.ts lvnm/locale/lvnm_de.ts lvnm/locale/lvnm_jp.ts
 - pyside6-lrelease lvnm/locale/lvnm_en.ts -qm lvnm/locale/lvnm_en.qm
 - pyside6-lrelease lvnm/locale/lvnm_de.ts -qm lvnm/locale/lvnm_de.qm
+- pyside6-lrelease lvnm/locale/lvnm_jp.ts -qm lvnm/locale/lvnm_jp.qm
 ```

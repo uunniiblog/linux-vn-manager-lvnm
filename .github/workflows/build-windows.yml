@@ -41,6 +41,7 @@ jobs:
         run: |
           pyside6-lrelease lvnm/locale/lvnm_de.ts -qm lvnm/locale/lvnm_de.qm
           pyside6-lrelease lvnm/locale/lvnm_en.ts -qm lvnm/locale/lvnm_en.qm
+          pyside6-lrelease lvnm/locale/lvnm_jp.ts -qm lvnm/locale/lvnm_jp.qm
 
       - name: Build Windows Application
         shell: pwsh

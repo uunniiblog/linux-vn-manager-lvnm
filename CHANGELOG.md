@@ -7,6 +7,8 @@ Notable changes for each release are listed below, newest first.
 - Fix monitor's detection in flatpak, should work good for KDE, needs testing in other DEs.
 - Add a small popup when umu is downloading steam's runtime after launching a game.
 - Disable gamescope if it's not detected as installed anymore to avoid it being lock on enabled.
+- Set XDG_CONFIG_HOME for emulators to use the "real" native home settings paths when running lvnm flatpak and non flatpatk emulators.
+- Added Japanese translation config to LVNM. Actual translation is still pending to do in locale/lvnm_jp.ts.
 - PC-98 fixes: 
     - Enabled retroarch SDL for controller support in flatpak PC-98 config, 
     - Enabled virtual keyboard.

@@ -20,7 +20,9 @@ def install_translator(app, settings):
     locale = QLocale(language) if language else QLocale.system()
 
     translator = QTranslator(app)
-    if translator.load(locale, "lvnm", "_", str(config.LOCALE_DIR)):
+    use_japanese = language == "jp" or (not language and locale.language() == QLocale.Language.Japanese)
+    loaded = translator.load("lvnm_jp", str(config.LOCALE_DIR)) if use_japanese else translator.load(locale, "lvnm", "_", str(config.LOCALE_DIR))
+    if loaded:
         app.installTranslator(translator)
         return translator
     return None

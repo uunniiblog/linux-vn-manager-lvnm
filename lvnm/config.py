@@ -258,6 +258,7 @@ LANGUAGES = [
     {"code": "", "name": "System"},
     {"code": "en", "name": "English"},
     {"code": "de", "name": "Deutsch"},
+    {"code": "jp", "name": "日本語"},
 ]
 
 # User config
