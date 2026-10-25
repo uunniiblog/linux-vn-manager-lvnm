@@ -614,7 +614,7 @@ class GameTab(QWidget):
         GameManager.update_game(game_card.name, current_card.to_dict())
         self.update_item_metadata(game_card.name)
         if self.sidebar.current_game and self.sidebar.current_game.name == game_card.name:
-            fields = ("umu_store", "umu_gameid", "pre_launch_args", "disable_network", "arguments", "pc98", "pre_launch_script",
+            fields = ("umu_store", "umu_gameid", "pre_launch_args", "disable_network", "arguments", "timetracker_autostart", "pc98", "pre_launch_script",
                       "pre_launch_script_wait", "exit_script", "registry_path")
             for field in fields:
                 setattr(self.sidebar.current_game, field, getattr(current_card, field))

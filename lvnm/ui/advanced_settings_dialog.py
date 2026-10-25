@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QSettings
 from system_utils import SystemUtils
 from prefix_manager import PrefixManager
 from regedit_management import RegeditManager
+from settings_manager import SettingsManager
 from ui.console_dialog import ConsoleDialog
 from platform_profile import CURRENT_PLATFORM, Feature, PlatformProfile
 from ui.platform_ui import PlatformUi
@@ -122,6 +123,22 @@ class AdvancedSettingsDialog(QDialog):
         exit_script_layout.addWidget(self.btn_exit_script)
         form.addRow(self.tr("Exit Script:"), exit_script_layout)
 
+        self.timetracking_enabled = SettingsManager().get(config.USER_CONF_TIMETRACKER, {}).get("timetracking", False)
+        if self.timetracking_enabled:
+            # None follows the global setting
+            # True and False override it for this game.
+            autostart_override = getattr(self.current_game, "timetracker_autostart", None)
+            self.chk_use_global_timetracker_autostart = QCheckBox(self.tr("Use global setting"))
+            self.chk_use_global_timetracker_autostart.setChecked(autostart_override is None)
+            self.chk_timetracker_autostart = QCheckBox(self.tr("Automatically start time tracking when this game launches"))
+            self.chk_timetracker_autostart.setChecked(autostart_override if autostart_override is not None else False)
+            self.chk_timetracker_autostart.setEnabled(autostart_override is not None)
+            self.chk_use_global_timetracker_autostart.toggled.connect(lambda use_global: self.chk_timetracker_autostart.setEnabled(not use_global))
+            timetracker_autostart_layout = QVBoxLayout()
+            timetracker_autostart_layout.addWidget(self.chk_use_global_timetracker_autostart)
+            timetracker_autostart_layout.addWidget(self.chk_timetracker_autostart)
+            form.addRow(self.tr("Time Tracking Auto Start:"), timetracker_autostart_layout)
+
         # Registry Keys (Wine/Proton only)
         self.label_registry_path = QLabel(self.tr("Registry Path:"))
         self.edit_registry_path = QLineEdit(getattr(self.current_game, "registry_path", ""))
@@ -211,6 +228,8 @@ class AdvancedSettingsDialog(QDialog):
         if self.platform.supports(Feature.NETWORK_ISOLATION):
             self.current_game.disable_network = self.chk_disable_network.isChecked()
         self.current_game.arguments = self.edit_arguments.text()
+        if self.timetracking_enabled:
+            self.current_game.timetracker_autostart = None if self.chk_use_global_timetracker_autostart.isChecked() else self.chk_timetracker_autostart.isChecked()
         for field_name, combo in self.pc98_combos.items():
             setattr(self.current_game.pc98, field_name, combo.currentData())
         self.current_game.pre_launch_script = self.edit_pre_script.text()

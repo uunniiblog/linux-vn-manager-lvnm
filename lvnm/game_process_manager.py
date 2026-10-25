@@ -68,7 +68,7 @@ class GameProcessManager(QObject):
                 logger.debug(f"Started {name}. Total running: {len(self.active_runners)}")
 
                 # Initialize Time tracking if enabled
-                if timetracker_settings.get("timetracking", False) and timetracker_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False):
+                if timetracker_settings.get("timetracking", False) and self._should_autostart_timetracker(game_card, timetracker_settings):
                     try:
                         self.start_timetracker(name, game_card, timetracker_settings)
                     except Exception as e:
@@ -117,11 +117,16 @@ class GameProcessManager(QObject):
         tracking.stats_received.connect(lambda stats, n=name: self.tracking_updated.emit(n, stats))
         
         # Start tracking if autostart
-        if timetracker_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False):
+        if self._should_autostart_timetracker(game_card, timetracker_settings):
             tracking.start_auto_tracking()
             
         self.active_trackers[name] = tracking
         return tracking
+
+    @staticmethod
+    def _should_autostart_timetracker(game_card, timetracker_settings: dict) -> bool:
+        override = getattr(game_card, "timetracker_autostart", None)
+        return timetracker_settings.get(config.USER_CONF_TIMETRACKER_AUTOSTART, False) if override is None else override
 
     def get_tracker(self, name: str):
         return self.active_trackers.get(name)

@@ -29,6 +29,7 @@ Notable changes for each release are listed below, newest first.
 - Advanced settings:
     - Moved the image section to its own dialog so it is easier to navigate and maintain.
     - The new image dialog and advanced settings are both accesible through the sidebar or the right click menu over a game.
+    - Added an override for auto starting the timetracking per game.
 
 ## [v0.6.0]
 - Flatpak release:

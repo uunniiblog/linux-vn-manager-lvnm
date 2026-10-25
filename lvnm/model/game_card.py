@@ -103,6 +103,7 @@ class GameCard:
     label: str = ""
     pre_launch_args: str = ""
     disable_network: bool = False
+    timetracker_autostart: bool | None = None
     pre_launch_script: str = ""
     pre_launch_script_wait: bool = False
     exit_script: str = ""
