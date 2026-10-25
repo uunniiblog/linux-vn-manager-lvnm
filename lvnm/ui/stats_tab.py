@@ -1,11 +1,16 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
-                               QPushButton, QLabel, QTabWidget, QToolTip)
-from PySide6.QtCharts import (QChart, QChartView, QBarSeries, QBarSet,
-                               QBarCategoryAxis, QValueAxis,
-                               QHorizontalBarSeries)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QComboBox,
+    QPushButton, QLabel, QTabWidget, QToolTip
+)
+from PySide6.QtCharts import (
+    QChart, QChartView, QBarSeries, QBarSet,
+    QBarCategoryAxis, QValueAxis, QHorizontalBarSeries
+)
 from PySide6.QtGui import QIcon, QColor, QPainter, QFont, QCursor
 from PySide6.QtCore import Qt
 from timetracker.log_manager import LogManager
+from ui.bounded_combo_box import BoundedComboBox
+from ui.tracking_entries_tab import TrackingEntriesTab
 
 class StatsTab(QWidget):
     def __init__(self, theme_manager=None):
@@ -23,6 +28,8 @@ class StatsTab(QWidget):
 
         self.setup_individual_tab()
         self.setup_global_tab()
+        self.entries_tab = TrackingEntriesTab(self.log_manager, self.refresh_data)
+        self.tabs.addTab(self.entries_tab, self.tr("Log files"))
         self.refresh_data()
 
     def get_theme_colors(self):
@@ -260,19 +267,23 @@ class StatsTab(QWidget):
             QToolTip.hideText()
 
     def refresh_data(self):
+        selected_app = self.log_manager._extract_process(self.app_combo.currentText())
         self.app_combo.blockSignals(True)
         self.app_combo.clear()
         apps = self.log_manager.get_apps_sorted_by_latest()
         if apps:
             self.app_combo.addItems(apps)
-            self.app_combo.setCurrentIndex(0)
+            current_index = next((index for index, app in enumerate(apps) if self.log_manager._extract_process(app) == selected_app), 0)
+            self.app_combo.setCurrentIndex(current_index)
         self.app_combo.blockSignals(False)
         self.update_graph()
         self.update_global_stats()
+        self.entries_tab.refresh_apps()
 
     def update_graph(self):
         app = self.app_combo.currentText()
         if not app:
+            self.info_label.setText(self.tr("Total Playtime: 0h 0m"))
             self.render_canvas({})
             return
         total_seconds, daily_data = self.log_manager.get_stats_for_app(app)
@@ -319,39 +330,3 @@ class StatsTab(QWidget):
         current_widget = self.tabs.currentWidget()
         if current_widget:
             self.refresh_data()
-
-class BoundedComboBox(QComboBox):
-    """
-    Custom QComboBox with percentage height and scroll bar for game list
-    """
-
-    def __init__(self, parent=None, max_height_ratio=0.7, theme_color_provider=None):
-        super().__init__(parent)
-        self.max_height_ratio = max_height_ratio
-        self.theme_color_provider = theme_color_provider
-        self.setStyleSheet("QComboBox { combobox-popup: 0; }")
-
-    def showPopup(self):
-        top_level = self.window()
-        if top_level is not None and top_level.height() > 0:
-            reference_height = top_level.height()
-        else:
-            screen = QApplication.primaryScreen()
-            reference_height = screen.availableGeometry().height() if screen else 600
-
-        max_popup_height = int(reference_height * self.max_height_ratio)
-        self.setMaxVisibleItems(max(self.count(), 1))
-
-        view = self.view()
-        view.setMaximumHeight(max_popup_height)
-        view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        view.setStyleSheet("""
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
-        popup = view.parentWidget()
-        if popup is not None:
-            popup.setMaximumHeight(max_popup_height)
-
-        super().showPopup()

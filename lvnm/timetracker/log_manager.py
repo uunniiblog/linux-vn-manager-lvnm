@@ -1,8 +1,10 @@
 import os
 import json
 import csv
+import io
 import config
 import logging
+import tempfile
 from pathlib import Path
 from datetime import datetime, timedelta
 from settings_manager import SettingsManager
@@ -60,6 +62,122 @@ class LogManager(QObject):
             
         return self.log_dir / f"{safe_name}.csv"
 
+    def get_sessions(self, app_name):
+        """Return the stored sessions for an app in CSV order."""
+        log_file = self.get_app_file(app_name)
+        if not log_file.exists():
+            return []
+        try:
+            with log_file.open("r", encoding="utf-8", newline="") as file:
+                return list(csv.DictReader(file, delimiter=";"))
+        except (OSError, UnicodeError, csv.Error) as error:
+            raise RuntimeError(f"Could not read tracking sessions: {error}") from error
+
+    def delete_log_file(self, app_name):
+        """Delete an app's complete tracking log and its cached title."""
+        log_file = self.get_app_file(app_name)
+        try:
+            log_file.unlink()
+        except FileNotFoundError as error:
+            raise ValueError("The selected log file no longer exists. Refresh the list and try again.") from error
+        except OSError as error:
+            raise RuntimeError(f"Could not delete tracking log: {error}") from error
+
+        if self.metadata_file.exists():
+            try:
+                cache = json.loads(self.metadata_file.read_text(encoding="utf-8"))
+                if app_name in cache:
+                    del cache[app_name]
+                    self.metadata_file.write_text(json.dumps(cache, indent=4, ensure_ascii=False), encoding="utf-8")
+            except (OSError, ValueError) as error:
+                logger.warning(f"Could not update tracking app cache after deleting log file: {error}")
+
+    def delete_session(self, app_name, row_index, expected_row=None):
+        """Remove one session while preserving every other CSV line exactly."""
+        log_file = self.get_app_file(app_name)
+        try:
+            original = log_file.read_bytes()
+            rows = list(csv.DictReader(io.StringIO(original.decode("utf-8")), delimiter=";"))
+            lines = original.splitlines(keepends=True)
+            if len(lines) != len(rows) + 1:
+                raise ValueError("This log contains multiline records and cannot be safely edited.")
+            if row_index < 0 or row_index >= len(rows) or expected_row is not None and rows[row_index] != expected_row:
+                raise ValueError("The selected session changed. Refresh the list and try again.")
+
+            updated = b"".join(lines[:row_index + 1] + lines[row_index + 2:])
+            with tempfile.NamedTemporaryFile(mode="wb", dir=log_file.parent, prefix=f".{log_file.name}.", delete=False) as temporary:
+                temporary.write(updated)
+                temporary_path = Path(temporary.name)
+            try:
+                os.replace(temporary_path, log_file)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+
+            if self.metadata_file.exists():
+                try:
+                    cache = json.loads(self.metadata_file.read_text(encoding="utf-8"))
+                    if app_name in cache:
+                        remaining_rows = rows[:row_index] + rows[row_index + 1:]
+                        if remaining_rows:
+                            latest = max(remaining_rows, key=lambda row: row.get("Timestamp_End") or "")
+                            cache[app_name]["last_title"] = latest.get("Title") or app_name
+                        else:
+                            del cache[app_name]
+                        self.metadata_file.write_text(json.dumps(cache, indent=4, ensure_ascii=False), encoding="utf-8")
+                except (OSError, ValueError) as error:
+                    logger.warning(f"Could not update tracking app cache after deleting a session: {error}")
+        except (OSError, UnicodeError, csv.Error) as error:
+            raise RuntimeError(f"Could not delete tracking session: {error}") from error
+
+    def update_sessions(self, app_name, changes):
+        """Replace selected CSV rows together while preserving unchanged lines."""
+        if not changes:
+            return
+        log_file = self.get_app_file(app_name)
+        try:
+            original = log_file.read_bytes()
+            rows = list(csv.DictReader(io.StringIO(original.decode("utf-8")), delimiter=";"))
+            lines = original.splitlines(keepends=True)
+            columns = self.header.strip().split(";")
+            if len(lines) != len(rows) + 1:
+                raise ValueError("This log contains multiline records and cannot be safely edited.")
+
+            changed_indices = set()
+            for row_index, expected_row, updated_row in changes:
+                if row_index in changed_indices or row_index < 0 or row_index >= len(rows) or rows[row_index] != expected_row:
+                    raise ValueError("A tracking entry changed. Refresh the list and try again.")
+                if set(updated_row) != set(columns) or updated_row.get("App") != app_name:
+                    raise ValueError("The app column cannot be changed in this log.")
+                if any(not isinstance(value, str) or any(character in value for character in ";\r\n") for value in updated_row.values()):
+                    raise ValueError("Tracking entries cannot contain semicolons or line breaks.")
+                changed_indices.add(row_index)
+
+                original_line = lines[row_index + 1]
+                ending = b"\r\n" if original_line.endswith(b"\r\n") else b"\n" if original_line.endswith(b"\n") else b""
+                content = ";".join(updated_row[column] for column in columns)
+                lines[row_index + 1] = content.encode("utf-8") + ending
+                rows[row_index] = updated_row
+
+            with tempfile.NamedTemporaryFile(mode="wb", dir=log_file.parent, prefix=f".{log_file.name}.", delete=False) as temporary:
+                temporary.write(b"".join(lines))
+                temporary_path = Path(temporary.name)
+            try:
+                os.replace(temporary_path, log_file)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+
+            if self.metadata_file.exists():
+                try:
+                    cache = json.loads(self.metadata_file.read_text(encoding="utf-8"))
+                    if app_name in cache and rows:
+                        latest = max(rows, key=lambda row: row.get("Timestamp_End") or "")
+                        cache[app_name]["last_title"] = latest.get("Title") or app_name
+                        self.metadata_file.write_text(json.dumps(cache, indent=4, ensure_ascii=False), encoding="utf-8")
+                except (OSError, ValueError) as error:
+                    logger.warning(f"Could not update tracking app cache after editing sessions: {error}")
+        except (OSError, UnicodeError, csv.Error) as error:
+            raise RuntimeError(f"Could not update tracking sessions: {error}") from error
+
     def save_session(self, session_data, is_update=False):
         """
         Saves or updates a log entry in the specific app's file.
@@ -92,7 +210,9 @@ class LogManager(QObject):
                     f.write(line)
                 self._update_last_played_cache(app_name, session_data['title'])
             else:
-                self._replace_last_session(log_file, line.encode("utf-8"))
+                appended = self._replace_last_session(log_file, line.encode("utf-8"))
+                if appended:
+                    self._update_last_played_cache(app_name, session_data['title'])
             
             return log_file
         except Exception as e:
@@ -107,7 +227,7 @@ class LogManager(QObject):
             file_size = file.tell()
             if file_size == 0:
                 file.write(line)
-                return
+                return True
             file.seek(file_size - 1)
             has_trailing_newline = file.read(1) == b"\n"
             scan_end = file_size - 1 if has_trailing_newline else file_size
@@ -128,15 +248,20 @@ class LogManager(QObject):
                 if file.read(1) == b"\r":
                     line = line[:-1] + b"\r\n"
 
-            if line_start == 0:
-                # Append the first record
+            file.seek(line_start)
+            previous_line = file.read(file_size - line_start).rstrip(b"\r\n")
+            if line_start == 0 or previous_line.split(b";", 1)[0] != line.split(b";", 1)[0]:
+                # The active session was removed, so append instead of replacing another session.
                 file.seek(0, os.SEEK_END)
                 if not has_trailing_newline:
                     file.write(b"\n")
-            else:
-                file.seek(line_start)
+                file.write(line)
+                return True
+
+            file.seek(line_start)
             file.write(line)
             file.truncate()
+            return False
 
     def get_total_app_playtime(self, app_name):
         """
